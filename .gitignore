@@ -1,0 +1,31 @@
+# Dependencies
+node_modules
+
+# Build output
+out
+dist
+release
+*.tsbuildinfo
+
+# Caches
+.eslintcache
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Editors
+.idea/
+.vscode/
+
+# Claude Code (machine-specific local overrides and run-skill screenshots)
+.claude/settings.local.json
+.claude/skills/*/shots/

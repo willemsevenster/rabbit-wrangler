@@ -1,0 +1,110 @@
+import { useState } from 'react'
+import { useAppStore } from '../store/app-store'
+import { ContextMenu, type MenuItem } from './ContextMenu'
+
+/** VSCode-style menu bar (Connections / Queues / View / Help) in the title bar. */
+export function MenuBar() {
+  const [open, setOpen] = useState<{ index: number; x: number; y: number } | null>(null)
+
+  const openNew = useAppStore((s) => s.openNewConnection)
+  const refreshConnections = useAppStore((s) => s.refreshConnections)
+  const disconnect = useAppStore((s) => s.disconnectConnection)
+  const refreshQueues = useAppStore((s) => s.refreshQueues)
+  const purgeQueue = useAppStore((s) => s.purgeQueue)
+  const selectedConnectionId = useAppStore((s) => s.selectedConnectionId)
+  const selectedQueue = useAppStore((s) => s.selectedQueue)
+  const sidebarVisible = useAppStore((s) => s.sidebarVisible)
+  const toggleSidebar = useAppStore((s) => s.toggleSidebar)
+
+  const menus: { label: string; items: () => MenuItem[] }[] = [
+    {
+      label: 'Connections',
+      items: () => [
+        { label: 'Add Connection…', icon: 'add', onClick: openNew },
+        { label: 'Refresh Connections', icon: 'refresh', onClick: () => void refreshConnections() },
+        { separator: true },
+        {
+          label: 'Disconnect',
+          icon: 'debug-disconnect',
+          disabled: !selectedConnectionId,
+          onClick: () => selectedConnectionId && void disconnect(selectedConnectionId)
+        }
+      ]
+    },
+    {
+      label: 'Queues',
+      items: () => [
+        {
+          label: 'Refresh Queues',
+          icon: 'refresh',
+          disabled: !selectedConnectionId,
+          onClick: () => void refreshQueues()
+        },
+        { separator: true },
+        {
+          label: 'Purge Selected Queue…',
+          icon: 'trash',
+          danger: true,
+          disabled: !selectedQueue,
+          onClick: async () => {
+            if (!selectedQueue) return
+            if (!confirm(`Purge all messages from "${selectedQueue}"? This cannot be undone.`)) {
+              return
+            }
+            const r = await purgeQueue(selectedQueue)
+            if (!r.ok) alert(`Purge failed: ${r.error ?? 'unknown error'}`)
+          }
+        }
+      ]
+    },
+    {
+      label: 'View',
+      items: () => [
+        {
+          label: sidebarVisible ? 'Hide Sidebar' : 'Show Sidebar',
+          icon: 'layout-sidebar-left',
+          onClick: toggleSidebar
+        },
+        { label: 'Reload', icon: 'refresh', onClick: () => location.reload() }
+      ]
+    },
+    {
+      label: 'Help',
+      items: () => [
+        {
+          label: 'About Rabbit Wrangler',
+          icon: 'info',
+          onClick: () => alert('Rabbit Wrangler — RabbitMQ management tool')
+        }
+      ]
+    }
+  ]
+
+  function openAt(index: number, el: HTMLElement) {
+    const r = el.getBoundingClientRect()
+    setOpen({ index, x: r.left, y: r.bottom })
+  }
+
+  return (
+    <div className="menubar">
+      {menus.map((m, i) => (
+        <button
+          key={m.label}
+          className={`menubar__item ${open?.index === i ? 'is-open' : ''}`}
+          onClick={(e) => (open?.index === i ? setOpen(null) : openAt(i, e.currentTarget))}
+          onMouseEnter={(e) => open && open.index !== i && openAt(i, e.currentTarget)}
+        >
+          {m.label}
+        </button>
+      ))}
+      {open && (
+        <ContextMenu
+          x={open.x}
+          y={open.y}
+          items={menus[open.index].items()}
+          onClose={() => setOpen(null)}
+        />
+      )}
+    </div>
+  )
+}

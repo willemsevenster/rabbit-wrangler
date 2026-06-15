@@ -1,0 +1,157 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## What this is
+
+Rabbit Wrangler is an Electron desktop app for operating multiple RabbitMQ
+clusters: non-destructively peeking at live messages, moving messages out of
+dead-letter queues, and purging queues. Stack: electron-vite + React + Vite +
+TypeScript.
+
+## Commands
+
+This project uses **pnpm** (not npm/yarn). Build scripts for `electron` and
+`esbuild` are allow-listed in `pnpm-workspace.yaml` — pnpm blocks postinstall
+scripts by default, and Electron needs its to download the binary.
+
+```sh
+pnpm install         # also downloads the Electron binary via allowed build scripts
+pnpm dev             # launch app with HMR (electron-vite dev)
+pnpm build           # typecheck + bundle all three targets to out/
+pnpm typecheck       # both projects: typecheck:node + typecheck:web
+pnpm lint            # eslint (flat config, eslint.config.mjs)
+pnpm format          # prettier --write
+pnpm build:win       # package installer via electron-builder (also :mac / :linux)
+```
+
+- Typecheck is split because main/preload and renderer have **different libs**:
+  `typecheck:node` (`tsconfig.node.json`, no DOM lib — covers `src/main`,
+  `src/preload`, `src/shared`) and `typecheck:web` (`tsconfig.web.json` — covers
+  `src/renderer`, `src/shared`). `pnpm build` runs both before bundling.
+- **No test runner is configured yet.** If you add tests, wire the script here.
+- To launch and **drive** the app (screenshots, DOM inspection) use the
+  `/run-rabbit-wrangler` skill — REPL driver at
+  `.claude/skills/run-rabbit-wrangler/driver.mjs`.
+
+## Architecture
+
+Three electron-vite targets plus a shared contract bundled into all of them:
+
+- `src/main/` — Electron main process (Node). Owns all RabbitMQ connections.
+- `src/preload/` — context-isolated bridge exposing `window.api`.
+- `src/renderer/` — React UI (Vite). Has **no** Node/broker access; everything
+  goes through `window.api` or the event WebSocket.
+- `src/shared/` — types + IPC contract, imported by all three (keep it free of
+  Node/DOM imports).
+
+### Two transports, deliberately split
+
+This is the central design decision and spans `src/shared/ipc.ts`,
+`src/main/ipc.ts`, `src/main/websocket-server.ts`, `src/main/event-bus.ts`, and
+`src/renderer/src/lib/event-socket.ts`:
+
+1. **IPC `invoke` = commands (request/response).** Channel names and the
+   `RabbitApi` interface live in `src/shared/ipc.ts`. The renderer never touches
+   `ipcRenderer` — it calls `window.api.*` (defined in `src/preload/index.ts`),
+   which maps 1:1 to handlers registered in `src/main/ipc.ts`.
+2. **WebSocket = the event firehose (server push).** Peeked messages arrive at
+   high frequency, so they bypass IPC. Main runs a localhost `WebSocketServer`
+   (`websocket-server.ts`) on an **ephemeral 127.0.0.1 port**; the renderer
+   fetches that port via the `events:port` IPC call, then connects. Anything
+   main wants to push is a `StreamEvent` (discriminated union in `ipc.ts`):
+   producers call `eventBus.emitStream(...)`, the WS server is the sole
+   subscriber and broadcasts to clients. In the renderer, `EventSocket` decodes
+   frames and the zustand store's `applyStreamEvent` reducer folds them in.
+
+### Two RabbitMQ transports per cluster
+
+Each connected cluster (`src/main/connections/cluster-connection.ts`) owns
+**both**:
+
+- **Management HTTP API** (`rabbitmq/management-api.ts`, default port 15672) for
+  the management plane: list queues, read stats, purge. Always available.
+- **AMQP via `amqplib`** (`rabbitmq/amqp.ts`) for the message plane: peek and
+  move. Opened lazily, only when a message operation is first requested.
+
+When adding an operation, decide which plane it belongs to — don't reach for AMQP
+when the management API already exposes it (e.g. purge is an HTTP `DELETE`).
+
+### Key behaviors
+
+- **Peeking is non-destructive and de-duplicated** (`rabbitmq/message-peeker.ts`):
+  a dedicated channel consumes (prefetch `PREFETCH_WINDOW`) with manual ack and
+  `nack(requeue: true)`, so nothing is consumed. Because the broker redelivers
+  requeued messages forever, each message is surfaced to the UI **once** — keyed
+  by a fingerprint (publisher `messageId`, else a hash of body + routing key +
+  correlationId) — and already-seen messages are requeued on a throttle so a
+  static queue doesn't spin in a hot loop. Caveats baked into the file: only the
+  head `PREFETCH_WINDOW` messages are ever visible, and two payload-identical
+  messages without a `messageId` collapse into one row. One peeker per
+  (connection, queue), enforced by `ClusterConnection`. The peek UI
+  (`MessagePeekPanel`) is a message **table**; selecting a row opens a
+  resizable, persisted-height pane (`peekPaneHeight` in localStorage) with the
+  message details (exchange, size, properties, headers — `x-death` broken out
+  for DLQ messages) and the payload in a read-only **Monaco** editor
+  (`MonacoViewer`; workers bundled via Vite `?worker`, so the renderer CSP allows
+  `worker-src 'self' blob:`).
+- **Move = drain + republish with confirms** (`rabbitmq/operations.ts`, UI via
+  the queue context menu → "Move Messages…"): pulls messages one at a time,
+  republishes to the target exchange/routing-key on a **confirm channel**, and
+  only acks the original after `waitForConfirms()`. So a crash mid-move can
+  duplicate but never drop. Publishes are `mandatory` with a `return` listener —
+  an unroutable target (e.g. a typo'd queue on the default exchange) nack-requeues
+  the message and aborts rather than silently discarding it. Like purge, the
+  source queue's peeker is stopped first so its held messages are drainable.
+- **Exchanges** (`management-api.ts` + `components/ExchangeDetail`/`ExchangeDiagram`):
+  listed in the sidebar tree under an "Exchanges" group (queues are under a
+  "Queues" group). The detail view shows **read-only** bindings (management API
+  `/bindings/source`) + an SVG binding diagram (exchange → destinations), a
+  **Publish** dialog (management API publish; reports routed vs. unrouted), and
+  **Delete** (disabled for the default exchange and `amq.*` built-ins). The
+  default exchange is addressed as `amq.default` in API paths.
+- **Connection registry**: `connection-manager.ts` is a singleton mapping
+  connection id → live `ClusterConnection`. All IPC handlers route through
+  `connectionManager.require(id)`. Saved configs live separately in
+  `store/config-store.ts` (electron-store); only currently-connected clusters
+  are in the manager.
+- **Credentials**: `config-store.ts` encrypts passwords with the OS vault
+  (`safeStorage`) before persisting. `list()` returns `SafeConnectionConfig`
+  (no password) — only the main process ever sees plaintext via `get()`. Never
+  send full `ConnectionConfig` to the renderer.
+
+## Conventions & gotchas
+
+- **Extending the API requires touching the contract in lockstep:** add the
+  channel + method to `src/shared/ipc.ts`, implement it in `src/preload/index.ts`,
+  register the handler in `src/main/ipc.ts`, and implement the behavior in
+  `ClusterConnection` / `ConnectionManager`. Missing any layer is a silent gap.
+- **Path aliases** (`@shared/*`, `@renderer/*`) are declared in **two places** —
+  `electron.vite.config.ts` (for bundling) and the tsconfigs (for typecheck).
+  Update both or builds and typecheck disagree.
+- **Module format**: the project is **ESM** (`"type": "module"`). Consequences:
+  main uses `import.meta.dirname` (not `__dirname`), and electron-vite emits the
+  preload as **`out/preload/index.mjs`** — the `BrowserWindow` `preload:` path in
+  `src/main/index.ts` must use the `.mjs` extension or Electron won't find it.
+  `externalizeDepsPlugin` keeps `dependencies` external for main/preload (Node
+  resolves them at runtime — hence `node-linker=hoisted` in `.npmrc`); the
+  renderer bundles everything.
+- **Dependency version ceilings** (don't blindly `pnpm up --latest` past these —
+  the chain breaks):
+  - `vite` is capped at **7.x** by `electron-vite` 5 (its peer is `vite <8`).
+  - `@vitejs/plugin-react` is capped at **5.x** because 6.x requires Vite 8.
+  - `eslint` is capped at **9.x** because `eslint-plugin-react` (latest 7.37)
+    crashes on ESLint 10 (removed context API). Revisit when that plugin ships
+    ESLint 10 support.
+  - `amqplib` 2.x ships its **own** types — there is no `@types/amqplib` (adding
+    it back will conflict).
+  - pnpm blocks dependency build scripts by default; `electron`, `esbuild`, and
+    `electron-winstaller` are allow-listed in `pnpm-workspace.yaml`. A new dep
+    that needs a postinstall (e.g. a native module) must be added there.
+- The preload's `contextIsolation: false` fallback branch references `window`,
+  which isn't in the node typecheck lib — hence the `@ts-expect-error` lines.
+  That branch is dead in this app (isolation is on); don't "fix" it by removing
+  the suppressions.
+- **Security**: `contextIsolation` is on; `src/renderer/index.html` sets a CSP
+  that only allows `connect-src` to self and `ws://127.0.0.1:*`. Widen it
+  deliberately if you add outbound calls from the renderer.

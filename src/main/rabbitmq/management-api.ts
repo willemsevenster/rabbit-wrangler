@@ -1,0 +1,199 @@
+import type {
+  BindingInfo,
+  ConnectionConfig,
+  ExchangeInfo,
+  OperationResult,
+  PublishMessageRequest,
+  QueueInfo
+} from '@shared/types'
+
+/** Names matching this are flagged as dead-letter queues in the UI. */
+const DLQ_PATTERN = /(\.dlq|\.dead|_dlq|deadletter)$/i
+
+/** The complete set of AMQP basic message properties RabbitMQ accepts on publish. */
+const VALID_PROPERTIES = new Set([
+  'content_type',
+  'content_encoding',
+  'priority',
+  'delivery_mode',
+  'correlation_id',
+  'reply_to',
+  'expiration',
+  'message_id',
+  'timestamp',
+  'type',
+  'user_id',
+  'app_id',
+  'cluster_id'
+])
+
+/**
+ * Thin client over the RabbitMQ Management HTTP API (the `rabbitmq_management`
+ * plugin, default port 15672). Used for everything that is a management-plane
+ * concept rather than a message operation: listing queues, stats, purging.
+ *
+ * Message-level work (peek, move) goes over AMQP instead — see message-peeker
+ * and operations.
+ */
+export class ManagementApi {
+  private readonly baseUrl: string
+  private readonly authHeader: string
+  private readonly vhost: string
+
+  constructor(config: ConnectionConfig) {
+    const scheme = config.tls ? 'https' : 'http'
+    this.baseUrl = `${scheme}://${config.host}:${config.managementPort}/api`
+    this.authHeader =
+      'Basic ' + Buffer.from(`${config.username}:${config.password}`).toString('base64')
+    this.vhost = config.vhost
+  }
+
+  /** Encodes a vhost for use in a path segment ("/" -> "%2F"). */
+  private vhostSegment(): string {
+    return encodeURIComponent(this.vhost)
+  }
+
+  private async request<T>(path: string, init?: RequestInit): Promise<T> {
+    const res = await fetch(`${this.baseUrl}${path}`, {
+      ...init,
+      headers: { authorization: this.authHeader, 'content-type': 'application/json', ...init?.headers }
+    })
+    if (!res.ok) {
+      throw new Error(`Management API ${init?.method ?? 'GET'} ${path} failed: ${res.status} ${res.statusText}`)
+    }
+    // Some endpoints (purge) return 204 with no body.
+    const text = await res.text()
+    return (text ? JSON.parse(text) : undefined) as T
+  }
+
+  /** Cheap reachability + auth probe used on connect. */
+  async ping(): Promise<void> {
+    await this.request('/whoami')
+  }
+
+  async listQueues(): Promise<QueueInfo[]> {
+    const raw = await this.request<RawQueue[]>(`/queues/${this.vhostSegment()}`)
+    return raw.map((q) => ({
+      name: q.name,
+      vhost: q.vhost,
+      durable: q.durable,
+      state: q.state ?? 'unknown',
+      messages: q.messages ?? 0,
+      messagesReady: q.messages_ready ?? 0,
+      messagesUnacknowledged: q.messages_unacknowledged ?? 0,
+      consumers: q.consumers ?? 0,
+      isDeadLetter: DLQ_PATTERN.test(q.name)
+    }))
+  }
+
+  async purgeQueue(queue: string): Promise<OperationResult> {
+    try {
+      const before = await this.request<RawQueue>(
+        `/queues/${this.vhostSegment()}/${encodeURIComponent(queue)}`
+      )
+      await this.request<void>(
+        `/queues/${this.vhostSegment()}/${encodeURIComponent(queue)}/contents`,
+        { method: 'DELETE' }
+      )
+      return { ok: true, affected: before.messages ?? 0 }
+    } catch (err) {
+      return { ok: false, affected: 0, error: err instanceof Error ? err.message : String(err) }
+    }
+  }
+
+  /** Path segment for an exchange — the default ("") is addressed as amq.default. */
+  private exchangeSegment(name: string): string {
+    return encodeURIComponent(name === '' ? 'amq.default' : name)
+  }
+
+  async listExchanges(): Promise<ExchangeInfo[]> {
+    const raw = await this.request<RawExchange[]>(`/exchanges/${this.vhostSegment()}`)
+    return raw.map((x) => ({
+      name: x.name,
+      vhost: x.vhost,
+      type: x.type,
+      durable: x.durable,
+      autoDelete: x.auto_delete ?? false,
+      internal: x.internal ?? false
+    }))
+  }
+
+  async listExchangeBindings(exchange: string): Promise<BindingInfo[]> {
+    const raw = await this.request<RawBinding[]>(
+      `/exchanges/${this.vhostSegment()}/${this.exchangeSegment(exchange)}/bindings/source`
+    )
+    return raw.map((b) => ({
+      source: b.source,
+      destination: b.destination,
+      destinationType: b.destination_type === 'exchange' ? 'exchange' : 'queue',
+      routingKey: b.routing_key,
+      arguments: b.arguments ?? {}
+    }))
+  }
+
+  async deleteExchange(exchange: string): Promise<OperationResult> {
+    try {
+      await this.request<void>(
+        `/exchanges/${this.vhostSegment()}/${this.exchangeSegment(exchange)}`,
+        { method: 'DELETE' }
+      )
+      return { ok: true, affected: 1 }
+    } catch (err) {
+      return { ok: false, affected: 0, error: err instanceof Error ? err.message : String(err) }
+    }
+  }
+
+  async publishMessage(req: PublishMessageRequest): Promise<OperationResult> {
+    try {
+      // Invalid properties are ignored (only the known AMQP basic properties pass).
+      const properties: Record<string, unknown> = {}
+      for (const [key, value] of Object.entries(req.properties)) {
+        if (VALID_PROPERTIES.has(key)) properties[key] = value
+      }
+      if (Object.keys(req.headers).length > 0) properties.headers = req.headers
+      const result = await this.request<{ routed: boolean }>(
+        `/exchanges/${this.vhostSegment()}/${this.exchangeSegment(req.exchange)}/publish`,
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            properties,
+            routing_key: req.routingKey,
+            payload: req.payload,
+            payload_encoding: req.payloadEncoding
+          })
+        }
+      )
+      return { ok: true, affected: result.routed ? 1 : 0 }
+    } catch (err) {
+      return { ok: false, affected: 0, error: err instanceof Error ? err.message : String(err) }
+    }
+  }
+}
+
+interface RawQueue {
+  name: string
+  vhost: string
+  durable: boolean
+  state?: string
+  messages?: number
+  messages_ready?: number
+  messages_unacknowledged?: number
+  consumers?: number
+}
+
+interface RawExchange {
+  name: string
+  vhost: string
+  type: string
+  durable: boolean
+  auto_delete?: boolean
+  internal?: boolean
+}
+
+interface RawBinding {
+  source: string
+  destination: string
+  destination_type?: string
+  routing_key: string
+  arguments?: Record<string, unknown>
+}

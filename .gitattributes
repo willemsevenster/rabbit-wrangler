@@ -1,0 +1,12 @@
+# Normalize line endings: store text as LF in the repo, check out LF on all
+# platforms. Keeps a cross-platform (win/mac/linux) build consistent.
+* text=auto eol=lf
+
+# Lockfile is generated; collapse diffs in review.
+pnpm-lock.yaml linguist-generated=true
+
+# Binary assets.
+*.png binary
+*.jpg binary
+*.ico binary
+*.icns binary

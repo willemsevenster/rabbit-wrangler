@@ -1,0 +1,9 @@
+# Allow these dependencies to run install/build scripts (pnpm blocks them by
+# default since v10). Electron downloads its binary here; esbuild installs its
+# native binary; electron-winstaller fetches its Windows installer tooling.
+# Without this, a fresh `pnpm install` leaves Electron with no binary and
+# electron-vite fails to start with "Error: Electron uninstall".
+onlyBuiltDependencies:
+  - electron
+  - electron-winstaller
+  - esbuild
