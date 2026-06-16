@@ -139,6 +139,18 @@ const COMMANDS = {
     console.log('vdrag', sel, dy)
   },
 
+  // dnd <srcSelector> <dstSelector> — HTML5 drag-and-drop from src onto dst.
+  async dnd(rest) {
+    if (!page) return console.log('ERROR: launch first')
+    const [src, dst] = rest.split(/\s+/)
+    try {
+      await page.dragAndDrop(src, dst)
+      console.log('dnd', src, '->', dst, '→ OK')
+    } catch (e) {
+      console.log('dnd', src, '->', dst, '→', e.message)
+    }
+  },
+
   // hover <selector> — move the real pointer over the element (triggers :hover).
   async hover(sel) {
     if (!page) return console.log('ERROR: launch first')

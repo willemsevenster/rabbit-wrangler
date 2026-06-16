@@ -553,6 +553,11 @@ body.resizing {
   box-shadow: inset 0 1px 0 var(--focus-border);
 }
 
+/* drop-target indicator while dragging a tab to reorder */
+.tab.is-dragover {
+  box-shadow: inset 2px 0 0 var(--focus-border);
+}
+
 .tab__icon {
   display: inline-flex;
   align-items: center;
@@ -826,11 +831,23 @@ body.resizing-v {
 }
 
 .msg-detail__meta {
-  flex: 0 0 320px;
+  flex: 0 0 auto;
   overflow: auto;
   padding: 10px 12px;
-  border-right: 1px solid var(--border);
   user-select: text;
+}
+
+/* draggable divider between the properties column and the payload editor */
+.msg-detail__resizer {
+  flex: 0 0 auto;
+  width: 6px;
+  cursor: col-resize;
+  background: var(--border);
+}
+
+.msg-detail__resizer:hover,
+body.resizing .msg-detail__resizer {
+  background: var(--focus-border);
 }
 
 .msg-detail__payload {
@@ -1189,6 +1206,7 @@ body.resizing-v {
   position: fixed;
   z-index: 1000;
   min-width: 200px;
+  max-width: 340px;
   background: #252526;
   border: 1px solid #454545;
   border-radius: 5px;
@@ -1241,6 +1259,26 @@ body.resizing-v {
 
 .context-menu__label {
   flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* right-aligned count badge in a menu row (matches the tab badge) */
+.context-menu__badge {
+  flex: 0 0 auto;
+  margin-left: 8px;
+  min-width: 16px;
+  height: 15px;
+  padding: 0 5px;
+  border-radius: 8px;
+  background: var(--button-bg);
+  color: #ffffff;
+  font-size: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .context-menu__sep {

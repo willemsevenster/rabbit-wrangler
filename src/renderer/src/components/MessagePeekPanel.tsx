@@ -196,10 +196,29 @@ function MessageDetailPane({ message: m }: { message: PeekedMessage }) {
   const props = propertyRows(m.properties)
   const deaths = deathRecords(m.headers)
   const otherHeaders = Object.entries(m.headers).filter(([k]) => k !== 'x-death')
+  const metaWidth = useAppStore((s) => s.detailMetaWidth)
+  const setMetaWidth = useAppStore((s) => s.setDetailMetaWidth)
+  const detailRef = useRef<HTMLDivElement>(null)
+
+  function onMetaResize(e: MouseEvent) {
+    e.preventDefault()
+    const onMove = (ev: globalThis.MouseEvent) => {
+      const rect = detailRef.current?.getBoundingClientRect()
+      if (rect) setMetaWidth(ev.clientX - rect.left)
+    }
+    const onUp = () => {
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+      document.body.classList.remove('resizing')
+    }
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+    document.body.classList.add('resizing')
+  }
 
   return (
-    <div className="msg-detail">
-      <div className="msg-detail__meta">
+    <div className="msg-detail" ref={detailRef}>
+      <div className="msg-detail__meta" style={{ width: metaWidth }}>
         <div className="peek-item__summary">
           <span>
             Exchange: <code>{m.exchange || '(default)'}</code>
@@ -270,6 +289,8 @@ function MessageDetailPane({ message: m }: { message: PeekedMessage }) {
           </>
         )}
       </div>
+
+      <div className="msg-detail__resizer" onMouseDown={onMetaResize} role="separator" />
 
       <div className="msg-detail__payload">
         <div className="peek-item__section" style={{ margin: '0 0 6px' }}>

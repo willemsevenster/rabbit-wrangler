@@ -85,6 +85,8 @@ interface AppState {
   sidebarVisible: boolean
   /** Persisted height of the message-detail pane in the peek view. */
   peekPaneHeight: number
+  /** Persisted width of the properties column in the message-detail pane. */
+  detailMetaWidth: number
 
   init(): Promise<void>
   refreshConnections(): Promise<void>
@@ -99,6 +101,10 @@ interface AppState {
   openExchangeTab(connectionId: string, exchange: string): Promise<void>
   setActiveTab(id: string): void
   closeTab(id: string): void
+  closeAllTabs(): void
+  closeTabsToRight(id: string): void
+  moveTab(id: string, to: 'left' | 'right' | 'start' | 'end'): void
+  reorderTab(id: string, toIndex: number): void
   refreshTab(id: string): Promise<void>
   selectTabMessage(tabId: string, messageId: string | null): void
 
@@ -119,6 +125,7 @@ interface AppState {
   setSidebarWidth(width: number): void
   toggleSidebar(): void
   setPeekPaneHeight(height: number): void
+  setDetailMetaWidth(width: number): void
 
   openNewConnection(): void
   editConnection(connection: SafeConnectionConfig): void
@@ -146,6 +153,12 @@ const clampPaneHeight = (h: number): number =>
   Math.min(PEEK_PANE_MAX, Math.max(PEEK_PANE_MIN, Math.round(h)))
 const initialPeekPaneHeight = clampPaneHeight(Number(localStorage.getItem('rw.peekPaneHeight')) || 260)
 
+const DETAIL_META_MIN = 160
+const DETAIL_META_MAX = 640
+const clampMetaWidth = (w: number): number =>
+  Math.min(DETAIL_META_MAX, Math.max(DETAIL_META_MIN, Math.round(w)))
+const initialDetailMetaWidth = clampMetaWidth(Number(localStorage.getItem('rw.detailMetaWidth')) || 320)
+
 export const useAppStore = create<AppState>((set, get) => ({
   connections: [],
   statuses: {},
@@ -164,6 +177,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   sidebarWidth: initialSidebarWidth,
   sidebarVisible: true,
   peekPaneHeight: initialPeekPaneHeight,
+  detailMetaWidth: initialDetailMetaWidth,
 
   async init() {
     if (initialized) return
@@ -297,8 +311,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     const { tabs, activeTabId } = get()
     const idx = tabs.findIndex((t) => t.id === id)
     if (idx === -1) return
-    const tab = tabs[idx]
-    if (tab.kind === 'queue') void window.api.stopPeek(tab.connectionId, tab.queue)
+    stopTabPeek(tabs[idx])
     const remaining = tabs.filter((t) => t.id !== id)
     let nextActive = activeTabId
     if (activeTabId === id) {
@@ -306,6 +319,45 @@ export const useAppStore = create<AppState>((set, get) => ({
       nextActive = neighbor ? neighbor.id : null
     }
     set({ tabs: remaining, activeTabId: nextActive })
+  },
+
+  closeAllTabs() {
+    for (const t of get().tabs) stopTabPeek(t)
+    set({ tabs: [], activeTabId: null })
+  },
+
+  closeTabsToRight(id) {
+    const { tabs, activeTabId } = get()
+    const idx = tabs.findIndex((t) => t.id === id)
+    if (idx === -1) return
+    for (const t of tabs.slice(idx + 1)) stopTabPeek(t)
+    const remaining = tabs.slice(0, idx + 1)
+    set({
+      tabs: remaining,
+      // If the active tab was one of those closed, fall back to the anchor tab.
+      activeTabId: remaining.some((t) => t.id === activeTabId) ? activeTabId : id
+    })
+  },
+
+  moveTab(id, to) {
+    const tabs = get().tabs
+    const i = tabs.findIndex((t) => t.id === id)
+    if (i === -1) return
+    const target =
+      to === 'left' ? i - 1 : to === 'right' ? i + 1 : to === 'start' ? 0 : tabs.length - 1
+    get().reorderTab(id, target)
+  },
+
+  reorderTab(id, toIndex) {
+    const current = get().tabs
+    const from = current.findIndex((t) => t.id === id)
+    if (from === -1) return
+    const target = Math.max(0, Math.min(toIndex, current.length - 1))
+    if (from === target) return
+    const next = [...current]
+    const [moved] = next.splice(from, 1)
+    next.splice(target, 0, moved)
+    set({ tabs: next })
   },
 
   async refreshTab(id) {
@@ -490,6 +542,12 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ peekPaneHeight: h })
   },
 
+  setDetailMetaWidth(width) {
+    const w = clampMetaWidth(width)
+    localStorage.setItem('rw.detailMetaWidth', String(w))
+    set({ detailMetaWidth: w })
+  },
+
   openNewConnection() {
     set({ dialogOpen: true, editing: null })
   },
@@ -516,6 +574,11 @@ export const useAppStore = create<AppState>((set, get) => ({
   }
 }))
 
+/** Stop the broker-side peeker backing a queue tab (no-op for other kinds). */
+function stopTabPeek(tab: EditorTab): void {
+  if (tab.kind === 'queue') void window.api.stopPeek(tab.connectionId, tab.queue)
+}
+
 /** Reset a queue tab's accumulated context (peeks/unread/selection). */
 function clearQueueTab(tabs: EditorTab[], tabId: string): EditorTab[] {
   return tabs.map((t) =>
@@ -534,9 +597,7 @@ function closeTabsFor(
 ): void {
   const { tabs, activeTabId } = get()
   for (const t of tabs) {
-    if (t.connectionId === connectionId && t.kind === 'queue') {
-      void window.api.stopPeek(t.connectionId, t.queue)
-    }
+    if (t.connectionId === connectionId) stopTabPeek(t)
   }
   const remaining = tabs.filter((t) => t.connectionId !== connectionId)
   const activeAlive = remaining.some((t) => t.id === activeTabId)
