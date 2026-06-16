@@ -7,3 +7,7 @@ onlyBuiltDependencies:
   - electron
   - electron-winstaller
   - esbuild
+# Force a patched dompurify everywhere it appears transitively (monaco-editor
+# pulls in an older line with published advisories). Pinned to the latest 3.x.
+overrides:
+  dompurify: ^3.4.9
