@@ -160,6 +160,7 @@ function ConnectionChildren({
   openMenu: OpenMenu
 }) {
   const state = useAppStore((s) => s.statuses[connectionId]?.state)
+  const error = useAppStore((s) => s.statuses[connectionId]?.error)
   const queues = useAppStore((s) => s.queuesByConn[connectionId]) ?? []
   const exchanges = useAppStore((s) => s.exchangesByConn[connectionId]) ?? []
   const queuesCollapsed = useAppStore((s) => s.queuesCollapsed)
@@ -168,7 +169,15 @@ function ConnectionChildren({
   const toggleExchanges = useAppStore((s) => s.toggleExchangesCollapsed)
 
   if (state === 'error') {
-    return <div className="tree__empty" style={{ paddingLeft: 30 }}>Failed to connect.</div>
+    return (
+      <div className="tree__error" style={{ paddingLeft: 30 }}>
+        <div className="tree__error-title">
+          <span className="codicon codicon-error" />
+          Failed to connect
+        </div>
+        {error && <div className="tree__error-detail">{error}</div>}
+      </div>
+    )
   }
   if (state !== 'connected') {
     return <div className="tree__empty" style={{ paddingLeft: 30 }}>Loading…</div>

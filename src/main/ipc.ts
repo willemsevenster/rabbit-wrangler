@@ -1,4 +1,4 @@
-import { ipcMain } from 'electron'
+import { app, ipcMain } from 'electron'
 import { IPC } from '@shared/ipc'
 import { configStore } from './store/config-store'
 import { connectionManager } from './connections/connection-manager'
@@ -67,4 +67,6 @@ export function registerIpcHandlers(): void {
   )
 
   ipcMain.handle(IPC.getEventStreamPort, () => eventStreamServer.getPort())
+
+  ipcMain.handle(IPC.quitApp, () => app.quit())
 }

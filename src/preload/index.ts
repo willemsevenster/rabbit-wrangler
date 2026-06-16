@@ -40,6 +40,8 @@ const api: RabbitApi = {
 
   getEventStreamPort: () => ipcRenderer.invoke(IPC.getEventStreamPort),
 
+  quitApp: () => ipcRenderer.invoke(IPC.quitApp),
+
   copyText: (text: string) => clipboard.writeText(text)
 }
 

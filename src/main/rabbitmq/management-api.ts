@@ -54,12 +54,27 @@ export class ManagementApi {
   }
 
   private async request<T>(path: string, init?: RequestInit): Promise<T> {
-    const res = await fetch(`${this.baseUrl}${path}`, {
-      ...init,
-      headers: { authorization: this.authHeader, 'content-type': 'application/json', ...init?.headers }
-    })
+    const method = init?.method ?? 'GET'
+    const url = `${this.baseUrl}${path}`
+
+    let res: Response
+    try {
+      res = await fetch(url, {
+        ...init,
+        headers: {
+          authorization: this.authHeader,
+          'content-type': 'application/json',
+          ...init?.headers
+        }
+      })
+    } catch (err) {
+      // Network-level failure (host down, wrong port, DNS, TLS) — fetch rejects
+      // before any HTTP status. Dig the OS error code out of the cause for a hint.
+      throw new Error(describeNetworkError(err, method, url))
+    }
+
     if (!res.ok) {
-      throw new Error(`Management API ${init?.method ?? 'GET'} ${path} failed: ${res.status} ${res.statusText}`)
+      throw new Error(await describeHttpError(res, method, path))
     }
     // Some endpoints (purge) return 204 with no body.
     const text = await res.text()
@@ -168,6 +183,76 @@ export class ManagementApi {
       return { ok: false, affected: 0, error: err instanceof Error ? err.message : String(err) }
     }
   }
+}
+
+/** Human hint for a Node/undici socket error code. */
+function hintForCode(code: string): string {
+  switch (code) {
+    case 'ECONNREFUSED':
+      return ' — nothing is listening there. Check the host and management port (default 15672) and that the rabbitmq_management plugin is enabled.'
+    case 'ENOTFOUND':
+    case 'EAI_AGAIN':
+      return ' — host could not be resolved. Check the hostname.'
+    case 'ETIMEDOUT':
+    case 'UND_ERR_CONNECT_TIMEOUT':
+      return ' — connection timed out. Check the host/port and any firewall between you and the broker.'
+    case 'ECONNRESET':
+      return ' — the connection was reset. If the broker uses TLS, enable the TLS option (https).'
+    case 'CERT_HAS_EXPIRED':
+    case 'DEPTH_ZERO_SELF_SIGNED_CERT':
+    case 'SELF_SIGNED_CERT_IN_CHAIN':
+    case 'UNABLE_TO_VERIFY_LEAF_SIGNATURE':
+      return ' — the TLS certificate could not be verified.'
+    default:
+      return ''
+  }
+}
+
+/** Build a detailed message for a fetch() that rejected before any HTTP response. */
+function describeNetworkError(err: unknown, method: string, url: string): string {
+  const cause =
+    err && typeof err === 'object' && 'cause' in err
+      ? (err as { cause?: unknown }).cause
+      : undefined
+  const code =
+    cause && typeof cause === 'object' && 'code' in cause
+      ? String((cause as { code?: unknown }).code)
+      : undefined
+  const causeMsg =
+    cause instanceof Error ? cause.message : err instanceof Error ? err.message : String(err)
+  // `code` already conveys the failure for the common cases (ECONNREFUSED has an
+  // empty message); only append causeMsg when it adds something.
+  const detail = [code, causeMsg].filter(Boolean).join(': ') || 'connection failed'
+  return `Cannot reach the RabbitMQ management API (${method} ${url}): ${detail}${code ? hintForCode(code) : ''}`
+}
+
+/** Build a detailed message for a non-2xx HTTP response, including the broker's reason. */
+async function describeHttpError(res: Response, method: string, path: string): Promise<string> {
+  let reason = ''
+  try {
+    const text = await res.text()
+    if (text) {
+      try {
+        const json = JSON.parse(text) as { error?: unknown; reason?: unknown }
+        const parts = [json.error, json.reason].filter(Boolean).map(String)
+        reason = parts.join(': ') || text
+      } catch {
+        reason = text
+      }
+    }
+  } catch {
+    // ignore body read failures
+  }
+  const hint =
+    res.status === 401
+      ? ' — check the username and password.'
+      : res.status === 403
+        ? ' — the user lacks permission for this virtual host or resource.'
+        : res.status === 404
+          ? ' — not found; check the virtual host and resource name.'
+          : ''
+  const base = `Management API ${method} ${path} failed: ${res.status} ${res.statusText}${hint}`
+  return reason ? `${base} (${reason.trim()})` : base
 }
 
 interface RawQueue {

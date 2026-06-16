@@ -1,12 +1,21 @@
+import { useEffect, useRef, useState } from 'react'
 import { useAppStore, type EditorTab } from '../store/app-store'
 import { QueueTable } from './QueueTable'
 import { MessagePeekPanel } from './MessagePeekPanel'
 import { ExchangeDetail } from './ExchangeDetail'
+import { ContextMenu, type MenuItem } from './ContextMenu'
 
 const TAB_ICON: Record<EditorTab['kind'], string> = {
   overview: 'codicon-database',
   queue: 'codicon-inbox',
   exchange: 'codicon-symbol-namespace'
+}
+
+/** Same icons, bare names, for the context-menu (overflow) list. */
+const TAB_MENU_ICON: Record<EditorTab['kind'], string> = {
+  overview: 'database',
+  queue: 'inbox',
+  exchange: 'symbol-namespace'
 }
 
 /**
@@ -39,50 +48,107 @@ function TabBar() {
   const activeTabId = useAppStore((s) => s.activeTabId)
   const setActiveTab = useAppStore((s) => s.setActiveTab)
   const closeTab = useAppStore((s) => s.closeTab)
+  const stripRef = useRef<HTMLDivElement>(null)
+  const [overflow, setOverflow] = useState<{ x: number; y: number } | null>(null)
+
+  // Keep the active tab scrolled into view (e.g. after picking it from the overflow menu).
+  useEffect(() => {
+    const strip = stripRef.current
+    if (!strip || !activeTabId) return
+    const el = [...strip.querySelectorAll('[data-tab]')].find(
+      (n) => n.getAttribute('data-tab') === activeTabId
+    )
+    el?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+  }, [activeTabId])
+
+  // Right-align the dropdown under the chevron (ContextMenu positions by its left edge).
+  function openOverflow(el: HTMLElement) {
+    const r = el.getBoundingClientRect()
+    setOverflow({ x: Math.max(4, r.right - 240), y: r.bottom })
+  }
+
+  const overflowItems: MenuItem[] = tabs.map((t) => {
+    const unread = t.kind === 'queue' && t.unread > 0 ? `  (${t.unread})` : ''
+    return {
+      label: `${t.title}${unread}`,
+      icon: TAB_MENU_ICON[t.kind],
+      onClick: () => setActiveTab(t.id)
+    }
+  })
 
   return (
-    <div className="tabbar" role="tablist">
-      {tabs.map((t) => {
-        const isActive = t.id === activeTabId
-        const unread = t.kind === 'queue' ? t.unread : 0
-        return (
-          <div
-            key={t.id}
-            className={`tab ${isActive ? 'is-active' : ''}`}
-            data-tab={t.id}
-            title={t.title}
-            role="tab"
-            aria-selected={isActive}
-            onClick={() => setActiveTab(t.id)}
-            onAuxClick={(e) => {
-              if (e.button === 1) {
-                e.preventDefault()
-                closeTab(t.id)
-              }
-            }}
-          >
-            <span className="tab__icon">
-              <span className={`codicon ${TAB_ICON[t.kind]}`} />
-            </span>
-            <span className="tab__label">{t.title}</span>
-            <span className="tab__trailing">
-              {unread > 0 && !isActive && (
-                <span className="tab__badge">{unread > 99 ? '99+' : unread}</span>
-              )}
-              <button
-                className="tab__close"
-                title="Close tab"
-                onClick={(e) => {
-                  e.stopPropagation()
+    <div className="tabbar">
+      <div
+        className="tabbar__tabs"
+        ref={stripRef}
+        role="tablist"
+        onWheel={(e) => {
+          // Translate vertical wheel into horizontal tab scrolling.
+          if (e.deltaY !== 0 && stripRef.current) stripRef.current.scrollLeft += e.deltaY
+        }}
+      >
+        {tabs.map((t) => {
+          const isActive = t.id === activeTabId
+          const unread = t.kind === 'queue' ? t.unread : 0
+          return (
+            <div
+              key={t.id}
+              className={`tab ${isActive ? 'is-active' : ''}`}
+              data-tab={t.id}
+              title={t.title}
+              role="tab"
+              aria-selected={isActive}
+              onClick={() => setActiveTab(t.id)}
+              onAuxClick={(e) => {
+                if (e.button === 1) {
+                  e.preventDefault()
                   closeTab(t.id)
-                }}
-              >
-                <span className="codicon codicon-close" />
-              </button>
-            </span>
-          </div>
-        )
-      })}
+                }
+              }}
+            >
+              <span className="tab__icon">
+                <span className={`codicon ${TAB_ICON[t.kind]}`} />
+              </span>
+              <span className="tab__label">{t.title}</span>
+              <span className="tab__trailing">
+                {unread > 0 && !isActive && (
+                  <span className="tab__badge">{unread > 99 ? '99+' : unread}</span>
+                )}
+                <button
+                  className="tab__close"
+                  title="Close tab"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    closeTab(t.id)
+                  }}
+                >
+                  <span className="codicon codicon-close" />
+                </button>
+              </span>
+            </div>
+          )
+        })}
+      </div>
+
+      {tabs.length > 0 && (
+        <button
+          className="tabbar__overflow"
+          title="Show all tabs"
+          aria-label="Show all open tabs"
+          onClick={(e) => (overflow ? setOverflow(null) : openOverflow(e.currentTarget))}
+        >
+          <span className="codicon codicon-chevron-down" />
+        </button>
+      )}
+
+      {overflow && (
+        <ContextMenu
+          x={overflow.x}
+          y={overflow.y}
+          items={overflowItems}
+          onClose={() => setOverflow(null)}
+        />
+      )}
     </div>
   )
 }

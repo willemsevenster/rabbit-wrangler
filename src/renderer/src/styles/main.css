@@ -426,6 +426,35 @@ body.resizing {
   line-height: 1.5;
 }
 
+.tree__error {
+  padding: 8px 20px 10px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.tree__error-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--error);
+  font-weight: 600;
+}
+
+.tree__error-title .codicon {
+  font-size: 14px;
+}
+
+/* Selectable so the operator can copy the full message for troubleshooting. */
+.tree__error-detail {
+  margin-top: 4px;
+  color: var(--text-muted);
+  white-space: pre-wrap;
+  word-break: break-word;
+  user-select: text;
+  font-family: 'Cascadia Code', ui-monospace, monospace;
+  font-size: 11px;
+}
+
 /* ---------- editor area ---------- */
 .editor {
   background: var(--editor-bg);
@@ -457,12 +486,45 @@ body.resizing {
   height: 35px;
   background: var(--sidebar-bg);
   border-bottom: 1px solid var(--border);
+  overflow: hidden;
+}
+
+/* the scrollable strip of tabs (the chevron button sits outside it, always visible) */
+.tabbar__tabs {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: stretch;
   overflow-x: auto;
   overflow-y: hidden;
 }
 
-.tabbar::-webkit-scrollbar {
+.tabbar__tabs::-webkit-scrollbar {
   height: 3px;
+}
+
+.tabbar__tabs::-webkit-scrollbar-thumb {
+  background: var(--panel-border);
+}
+
+/* overflow / "show all tabs" dropdown button, pinned at the end of the bar */
+.tabbar__overflow {
+  flex: 0 0 auto;
+  width: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--sidebar-bg);
+  border: none;
+  border-left: 1px solid var(--border);
+  color: var(--text);
+}
+
+.tabbar__overflow:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.tabbar__overflow .codicon {
+  font-size: 16px;
 }
 
 .tab {

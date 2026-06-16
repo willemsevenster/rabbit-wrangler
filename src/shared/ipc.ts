@@ -46,7 +46,10 @@ export const IPC = {
   moveMessages: 'messages:move',
 
   // event stream bootstrap
-  getEventStreamPort: 'events:port'
+  getEventStreamPort: 'events:port',
+
+  // app lifecycle
+  quitApp: 'app:quit'
 } as const
 
 /** The API surface the preload exposes on `window.api`. */
@@ -72,6 +75,9 @@ export interface RabbitApi {
 
   /** Port of the localhost WebSocket carrying the live event stream. */
   getEventStreamPort(): Promise<number>
+
+  /** Quit the whole application. */
+  quitApp(): Promise<void>
 
   /** Write text to the system clipboard. Handled in the preload — no IPC. */
   copyText(text: string): void

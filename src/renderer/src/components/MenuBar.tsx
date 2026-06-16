@@ -30,7 +30,9 @@ export function MenuBar() {
           icon: 'debug-disconnect',
           disabled: !selectedConnectionId,
           onClick: () => selectedConnectionId && void disconnect(selectedConnectionId)
-        }
+        },
+        { separator: true },
+        { label: 'Exit', icon: 'sign-out', onClick: () => void window.api.quitApp() }
       ]
     },
     {

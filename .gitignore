@@ -10,6 +10,9 @@ release
 # Caches
 .eslintcache
 
+# Icon generator scratch log (build/icon.png + icon.svg are committed)
+build/_iconlog.txt
+
 # Logs
 *.log
 

@@ -164,6 +164,11 @@ when the management API already exposes it (e.g. purge is an HTTP `DELETE`).
   which isn't in the node typecheck lib — hence the `@ts-expect-error` lines.
   That branch is dead in this app (isolation is on); don't "fix" it by removing
   the suppressions.
+- **App icon**: the source of truth is `build/icon.svg`. Regenerate the raster
+  with `node_modules/.bin/electron scripts/generate-icon.mjs` → `build/icon.png`
+  (512×512; the script uses Electron's offscreen renderer with HW accel disabled
+  to dodge `UnknownVizError`). electron-builder derives the platform `.ico`/`.icns`
+  from `build/icon.png`; the dev `BrowserWindow` sets `icon` to it directly.
 - **Security**: `contextIsolation` is on; `src/renderer/index.html` sets a CSP
   that only allows `connect-src` to self and `ws://127.0.0.1:*`. Widen it
   deliberately if you add outbound calls from the renderer.

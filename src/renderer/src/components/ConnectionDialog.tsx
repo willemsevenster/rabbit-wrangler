@@ -88,6 +88,7 @@ export function ConnectionDialog() {
             <div className="field">
               <label>AMQP Port</label>
               <input
+                id="conn-amqp-port"
                 type="number"
                 value={amqpPort}
                 onChange={(e) => setAmqpPort(Number(e.target.value))}
@@ -96,6 +97,7 @@ export function ConnectionDialog() {
             <div className="field">
               <label>Management Port</label>
               <input
+                id="conn-mgmt-port"
                 type="number"
                 value={managementPort}
                 onChange={(e) => setManagementPort(Number(e.target.value))}
