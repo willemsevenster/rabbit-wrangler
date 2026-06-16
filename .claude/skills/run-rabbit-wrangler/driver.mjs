@@ -139,6 +139,17 @@ const COMMANDS = {
     console.log('vdrag', sel, dy)
   },
 
+  // hover <selector> — move the real pointer over the element (triggers :hover).
+  async hover(sel) {
+    if (!page) return console.log('ERROR: launch first')
+    try {
+      await page.hover(sel)
+      console.log('hover', sel, '→ OK')
+    } catch (e) {
+      console.log('hover', sel, '→', e.message)
+    }
+  },
+
   // Right-click (opens context menus). Uses a real pointer event, not DOM click.
   async rclick(sel) {
     if (!page) return console.log('ERROR: launch first')

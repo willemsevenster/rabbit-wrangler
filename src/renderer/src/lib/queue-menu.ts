@@ -22,11 +22,11 @@ function queueSnapshot(q: QueueInfo) {
  * table so both behave identically. Reads live actions from the store at
  * open-time.
  */
-export function buildQueueMenu(q: QueueInfo): MenuItem[] {
-  const { selectQueue, refreshQueues, purgeQueue, openMoveDialog } = useAppStore.getState()
+export function buildQueueMenu(connectionId: string, q: QueueInfo): MenuItem[] {
+  const { openQueueTab, refreshQueues, purgeQueue, openMoveDialog } = useAppStore.getState()
   return [
-    { label: 'Peek Messages', icon: 'eye', onClick: () => selectQueue(q.name) },
-    { label: 'Refresh', icon: 'refresh', onClick: () => void refreshQueues() },
+    { label: 'Peek Messages', icon: 'eye', onClick: () => openQueueTab(connectionId, q.name) },
+    { label: 'Refresh', icon: 'refresh', onClick: () => void refreshQueues(connectionId) },
     { separator: true },
     { label: 'Copy Queue Name', icon: 'copy', onClick: () => window.api.copyText(q.name) },
     {
@@ -35,14 +35,18 @@ export function buildQueueMenu(q: QueueInfo): MenuItem[] {
       onClick: () => window.api.copyText(JSON.stringify(queueSnapshot(q), null, 2))
     },
     { separator: true },
-    { label: 'Move Messages…', icon: 'arrow-right', onClick: () => openMoveDialog(q.name) },
+    {
+      label: 'Move Messages…',
+      icon: 'arrow-right',
+      onClick: () => openMoveDialog(q.name, connectionId)
+    },
     {
       label: 'Purge…',
       icon: 'trash',
       danger: true,
       onClick: async () => {
         if (!confirm(`Purge all messages from "${q.name}"? This cannot be undone.`)) return
-        const result = await purgeQueue(q.name)
+        const result = await purgeQueue(q.name, connectionId)
         if (!result.ok) alert(`Purge failed: ${result.error ?? 'unknown error'}`)
       }
     }

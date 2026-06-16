@@ -12,9 +12,11 @@ export function MenuBar() {
   const refreshQueues = useAppStore((s) => s.refreshQueues)
   const purgeQueue = useAppStore((s) => s.purgeQueue)
   const selectedConnectionId = useAppStore((s) => s.selectedConnectionId)
-  const selectedQueue = useAppStore((s) => s.selectedQueue)
+  const activeTab = useAppStore((s) => s.tabs.find((t) => t.id === s.activeTabId) ?? null)
   const sidebarVisible = useAppStore((s) => s.sidebarVisible)
   const toggleSidebar = useAppStore((s) => s.toggleSidebar)
+
+  const activeQueue = activeTab?.kind === 'queue' ? activeTab : null
 
   const menus: { label: string; items: () => MenuItem[] }[] = [
     {
@@ -42,16 +44,16 @@ export function MenuBar() {
         },
         { separator: true },
         {
-          label: 'Purge Selected Queue…',
+          label: 'Purge Active Queue…',
           icon: 'trash',
           danger: true,
-          disabled: !selectedQueue,
+          disabled: !activeQueue,
           onClick: async () => {
-            if (!selectedQueue) return
-            if (!confirm(`Purge all messages from "${selectedQueue}"? This cannot be undone.`)) {
+            if (!activeQueue) return
+            if (!confirm(`Purge all messages from "${activeQueue.queue}"? This cannot be undone.`)) {
               return
             }
-            const r = await purgeQueue(selectedQueue)
+            const r = await purgeQueue(activeQueue.queue, activeQueue.connectionId)
             if (!r.ok) alert(`Purge failed: ${r.error ?? 'unknown error'}`)
           }
         }

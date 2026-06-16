@@ -1,8 +1,10 @@
-import { useRef, useState, type MouseEvent } from 'react'
-import { useAppStore } from '../store/app-store'
+import { useRef, type MouseEvent } from 'react'
+import { useAppStore, type EditorTab } from '../store/app-store'
 import { ContextMenu, useContextMenu, type MenuItem } from './ContextMenu'
 import { MonacoViewer } from './MonacoViewer'
 import type { PeekedMessage } from '@shared/types'
+
+type QueueTab = Extract<EditorTab, { kind: 'queue' }>
 
 /** amqplib exposes properties camelCased; show the familiar RabbitMQ names, in order. */
 const PROP_ORDER: [string, string][] = [
@@ -101,18 +103,21 @@ function menuFor(m: PeekedMessage): MenuItem[] {
 }
 
 /**
- * Live tail of messages flowing through the selected queue, shown as a table.
+ * Live tail of messages flowing through one queue tab, shown as a table.
  * Selecting a row opens its details + payload (read-only Monaco) in a resizable
- * pane below.
+ * pane below. Buffer + selection live on the tab (in the store), so the view
+ * keeps its context when you switch tabs and away while it peeks in the background.
  */
-export function MessagePeekPanel() {
-  const peeks = useAppStore((s) => s.peeks)
+export function MessagePeekPanel({ tab }: { tab: QueueTab }) {
+  const peeks = tab.peeks
+  const selectedId = tab.selectedMessageId
   const paneHeight = useAppStore((s) => s.peekPaneHeight)
   const setPaneHeight = useAppStore((s) => s.setPeekPaneHeight)
-  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const selectMessage = useAppStore((s) => s.selectTabMessage)
   const { menu, openMenu, close } = useContextMenu()
   const peekRef = useRef<HTMLDivElement>(null)
 
+  const setSelectedId = (id: string): void => selectMessage(tab.id, id)
   const selected = peeks.find((m) => m.id === selectedId) ?? null
 
   function onResizeMouseDown(e: MouseEvent) {

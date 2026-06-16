@@ -95,6 +95,18 @@ when the management API already exposes it (e.g. purge is an HTTP `DELETE`).
   for DLQ messages) and the payload in a read-only **Monaco** editor
   (`MonacoViewer`; workers bundled via Vite `?worker`, so the renderer CSP allows
   `worker-src 'self' blob:`).
+- **Tabbed editor** (`EditorArea`, store `tabs`/`activeTabId`): the right-hand
+  area is a VSCode-style tab strip. Opening a queue, exchange, or connection
+  overview from the tree opens (or focuses — never duplicates) a tab keyed by
+  `${kind}:${connectionId}:${name}`. **Each queue tab owns its own peek buffer**
+  and keeps peeking in the background even when another tab is active — switching
+  tabs never stops a peeker; background tabs show an unread badge. A tab's context
+  is cleared only by its in-tab **Refresh** (which clears the buffer and
+  stop/start-peeks so the broker-side de-dup resets) or by closing it (`stopPeek`)
+  and reopening. Because tabs can span clusters, the store keys queue/exchange
+  lists by connection (`queuesByConn`/`exchangesByConn`), and the Move/Publish
+  dialogs carry the target `connectionId` rather than assuming the tree's
+  selection.
 - **Move = drain + republish with confirms** (`rabbitmq/operations.ts`, UI via
   the queue context menu → "Move Messages…"): pulls messages one at a time,
   republishes to the target exchange/routing-key on a **confirm channel**, and

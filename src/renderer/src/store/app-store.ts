@@ -14,36 +14,71 @@ import type {
   SafeConnectionConfig
 } from '@shared/types'
 
-/** Most recent peeked messages to retain per queue, oldest dropped. */
+/** Most recent peeked messages retained per queue tab, oldest dropped. */
 const PEEK_BUFFER = 500
+
+/**
+ * An open tab in the editor area. Tabs are independent: a queue tab keeps its own
+ * live-peek buffer and keeps receiving messages even while another tab is active.
+ * Identity is `${kind-prefix}:${connectionId}:${name}`, so a queue is keyed by
+ * connection too (the same queue name on two clusters gets two tabs).
+ */
+export type EditorTab =
+  | { id: string; kind: 'overview'; connectionId: string; title: string }
+  | {
+      id: string
+      kind: 'queue'
+      connectionId: string
+      queue: string
+      title: string
+      /** Live peeked messages for THIS tab, newest first. */
+      peeks: PeekedMessage[]
+      /** Row selected in this tab's message table (persists across tab switches). */
+      selectedMessageId: string | null
+      /** New messages received while this tab was in the background. */
+      unread: number
+    }
+  | {
+      id: string
+      kind: 'exchange'
+      connectionId: string
+      exchange: string
+      title: string
+      bindings: BindingInfo[]
+    }
+
+export const overviewTabId = (c: string): string => `o:${c}`
+export const queueTabId = (c: string, q: string): string => `q:${c}:${q}`
+export const exchangeTabId = (c: string, x: string): string => `x:${c}:${x}`
 
 interface AppState {
   connections: SafeConnectionConfig[]
   statuses: Record<string, ConnectionStatus>
-  /** The connection whose queues are loaded/active (one at a time). */
+  /** The connection whose queues/exchanges populate the tree (one at a time). */
   selectedConnectionId: string | null
-  /** Whether the active connection's queue list is collapsed in the tree. */
+  /** Whether the active connection's children are collapsed in the tree. */
   connectionCollapsed: boolean
-  queues: QueueInfo[]
-  selectedQueue: string | null
-  exchanges: ExchangeInfo[]
-  selectedExchange: string | null
-  /** Bindings for the selected exchange (read-only). */
-  bindings: BindingInfo[]
+  /** Per-connection queue + exchange lists. The tree shows the selected
+   * connection's; overview tabs read their own connection's. */
+  queuesByConn: Record<string, QueueInfo[]>
+  exchangesByConn: Record<string, ExchangeInfo[]>
   /** Tree group collapse state (under the active connection). */
   queuesCollapsed: boolean
   exchangesCollapsed: boolean
-  /** Live peeked messages, newest first. */
-  peeks: PeekedMessage[]
+
+  /** Open editor tabs and the active one. */
+  tabs: EditorTab[]
+  activeTabId: string | null
 
   /** Connection editor modal. `editing` null + open ⇒ creating a new one. */
   dialogOpen: boolean
   editing: SafeConnectionConfig | null
 
-  /** Source queue for the open Move-messages dialog (null = closed). */
-  moveDialogQueue: string | null
-  /** Exchange for the open Publish-message dialog (null = closed). */
-  publishDialogExchange: string | null
+  /** Target of the open Move-messages dialog (null = closed). Carries the
+   * connection so a move launched from a background-connection tab is correct. */
+  moveDialog: { connectionId: string; queue: string } | null
+  /** Target of the open Publish-message dialog (null = closed). */
+  publishDialog: { connectionId: string; exchange: string } | null
 
   /** Sidebar layout: persisted width and collapse state. */
   sidebarWidth: number
@@ -57,19 +92,27 @@ interface AppState {
   connectConnection(id: string): Promise<void>
   disconnectConnection(id: string): Promise<void>
   toggleConnectionCollapsed(): void
-  selectQueue(queue: string | null): void
-  refreshQueues(): Promise<void>
-  purgeQueue(queue: string): Promise<OperationResult>
-  openMoveDialog(queue: string): void
+
+  // editor tabs
+  openOverviewTab(connectionId: string): void
+  openQueueTab(connectionId: string, queue: string): void
+  openExchangeTab(connectionId: string, exchange: string): Promise<void>
+  setActiveTab(id: string): void
+  closeTab(id: string): void
+  refreshTab(id: string): Promise<void>
+  selectTabMessage(tabId: string, messageId: string | null): void
+
+  refreshQueues(connectionId?: string): Promise<void>
+  purgeQueue(queue: string, connectionId?: string): Promise<OperationResult>
+  openMoveDialog(queue: string, connectionId?: string): void
   closeMoveDialog(): void
   moveMessages(req: MoveMessagesRequest): Promise<OperationResult>
 
-  refreshExchanges(): Promise<void>
-  selectExchange(name: string): Promise<void>
-  deleteExchange(name: string): Promise<OperationResult>
+  refreshExchanges(connectionId?: string): Promise<void>
+  deleteExchange(name: string, connectionId?: string): Promise<OperationResult>
   toggleQueuesCollapsed(): void
   toggleExchangesCollapsed(): void
-  openPublishDialog(exchange: string): void
+  openPublishDialog(exchange: string, connectionId?: string): void
   closePublishDialog(): void
   publishMessage(req: PublishMessageRequest): Promise<OperationResult>
 
@@ -108,18 +151,16 @@ export const useAppStore = create<AppState>((set, get) => ({
   statuses: {},
   selectedConnectionId: null,
   connectionCollapsed: false,
-  queues: [],
-  selectedQueue: null,
-  exchanges: [],
-  selectedExchange: null,
-  bindings: [],
+  queuesByConn: {},
+  exchangesByConn: {},
   queuesCollapsed: false,
   exchangesCollapsed: false,
-  peeks: [],
+  tabs: [],
+  activeTabId: null,
   dialogOpen: false,
   editing: null,
-  moveDialogQueue: null,
-  publishDialogExchange: null,
+  moveDialog: null,
+  publishDialog: null,
   sidebarWidth: initialSidebarWidth,
   sidebarVisible: true,
   peekPaneHeight: initialPeekPaneHeight,
@@ -142,13 +183,14 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   async selectConnection(id) {
-    // Clicking the active connection just shows its overview (deselect any queue)
-    // and ensures it's expanded — it never disconnects or collapses.
-    if (get().selectedConnectionId === id) {
-      set({ selectedQueue: null, selectedExchange: null, connectionCollapsed: false })
-      return
+    // Clicking a connection makes it the tree's active connection, ensures it's
+    // connected, and opens/activates its overview tab. It never disconnects.
+    if (get().statuses[id]?.state === 'connected') {
+      set({ selectedConnectionId: id, connectionCollapsed: false })
+    } else {
+      await get().connectConnection(id)
     }
-    await get().connectConnection(id)
+    if (get().statuses[id]?.state === 'connected') get().openOverviewTab(id)
   },
 
   toggleConnectionCollapsed() {
@@ -158,12 +200,6 @@ export const useAppStore = create<AppState>((set, get) => ({
   async connectConnection(id) {
     set({
       selectedConnectionId: id,
-      selectedQueue: null,
-      queues: [],
-      exchanges: [],
-      selectedExchange: null,
-      bindings: [],
-      peeks: [],
       connectionCollapsed: false,
       statuses: { ...get().statuses, [id]: { connectionId: id, state: 'connecting' } }
     })
@@ -172,7 +208,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       // Derive status from the call result — the WS status events emitted during
       // connect() can race the renderer's socket setup and be missed.
       set({ statuses: { ...get().statuses, [id]: { connectionId: id, state: 'connected' } } })
-      await Promise.all([get().refreshQueues(), get().refreshExchanges()])
+      await Promise.all([get().refreshQueues(id), get().refreshExchanges(id)])
     } catch (e) {
       set({
         statuses: {
@@ -190,129 +226,222 @@ export const useAppStore = create<AppState>((set, get) => ({
   async disconnectConnection(id) {
     await window.api.disconnect(id)
     set({ statuses: { ...get().statuses, [id]: { connectionId: id, state: 'disconnected' } } })
-    if (get().selectedConnectionId === id) {
-      set({
-        selectedConnectionId: null,
-        selectedQueue: null,
-        queues: [],
-        exchanges: [],
-        selectedExchange: null,
-        bindings: [],
-        peeks: []
-      })
+    closeTabsFor(set, get, id)
+    if (get().selectedConnectionId === id) set({ selectedConnectionId: null })
+  },
+
+  openOverviewTab(connectionId) {
+    const id = overviewTabId(connectionId)
+    if (!get().tabs.some((t) => t.id === id)) {
+      const title = get().connections.find((c) => c.id === connectionId)?.name ?? connectionId
+      set({ tabs: [...get().tabs, { id, kind: 'overview', connectionId, title }] })
     }
+    set({ activeTabId: id })
   },
 
-  selectQueue(queue) {
-    const { selectedConnectionId, selectedQueue } = get()
-    if (!selectedConnectionId) return
-    // Re-clicking the queue you're already viewing must NOT clear the list: the
-    // de-duplicated peeker won't re-emit messages it has already surfaced, so a
-    // clear-and-restart here would leave the pane empty.
-    if (queue === selectedQueue) return
-    if (selectedQueue) void window.api.stopPeek(selectedConnectionId, selectedQueue)
-    set({ selectedQueue: queue, selectedExchange: null, peeks: [] })
-    if (queue) void window.api.startPeek(selectedConnectionId, queue)
-  },
-
-  async refreshQueues() {
-    const { selectedConnectionId } = get()
-    if (!selectedConnectionId) return
-    try {
-      const fresh = await window.api.listQueues(selectedConnectionId)
-      const now = Date.now()
+  openQueueTab(connectionId, queue) {
+    const id = queueTabId(connectionId, queue)
+    if (get().tabs.some((t) => t.id === id)) {
+      // Focus the existing tab — never duplicate, never clear its context.
       set({
-        queues: fresh.map((q) => {
-          const key = `${selectedConnectionId}:${q.name}`
-          const t = purgedAt.get(key)
-          if (t && now - t < PURGE_GRACE_MS) {
-            return { ...q, messages: 0, messagesReady: 0, messagesUnacknowledged: 0 }
-          }
-          if (t) purgedAt.delete(key)
-          return q
-        })
+        activeTabId: id,
+        tabs: get().tabs.map((t) => (t.id === id && t.kind === 'queue' ? { ...t, unread: 0 } : t))
+      })
+      return
+    }
+    const tab: EditorTab = {
+      id,
+      kind: 'queue',
+      connectionId,
+      queue,
+      title: queue,
+      peeks: [],
+      selectedMessageId: null,
+      unread: 0
+    }
+    set({ tabs: [...get().tabs, tab], activeTabId: id })
+    void window.api.startPeek(connectionId, queue)
+  },
+
+  async openExchangeTab(connectionId, exchange) {
+    const id = exchangeTabId(connectionId, exchange)
+    if (get().tabs.some((t) => t.id === id)) {
+      set({ activeTabId: id })
+      return
+    }
+    const title = exchange === '' ? '(AMQP default)' : exchange
+    set({
+      tabs: [...get().tabs, { id, kind: 'exchange', connectionId, exchange, title, bindings: [] }],
+      activeTabId: id
+    })
+    try {
+      const bindings = await window.api.listExchangeBindings(connectionId, exchange)
+      set({
+        tabs: get().tabs.map((t) =>
+          t.id === id && t.kind === 'exchange' ? { ...t, bindings } : t
+        )
       })
     } catch {
-      set({ queues: [] })
+      // leave bindings empty
     }
   },
 
-  async purgeQueue(queue) {
-    const { selectedConnectionId } = get()
-    if (!selectedConnectionId) return { ok: false, affected: 0, error: 'No connection selected' }
+  setActiveTab(id) {
+    set({
+      activeTabId: id,
+      tabs: get().tabs.map((t) => (t.id === id && t.kind === 'queue' ? { ...t, unread: 0 } : t))
+    })
+  },
+
+  closeTab(id) {
+    const { tabs, activeTabId } = get()
+    const idx = tabs.findIndex((t) => t.id === id)
+    if (idx === -1) return
+    const tab = tabs[idx]
+    if (tab.kind === 'queue') void window.api.stopPeek(tab.connectionId, tab.queue)
+    const remaining = tabs.filter((t) => t.id !== id)
+    let nextActive = activeTabId
+    if (activeTabId === id) {
+      const neighbor = remaining[idx] ?? remaining[idx - 1] ?? null
+      nextActive = neighbor ? neighbor.id : null
+    }
+    set({ tabs: remaining, activeTabId: nextActive })
+  },
+
+  async refreshTab(id) {
+    const tab = get().tabs.find((t) => t.id === id)
+    if (!tab) return
+    if (tab.kind === 'queue') {
+      // Clear this tab's context and re-peek from scratch: stopping the peeker
+      // resets the broker-side de-dup set so the current head window re-surfaces.
+      set({
+        tabs: get().tabs.map((t) =>
+          t.id === id && t.kind === 'queue'
+            ? { ...t, peeks: [], unread: 0, selectedMessageId: null }
+            : t
+        )
+      })
+      await window.api.stopPeek(tab.connectionId, tab.queue)
+      await window.api.startPeek(tab.connectionId, tab.queue)
+    } else if (tab.kind === 'exchange') {
+      await get().refreshExchanges(tab.connectionId)
+      try {
+        const bindings = await window.api.listExchangeBindings(tab.connectionId, tab.exchange)
+        set({
+          tabs: get().tabs.map((t) =>
+            t.id === id && t.kind === 'exchange' ? { ...t, bindings } : t
+          )
+        })
+      } catch {
+        // leave bindings as-is
+      }
+    } else {
+      await get().refreshQueues(tab.connectionId)
+    }
+  },
+
+  selectTabMessage(tabId, messageId) {
+    set({
+      tabs: get().tabs.map((t) =>
+        t.id === tabId && t.kind === 'queue' ? { ...t, selectedMessageId: messageId } : t
+      )
+    })
+  },
+
+  async refreshQueues(connectionId) {
+    const cid = connectionId ?? get().selectedConnectionId
+    if (!cid) return
+    try {
+      const fresh = await window.api.listQueues(cid)
+      const now = Date.now()
+      const adjusted = fresh.map((q) => {
+        const key = `${cid}:${q.name}`
+        const t = purgedAt.get(key)
+        if (t && now - t < PURGE_GRACE_MS) {
+          return { ...q, messages: 0, messagesReady: 0, messagesUnacknowledged: 0 }
+        }
+        if (t) purgedAt.delete(key)
+        return q
+      })
+      set({ queuesByConn: { ...get().queuesByConn, [cid]: adjusted } })
+    } catch {
+      set({ queuesByConn: { ...get().queuesByConn, [cid]: [] } })
+    }
+  },
+
+  async purgeQueue(queue, connectionId) {
+    const cid = connectionId ?? get().selectedConnectionId
+    if (!cid) return { ok: false, affected: 0, error: 'No connection selected' }
     // main stops the peeker before purging (so held messages are purgeable).
-    const result = await window.api.purgeQueue(selectedConnectionId, queue)
+    const result = await window.api.purgeQueue(cid, queue)
     if (result.ok) {
       // The management API's queue stats sample only every ~5s, so a refresh here
       // would still report the pre-purge count. Optimistically zero the purged
       // queue instead, and suppress the stat poll for it until the broker catches up.
-      purgedAt.set(`${selectedConnectionId}:${queue}`, Date.now())
+      purgedAt.set(`${cid}:${queue}`, Date.now())
+      const list = get().queuesByConn[cid] ?? []
       set({
-        peeks: [],
-        queues: get().queues.map((q) =>
-          q.name === queue
-            ? { ...q, messages: 0, messagesReady: 0, messagesUnacknowledged: 0 }
-            : q
-        )
+        queuesByConn: {
+          ...get().queuesByConn,
+          [cid]: list.map((q) =>
+            q.name === queue
+              ? { ...q, messages: 0, messagesReady: 0, messagesUnacknowledged: 0 }
+              : q
+          )
+        },
+        tabs: clearQueueTab(get().tabs, queueTabId(cid, queue))
       })
     }
-    // Resume the live peek of the now-empty queue.
-    if (get().selectedQueue === queue) void window.api.startPeek(selectedConnectionId, queue)
+    // Resume the live peek of the now-empty queue if its tab is open.
+    if (get().tabs.some((t) => t.id === queueTabId(cid, queue))) {
+      void window.api.startPeek(cid, queue)
+    }
     return result
   },
 
-  openMoveDialog(queue) {
-    set({ moveDialogQueue: queue })
+  openMoveDialog(queue, connectionId) {
+    const cid = connectionId ?? get().selectedConnectionId
+    if (!cid) return
+    set({ moveDialog: { connectionId: cid, queue } })
   },
 
   closeMoveDialog() {
-    set({ moveDialogQueue: null })
+    set({ moveDialog: null })
   },
 
   async moveMessages(req) {
     // main releases the source peeker before draining (see ClusterConnection).
     const result = await window.api.moveMessages(req)
     if (result.ok) {
-      set({ moveDialogQueue: null })
-      // The source was drained; refresh counts and resume its peek if open.
-      if (get().selectedQueue === req.sourceQueue) {
-        set({ peeks: [] })
+      set({ moveDialog: null })
+      // The source was drained; clear its tab and resume its peek if open.
+      const tid = queueTabId(req.connectionId, req.sourceQueue)
+      if (get().tabs.some((t) => t.id === tid)) {
+        set({ tabs: clearQueueTab(get().tabs, tid) })
         void window.api.startPeek(req.connectionId, req.sourceQueue)
       }
-      await get().refreshQueues()
+      await get().refreshQueues(req.connectionId)
     }
     return result
   },
 
-  async refreshExchanges() {
-    const { selectedConnectionId } = get()
-    if (!selectedConnectionId) return
+  async refreshExchanges(connectionId) {
+    const cid = connectionId ?? get().selectedConnectionId
+    if (!cid) return
     try {
-      set({ exchanges: await window.api.listExchanges(selectedConnectionId) })
+      set({ exchangesByConn: { ...get().exchangesByConn, [cid]: await window.api.listExchanges(cid) } })
     } catch {
-      set({ exchanges: [] })
+      set({ exchangesByConn: { ...get().exchangesByConn, [cid]: [] } })
     }
   },
 
-  async selectExchange(name) {
-    const { selectedConnectionId, selectedQueue } = get()
-    if (!selectedConnectionId) return
-    if (selectedQueue) void window.api.stopPeek(selectedConnectionId, selectedQueue)
-    set({ selectedExchange: name, selectedQueue: null, peeks: [], bindings: [] })
-    try {
-      set({ bindings: await window.api.listExchangeBindings(selectedConnectionId, name) })
-    } catch {
-      set({ bindings: [] })
-    }
-  },
-
-  async deleteExchange(name) {
-    const { selectedConnectionId } = get()
-    if (!selectedConnectionId) return { ok: false, affected: 0, error: 'No connection selected' }
-    const result = await window.api.deleteExchange(selectedConnectionId, name)
+  async deleteExchange(name, connectionId) {
+    const cid = connectionId ?? get().selectedConnectionId
+    if (!cid) return { ok: false, affected: 0, error: 'No connection selected' }
+    const result = await window.api.deleteExchange(cid, name)
     if (result.ok) {
-      if (get().selectedExchange === name) set({ selectedExchange: null, bindings: [] })
-      await get().refreshExchanges()
+      get().closeTab(exchangeTabId(cid, name))
+      await get().refreshExchanges(cid)
     }
     return result
   },
@@ -325,20 +454,22 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ exchangesCollapsed: !get().exchangesCollapsed })
   },
 
-  openPublishDialog(exchange) {
-    set({ publishDialogExchange: exchange })
+  openPublishDialog(exchange, connectionId) {
+    const cid = connectionId ?? get().selectedConnectionId
+    if (!cid) return
+    set({ publishDialog: { connectionId: cid, exchange } })
   },
 
   closePublishDialog() {
-    set({ publishDialogExchange: null })
+    set({ publishDialog: null })
   },
 
   async publishMessage(req) {
     const result = await window.api.publishMessage(req)
     if (result.ok) {
-      set({ publishDialogExchange: null })
+      set({ publishDialog: null })
       // A routed message lands in a queue — refresh counts.
-      await get().refreshQueues()
+      await get().refreshQueues(req.connectionId)
     }
     return result
   },
@@ -379,12 +510,41 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   async deleteConnection(id) {
     await window.api.deleteConnection(id)
-    if (get().selectedConnectionId === id) {
-      set({ selectedConnectionId: null, queues: [], selectedQueue: null, peeks: [] })
-    }
+    closeTabsFor(set, get, id)
+    if (get().selectedConnectionId === id) set({ selectedConnectionId: null })
     await get().refreshConnections()
   }
 }))
+
+/** Reset a queue tab's accumulated context (peeks/unread/selection). */
+function clearQueueTab(tabs: EditorTab[], tabId: string): EditorTab[] {
+  return tabs.map((t) =>
+    t.id === tabId && t.kind === 'queue'
+      ? { ...t, peeks: [], unread: 0, selectedMessageId: null }
+      : t
+  )
+}
+
+/** Close every tab belonging to a connection (on disconnect/delete) and stop
+ * any of their peekers, fixing up the active tab. */
+function closeTabsFor(
+  set: (partial: Partial<AppState>) => void,
+  get: () => AppState,
+  connectionId: string
+): void {
+  const { tabs, activeTabId } = get()
+  for (const t of tabs) {
+    if (t.connectionId === connectionId && t.kind === 'queue') {
+      void window.api.stopPeek(t.connectionId, t.queue)
+    }
+  }
+  const remaining = tabs.filter((t) => t.connectionId !== connectionId)
+  const activeAlive = remaining.some((t) => t.id === activeTabId)
+  set({
+    tabs: remaining,
+    activeTabId: activeAlive ? activeTabId : (remaining[remaining.length - 1]?.id ?? null)
+  })
+}
 
 /** Reducer for events arriving over the WebSocket. */
 function applyStreamEvent(
@@ -397,19 +557,25 @@ function applyStreamEvent(
       set({ statuses: { ...get().statuses, [event.payload.connectionId]: event.payload } })
       break
     case 'peek': {
-      const { selectedQueue, selectedConnectionId, peeks } = get()
-      if (
-        event.payload.queue === selectedQueue &&
-        event.payload.connectionId === selectedConnectionId
-      ) {
-        set({ peeks: [event.payload, ...peeks].slice(0, PEEK_BUFFER) })
-      }
+      const { tabs, activeTabId } = get()
+      const tid = queueTabId(event.payload.connectionId, event.payload.queue)
+      if (!tabs.some((t) => t.id === tid)) break
+      set({
+        tabs: tabs.map((t) => {
+          if (t.id !== tid || t.kind !== 'queue') return t
+          return {
+            ...t,
+            peeks: [event.payload, ...t.peeks].slice(0, PEEK_BUFFER),
+            unread: t.id === activeTabId ? t.unread : t.unread + 1
+          }
+        })
+      })
       break
     }
     case 'queue-stats':
-      if (event.payload.connectionId === get().selectedConnectionId) {
-        set({ queues: event.payload.queues })
-      }
+      set({
+        queuesByConn: { ...get().queuesByConn, [event.payload.connectionId]: event.payload.queues }
+      })
       break
   }
 }
