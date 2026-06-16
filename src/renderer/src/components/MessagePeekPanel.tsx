@@ -204,7 +204,7 @@ export function MessagePeekPanel({ tab }: { tab: QueueTab }) {
       </div>
 
       <div className="peek__resizer-h" onMouseDown={onResizeMouseDown} role="separator" />
-
+      <div className="peek__resizer-h" onMouseDown={onResizeMouseDown} role="separator" aria-orientation="horizontal" />
       <div className="peek__detail" style={{ height: paneHeight }}>
         {selected ? (
           <MessageDetailPane
