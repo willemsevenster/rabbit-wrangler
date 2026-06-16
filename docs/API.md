@@ -35,11 +35,11 @@ Defined in [`src/shared/ipc.ts`](../src/shared/ipc.ts), bridged in
 
 | Method                                         | IPC channel              | Backed by            | Notes                                                          |
 | ---------------------------------------------- | ------------------------ | -------------------- | -------------------------------------------------------------- |
-| `listConnections(): SafeConnectionConfig[]`    | `connections:list`       | `config-store`       | Returns configs **without** passwords.                         |
-| `saveConnection(config): SafeConnectionConfig` | `connections:save`       | `config-store`       | Password encrypted via OS vault (`safeStorage`).               |
-| `deleteConnection(id): void`                   | `connections:delete`     | registry + store     | Disconnects first, then removes the saved config.              |
-| `connect(id): void`                            | `connections:connect`    | `connection-manager` | Verifies the management endpoint (`/whoami`); AMQP stays lazy. |
-| `disconnect(id): void`                         | `connections:disconnect` | `connection-manager` | Disposes peekers + AMQP connection.                            |
+| `listConnections(): Promise<SafeConnectionConfig[]>`                  | `connections:list`       | `config-store`       | Returns configs **without** passwords.                         |
+| `saveConnection(config: ConnectionConfig): Promise<SafeConnectionConfig>` | `connections:save`       | `config-store`       | Password encrypted via OS vault (`safeStorage`).               |
+| `deleteConnection(id: string): Promise<void>`                         | `connections:delete`     | registry + store     | Disconnects first, then removes the saved config.              |
+| `connect(id: string): Promise<void>`                                  | `connections:connect`    | `connection-manager` | Verifies the management endpoint (`/whoami`); AMQP stays lazy. |
+| `disconnect(id: string): Promise<void>`                               | `connections:disconnect` | `connection-manager` | Disposes peekers + AMQP connection.
 
 ### Queues (management plane)
 
