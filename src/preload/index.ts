@@ -46,6 +46,11 @@ const api: RabbitApi = {
 
   quitApp: () => ipcRenderer.invoke(IPC.quitApp),
 
+  getAppVersion: () => ipcRenderer.invoke(IPC.getAppVersion),
+  checkForUpdates: () => ipcRenderer.invoke(IPC.checkForUpdates),
+  downloadUpdate: () => ipcRenderer.invoke(IPC.downloadUpdate),
+  quitAndInstall: () => ipcRenderer.invoke(IPC.quitAndInstall),
+
   copyText: (text: string) => clipboard.writeText(text)
 }
 

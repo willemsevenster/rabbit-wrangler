@@ -142,6 +142,18 @@ when the management API already exposes it (e.g. purge is an HTTP `DELETE`).
   (`safeStorage`) before persisting. `list()` returns `SafeConnectionConfig`
   (no password) — only the main process ever sees plaintext via `get()`. Never
   send full `ConnectionConfig` to the renderer.
+- **Auto-update** (`src/main/updater.ts`, `electron-updater` + GitHub Releases):
+  `initUpdater()` (called from `index.ts` after `createWindow`) checks for updates
+  ~4s after launch and every ~6h. It's a **no-op unless `app.isPackaged`** (the
+  updater needs `app-update.yml`, only present in a packaged build). `autoDownload`
+  and `autoInstallOnAppQuit` are **off**: the user downloads via the title-bar
+  Update button (`UpdateButton.tsx`) or Help → Check for updates, sees progress,
+  and is **prompted to restart** (`restartToUpdate` → `confirm` → `quitAndInstall`).
+  Status flows to the renderer as the `update-status` `StreamEvent` (reduced into
+  the store's `updateStatus`/`updateToast`), exactly like peeks/connection-status
+  — not via a new transport. Releases are built+published by
+  `.github/workflows/release.yml` on a `v*` tag; see `RELEASING.md`. Shipped
+  unsigned for now but **signing-ready** (add `WIN_CSC_*` secrets — no code change).
 
 ## Conventions & gotchas
 

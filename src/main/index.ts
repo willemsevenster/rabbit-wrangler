@@ -4,6 +4,7 @@ import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { registerIpcHandlers } from './ipc'
 import { eventStreamServer } from './websocket-server'
 import { connectionManager } from './connections/connection-manager'
+import { initUpdater, disposeUpdater } from './updater'
 
 function createWindow(): void {
   const mainWindow = new BrowserWindow({
@@ -59,6 +60,7 @@ app.whenReady().then(async () => {
   await eventStreamServer.start()
   registerIpcHandlers()
   createWindow()
+  initUpdater() // checks GitHub Releases for updates (no-op in dev)
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
@@ -70,6 +72,7 @@ app.on('window-all-closed', () => {
 })
 
 app.on('before-quit', async () => {
+  disposeUpdater()
   await connectionManager.disposeAll()
   await eventStreamServer.stop()
 })

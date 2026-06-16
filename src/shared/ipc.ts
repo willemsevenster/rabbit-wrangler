@@ -52,8 +52,12 @@ export const IPC = {
   // event stream bootstrap
   getEventStreamPort: 'events:port',
 
-  // app lifecycle
-  quitApp: 'app:quit'
+  // app lifecycle + auto-update
+  quitApp: 'app:quit',
+  getAppVersion: 'app:version',
+  checkForUpdates: 'update:check',
+  downloadUpdate: 'update:download',
+  quitAndInstall: 'update:install'
 } as const
 
 /** The API surface the preload exposes on `window.api`. */
@@ -87,8 +91,38 @@ export interface RabbitApi {
   /** Quit the whole application. */
   quitApp(): Promise<void>
 
+  /** App version (from package.json) — shown in the About dialog. */
+  getAppVersion(): Promise<string>
+  /** Trigger a user-initiated update check (result surfaces over the event socket). */
+  checkForUpdates(): Promise<void>
+  /** Download the available update; progress streams over the event socket. */
+  downloadUpdate(): Promise<void>
+  /** Quit and install the downloaded update (relaunches the app). */
+  quitAndInstall(): Promise<void>
+
   /** Write text to the system clipboard. Handled in the preload — no IPC. */
   copyText(text: string): void
+}
+
+/** Auto-update lifecycle, pushed from the main-process updater. */
+export type UpdateState =
+  | 'checking'
+  | 'available'
+  | 'none'
+  | 'downloading'
+  | 'downloaded'
+  | 'error'
+
+export interface UpdateStatusPayload {
+  state: UpdateState
+  /** Set for available / none / downloaded. */
+  version?: string
+  /** 0–100, set while downloading. */
+  percent?: number
+  /** Set for error. */
+  error?: string
+  /** True when the check was user-initiated, so the renderer shows feedback. */
+  manual?: boolean
 }
 
 /** Discriminated union of everything pushed over the event WebSocket. */
@@ -96,3 +130,4 @@ export type StreamEvent =
   | { type: 'connection-status'; payload: import('./types').ConnectionStatus }
   | { type: 'peek'; payload: PeekedMessage }
   | { type: 'queue-stats'; payload: { connectionId: string; queues: QueueInfo[] } }
+  | { type: 'update-status'; payload: UpdateStatusPayload }
