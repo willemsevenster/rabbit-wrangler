@@ -45,8 +45,8 @@ Defined in [`src/shared/ipc.ts`](../src/shared/ipc.ts), bridged in
 
 | Method                                             | IPC channel    | Maps to broker call                                 |
 | -------------------------------------------------- | -------------- | --------------------------------------------------- |
-| `listQueues(connectionId): QueueInfo[]`            | `queues:list`  | `GET /api/queues/{vhost}`                           |
-| `purgeQueue(connectionId, queue): OperationResult` | `queues:purge` | `GET …/{name}` (count) + `DELETE …/{name}/contents` |
+| `listQueues(connectionId: string): Promise<QueueInfo[]>`            | `queues:list`  | `GET /api/queues/{vhost}`                           |
+| `purgeQueue(connectionId: string, queue: string): Promise<OperationResult>` | `queues:purge` | `GET …/{name}` (count) + `DELETE …/{name}/contents` |
 
 ### Exchanges (management plane)
 
