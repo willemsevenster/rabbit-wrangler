@@ -24,15 +24,15 @@ jobs:
       # typecheck/lint/build scripts don't re-trigger that same error.
       npm_config_verify_deps_before_run: 'false'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Install pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v6
         with:
           version: 11.3.0 # pin to match the project; newer pnpm 11 needs Node 22.13+
 
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: 22
           cache: pnpm
