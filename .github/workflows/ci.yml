@@ -15,9 +15,14 @@ jobs:
   build:
     runs-on: ubuntu-latest
     env:
-      # CI only type-checks / lints / bundles — it never launches Electron — so
-      # skip the ~100 MB platform binary download to keep installs fast.
-      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      # CI only type-checks / lints / bundles — it never launches Electron and
+      # never packages — so we install with --ignore-scripts below (skipping
+      # Electron's binary download and the esbuild / electron-winstaller
+      # postinstalls). esbuild's binary still ships via its platform
+      # optional-dependency, so bundling works. This also sidesteps pnpm's hard
+      # "ignored builds" error in CI. Disable the pre-run deps check so the
+      # typecheck/lint/build scripts don't re-trigger that same error.
+      npm_config_verify_deps_before_run: 'false'
     steps:
       - uses: actions/checkout@v4
 
@@ -33,7 +38,7 @@ jobs:
           cache: pnpm
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --ignore-scripts
 
       - name: Lint
         run: pnpm lint
