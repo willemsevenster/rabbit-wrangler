@@ -872,6 +872,12 @@ body.resizing .msg-detail__resizer {
 }
 
 /* message detail pane */
+.msg-detail__actions {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
 .peek-item__summary {
   display: flex;
   flex-wrap: wrap;

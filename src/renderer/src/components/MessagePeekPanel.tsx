@@ -117,8 +117,34 @@ export function MessagePeekPanel({ tab }: { tab: QueueTab }) {
   const { menu, openMenu, close } = useContextMenu()
   const peekRef = useRef<HTMLDivElement>(null)
 
+  const openMoveDialog = useAppStore((s) => s.openMoveDialog)
+  const deleteMessage = useAppStore((s) => s.deleteMessage)
+
   const setSelectedId = (id: string): void => selectMessage(tab.id, id)
   const selected = peeks.find((m) => m.id === selectedId) ?? null
+
+  function moveMessage(m: PeekedMessage): void {
+    openMoveDialog(tab.queue, tab.connectionId, m.fingerprint)
+  }
+
+  async function removeMessage(m: PeekedMessage): Promise<void> {
+    if (!confirm(`Delete this message from "${tab.queue}"? This cannot be undone.`)) return
+    const r = await deleteMessage({
+      connectionId: tab.connectionId,
+      sourceQueue: tab.queue,
+      fingerprint: m.fingerprint
+    })
+    if (!r.ok) alert(`Delete failed: ${r.error ?? 'unknown error'}`)
+  }
+
+  function messageMenu(m: PeekedMessage): MenuItem[] {
+    return [
+      ...menuFor(m),
+      { separator: true },
+      { label: 'Move Message…', icon: 'arrow-right', onClick: () => moveMessage(m) },
+      { label: 'Delete Message', icon: 'trash', danger: true, onClick: () => void removeMessage(m) }
+    ]
+  }
 
   function onResizeMouseDown(e: MouseEvent) {
     e.preventDefault()
@@ -160,7 +186,7 @@ export function MessagePeekPanel({ tab }: { tab: QueueTab }) {
                 key={m.id}
                 className={selectedId === m.id ? 'is-selected' : ''}
                 onClick={() => setSelectedId(m.id)}
-                onContextMenu={(e) => openMenu(e, menuFor(m))}
+                onContextMenu={(e) => openMenu(e, messageMenu(m))}
               >
                 <td>
                   <span className="msg-table__rk">{m.routingKey || '(none)'}</span>
@@ -181,7 +207,11 @@ export function MessagePeekPanel({ tab }: { tab: QueueTab }) {
 
       <div className="peek__detail" style={{ height: paneHeight }}>
         {selected ? (
-          <MessageDetailPane message={selected} />
+          <MessageDetailPane
+            message={selected}
+            onMove={() => moveMessage(selected)}
+            onDelete={() => void removeMessage(selected)}
+          />
         ) : (
           <div className="placeholder">Select a message to view its details and payload.</div>
         )}
@@ -192,7 +222,15 @@ export function MessagePeekPanel({ tab }: { tab: QueueTab }) {
   )
 }
 
-function MessageDetailPane({ message: m }: { message: PeekedMessage }) {
+function MessageDetailPane({
+  message: m,
+  onMove,
+  onDelete
+}: {
+  message: PeekedMessage
+  onMove: () => void
+  onDelete: () => void
+}) {
   const props = propertyRows(m.properties)
   const deaths = deathRecords(m.headers)
   const otherHeaders = Object.entries(m.headers).filter(([k]) => k !== 'x-death')
@@ -219,6 +257,16 @@ function MessageDetailPane({ message: m }: { message: PeekedMessage }) {
   return (
     <div className="msg-detail" ref={detailRef}>
       <div className="msg-detail__meta" style={{ width: metaWidth }}>
+        <div className="msg-detail__actions">
+          <button className="btn btn--sm btn--secondary" onClick={onMove}>
+            <span className="codicon codicon-arrow-right" />
+            Move
+          </button>
+          <button className="btn btn--sm btn--danger" onClick={onDelete}>
+            <span className="codicon codicon-trash" />
+            Delete
+          </button>
+        </div>
         <div className="peek-item__summary">
           <span>
             Exchange: <code>{m.exchange || '(default)'}</code>

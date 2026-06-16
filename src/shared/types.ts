@@ -53,6 +53,10 @@ export interface QueueInfo {
 export interface PeekedMessage {
   /** Stable id assigned by the peeker (delivery tag + counter). */
   id: string
+  /** Content-based identity used to locate this exact message for move/delete
+   * (publisher `messageId`, else a hash of body + routing key + correlationId).
+   * Matches the peeker's de-dup key. */
+  fingerprint: string
   connectionId: string
   queue: string
   exchange: string
@@ -76,6 +80,24 @@ export interface MoveMessagesRequest {
   targetRoutingKey: string
   /** Maximum messages to move in this batch; undefined drains the queue. */
   limit?: number
+}
+
+/** Move a single peeked message (identified by fingerprint) to a target. */
+export interface MoveMessageRequest {
+  connectionId: string
+  sourceQueue: string
+  /** {@link PeekedMessage.fingerprint} of the message to move. */
+  fingerprint: string
+  targetExchange: string
+  targetRoutingKey: string
+}
+
+/** Delete (consume + drop) a single peeked message, identified by fingerprint. */
+export interface DeleteMessageRequest {
+  connectionId: string
+  sourceQueue: string
+  /** {@link PeekedMessage.fingerprint} of the message to delete. */
+  fingerprint: string
 }
 
 export interface OperationResult {

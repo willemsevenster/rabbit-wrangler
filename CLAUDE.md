@@ -115,6 +115,17 @@ when the management API already exposes it (e.g. purge is an HTTP `DELETE`).
   an unroutable target (e.g. a typo'd queue on the default exchange) nack-requeues
   the message and aborts rather than silently discarding it. Like purge, the
   source queue's peeker is stopped first so its held messages are drainable.
+- **Single-message move/delete** (`operations.ts` `moveMessage`/`deleteMessage`,
+  UI via the message row context menu or the detail-pane buttons): AMQP can't
+  address a message by id, so each peeked message carries a **fingerprint**
+  (`rabbitmq/fingerprint.ts` — the same key the peeker de-dups by). The op
+  `get`s messages one at a time, holding non-matches unacked, until the
+  fingerprint matches; then it acks (delete) or republishes+acks (move) that one
+  and requeues the rest (the broker also requeues unacked on channel close, so
+  nothing is lost). Two payload-identical messages without a `messageId` share a
+  fingerprint, so the first match is acted on. The Move dialog (`moveDialog`,
+  shared with bulk move) defaults to the **last destination used for that source
+  queue** (`lastMoveTargets`, persisted in localStorage).
 - **Exchanges** (`management-api.ts` + `components/ExchangeDetail`/`ExchangeDiagram`):
   listed in the sidebar tree under an "Exchanges" group (queues are under a
   "Queues" group). The detail view shows **read-only** bindings (management API

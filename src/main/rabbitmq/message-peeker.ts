@@ -1,6 +1,6 @@
 import type { ConsumeMessage } from 'amqplib'
-import { createHash } from 'node:crypto'
 import { eventBus } from '../event-bus'
+import { fingerprintOf } from './fingerprint'
 import type { AmqpChannel, AmqpConnection } from './amqp'
 import type { PeekedMessage } from '@shared/types'
 
@@ -64,11 +64,11 @@ export class MessagePeeker {
   private handle(msg: ConsumeMessage | null): void {
     if (!msg || !this.channel) return
 
-    const fingerprint = this.fingerprint(msg)
+    const fingerprint = fingerprintOf(msg)
     const isNew = !this.seen.has(fingerprint)
     if (isNew) {
       this.remember(fingerprint)
-      this.emit(msg)
+      this.emit(msg, fingerprint)
     }
 
     // Put it back (non-destructive). Already-seen messages are requeued slowly so
@@ -87,10 +87,11 @@ export class MessagePeeker {
     this.pending.add(timer)
   }
 
-  private emit(msg: ConsumeMessage): void {
+  private emit(msg: ConsumeMessage, fingerprint: string): void {
     const isBinary = !isUtf8(msg.content)
     const peeked: PeekedMessage = {
       id: `${this.connectionId}:${this.queue}:${msg.fields.deliveryTag}:${this.counter++}`,
+      fingerprint,
       connectionId: this.connectionId,
       queue: this.queue,
       exchange: msg.fields.exchange,
@@ -103,25 +104,6 @@ export class MessagePeeker {
       observedAt: Date.now()
     }
     eventBus.emitStream({ type: 'peek', payload: peeked })
-  }
-
-  /**
-   * Stable identity for de-duplication. Prefers the publisher-set `messageId`;
-   * otherwise hashes the body + routing key + correlationId.
-   */
-  private fingerprint(msg: ConsumeMessage): string {
-    const messageId = msg.properties.messageId
-    if (messageId) return `id:${messageId}`
-    return (
-      'h:' +
-      createHash('sha1')
-        .update(msg.fields.routingKey)
-        .update('\0')
-        .update(String(msg.properties.correlationId ?? ''))
-        .update('\0')
-        .update(msg.content)
-        .digest('hex')
-    )
   }
 
   private remember(fingerprint: string): void {

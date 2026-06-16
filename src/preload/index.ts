@@ -3,6 +3,8 @@ import { electronAPI } from '@electron-toolkit/preload'
 import { IPC, type RabbitApi } from '@shared/ipc'
 import type {
   ConnectionConfig,
+  DeleteMessageRequest,
+  MoveMessageRequest,
   MoveMessagesRequest,
   PublishMessageRequest
 } from '@shared/types'
@@ -29,6 +31,8 @@ const api: RabbitApi = {
   stopPeek: (connectionId: string, queue: string) =>
     ipcRenderer.invoke(IPC.stopPeek, connectionId, queue),
   moveMessages: (request: MoveMessagesRequest) => ipcRenderer.invoke(IPC.moveMessages, request),
+  moveMessage: (request: MoveMessageRequest) => ipcRenderer.invoke(IPC.moveMessage, request),
+  deleteMessage: (request: DeleteMessageRequest) => ipcRenderer.invoke(IPC.deleteMessage, request),
 
   listExchanges: (connectionId: string) => ipcRenderer.invoke(IPC.listExchanges, connectionId),
   listExchangeBindings: (connectionId: string, exchange: string) =>

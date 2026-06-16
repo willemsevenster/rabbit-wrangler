@@ -5,6 +5,8 @@ import { connectionManager } from './connections/connection-manager'
 import { eventStreamServer } from './websocket-server'
 import type {
   ConnectionConfig,
+  DeleteMessageRequest,
+  MoveMessageRequest,
   MoveMessagesRequest,
   PublishMessageRequest
 } from '@shared/types'
@@ -48,6 +50,14 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle(IPC.moveMessages, (_e, req: MoveMessagesRequest) =>
     connectionManager.require(req.connectionId).moveMessages(req)
+  )
+
+  ipcMain.handle(IPC.moveMessage, (_e, req: MoveMessageRequest) =>
+    connectionManager.require(req.connectionId).moveMessage(req)
+  )
+
+  ipcMain.handle(IPC.deleteMessage, (_e, req: DeleteMessageRequest) =>
+    connectionManager.require(req.connectionId).deleteMessage(req)
   )
 
   ipcMain.handle(IPC.listExchanges, (_e, connectionId: string) =>
