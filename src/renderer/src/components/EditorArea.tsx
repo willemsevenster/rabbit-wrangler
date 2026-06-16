@@ -71,7 +71,7 @@ function TabBar() {
   // Right-align the dropdown under the chevron (ContextMenu positions by its left edge).
   function openOverflow(el: HTMLElement) {
     const r = el.getBoundingClientRect()
-    setOverflow({ x: Math.max(4, r.right - 280), y: r.bottom })
+    setOverflow({ x: Math.max(4, r.right - 340), y: r.bottom })
   }
 
   function tabMenu(t: EditorTab, index: number): MenuItem[] {
