@@ -1,0 +1,8 @@
+# Generated / vendored
+pnpm-lock.yaml
+out
+dist
+release
+
+# Agent tooling — not part of the product's formatted source
+.claude
