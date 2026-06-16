@@ -13,8 +13,8 @@ import { Resizer } from './components/Resizer'
 function App() {
   const init = useAppStore((s) => s.init)
   const dialogOpen = useAppStore((s) => s.dialogOpen)
-  const moveDialogQueue = useAppStore((s) => s.moveDialogQueue)
-  const publishDialogExchange = useAppStore((s) => s.publishDialogExchange)
+  const moveDialog = useAppStore((s) => s.moveDialog)
+  const publishDialog = useAppStore((s) => s.publishDialog)
   const sidebarWidth = useAppStore((s) => s.sidebarWidth)
   const sidebarVisible = useAppStore((s) => s.sidebarVisible)
 
@@ -41,8 +41,8 @@ function App() {
       </div>
       <StatusBar />
       {dialogOpen && <ConnectionDialog />}
-      {moveDialogQueue && <MoveMessagesDialog />}
-      {publishDialogExchange !== null && <PublishMessageDialog />}
+      {moveDialog && <MoveMessagesDialog />}
+      {publishDialog && <PublishMessageDialog />}
     </div>
   )
 }

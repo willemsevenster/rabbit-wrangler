@@ -14,7 +14,7 @@ export function StatusBar() {
   const connections = useAppStore((s) => s.connections)
   const statuses = useAppStore((s) => s.statuses)
   const selectedId = useAppStore((s) => s.selectedConnectionId)
-  const queues = useAppStore((s) => s.queues)
+  const queues = useAppStore((s) => (selectedId ? s.queuesByConn[selectedId] : undefined)) ?? []
 
   const conn = connections.find((c) => c.id === selectedId)
   const state: ConnectionState = selectedId

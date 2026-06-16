@@ -2,10 +2,10 @@ import { useAppStore } from '../store/app-store'
 import { ContextMenu, useContextMenu } from './ContextMenu'
 import { buildQueueMenu } from '../lib/queue-menu'
 
-/** Queue overview shown in the editor when a connection (but no queue) is selected. */
-export function QueueTable() {
-  const queues = useAppStore((s) => s.queues)
-  const selectQueue = useAppStore((s) => s.selectQueue)
+/** Queue overview for a connection, shown inside its overview tab. */
+export function QueueTable({ connectionId }: { connectionId: string }) {
+  const queues = useAppStore((s) => s.queuesByConn[connectionId]) ?? []
+  const openQueueTab = useAppStore((s) => s.openQueueTab)
   const { menu, openMenu, close } = useContextMenu()
 
   return (
@@ -25,8 +25,8 @@ export function QueueTable() {
             <tr
               key={q.name}
               data-queue-row={q.name}
-              onClick={() => selectQueue(q.name)}
-              onContextMenu={(e) => openMenu(e, buildQueueMenu(q))}
+              onClick={() => openQueueTab(connectionId, q.name)}
+              onContextMenu={(e) => openMenu(e, buildQueueMenu(connectionId, q))}
             >
               <td>
                 <span

@@ -1,10 +1,13 @@
-import { useAppStore } from '../store/app-store'
+import { useAppStore, type EditorTab } from '../store/app-store'
 import { ExchangeDiagram } from './ExchangeDiagram'
 
-/** Editor view for a selected exchange: bindings (read-only) + diagram + actions. */
-export function ExchangeDetail({ exchangeName }: { exchangeName: string }) {
-  const exchanges = useAppStore((s) => s.exchanges)
-  const bindings = useAppStore((s) => s.bindings)
+type ExchangeTab = Extract<EditorTab, { kind: 'exchange' }>
+
+/** Editor tab for an exchange: bindings (read-only) + diagram + actions. */
+export function ExchangeDetail({ tab }: { tab: ExchangeTab }) {
+  const exchangeName = tab.exchange
+  const bindings = tab.bindings
+  const exchanges = useAppStore((s) => s.exchangesByConn[tab.connectionId] ?? [])
   const openPublish = useAppStore((s) => s.openPublishDialog)
   const del = useAppStore((s) => s.deleteExchange)
 
@@ -14,7 +17,7 @@ export function ExchangeDetail({ exchangeName }: { exchangeName: string }) {
 
   async function onDelete() {
     if (!confirm(`Delete exchange "${exchangeName}"? This cannot be undone.`)) return
-    const result = await del(exchangeName)
+    const result = await del(exchangeName, tab.connectionId)
     if (!result.ok) alert(`Delete failed: ${result.error ?? 'unknown error'}`)
   }
 
@@ -29,7 +32,10 @@ export function ExchangeDetail({ exchangeName }: { exchangeName: string }) {
         {x?.durable && <span className="badge">durable</span>}
         {x?.internal && <span className="badge">internal</span>}
         <span className="spacer" />
-        <button className="btn btn--sm btn--secondary" onClick={() => openPublish(exchangeName)}>
+        <button
+          className="btn btn--sm btn--secondary"
+          onClick={() => openPublish(exchangeName, tab.connectionId)}
+        >
           <span className="codicon codicon-arrow-right" />
           Publish
         </button>

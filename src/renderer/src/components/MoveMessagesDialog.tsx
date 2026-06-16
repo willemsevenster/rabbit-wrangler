@@ -7,8 +7,9 @@ const DLQ_SUFFIX = /(\.dlq|\.dead|_dlq|deadletter)$/i
 
 /** Modal to drain a queue's ready messages and republish them elsewhere. */
 export function MoveMessagesDialog() {
-  const sourceQueue = useAppStore((s) => s.moveDialogQueue) ?? ''
-  const connectionId = useAppStore((s) => s.selectedConnectionId)
+  const dialog = useAppStore((s) => s.moveDialog)
+  const sourceQueue = dialog?.queue ?? ''
+  const connectionId = dialog?.connectionId ?? null
   const close = useAppStore((s) => s.closeMoveDialog)
   const move = useAppStore((s) => s.moveMessages)
 

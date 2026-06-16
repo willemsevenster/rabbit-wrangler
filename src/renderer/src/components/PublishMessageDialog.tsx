@@ -55,9 +55,10 @@ function coerceHeader(value: string, type: HeaderType): unknown {
 
 /** Modal to publish a message to the selected exchange (mirrors the RabbitMQ form). */
 export function PublishMessageDialog() {
-  const exchange = useAppStore((s) => s.publishDialogExchange) ?? ''
-  const connectionId = useAppStore((s) => s.selectedConnectionId)
-  const queues = useAppStore((s) => s.queues)
+  const dialog = useAppStore((s) => s.publishDialog)
+  const exchange = dialog?.exchange ?? ''
+  const connectionId = dialog?.connectionId ?? null
+  const queues = useAppStore((s) => (connectionId ? s.queuesByConn[connectionId] : undefined)) ?? []
   const close = useAppStore((s) => s.closePublishDialog)
   const publish = useAppStore((s) => s.publishMessage)
 

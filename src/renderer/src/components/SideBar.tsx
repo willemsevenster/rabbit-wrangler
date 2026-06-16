@@ -1,5 +1,5 @@
 import { type MouseEvent, type ReactNode } from 'react'
-import { useAppStore } from '../store/app-store'
+import { useAppStore, overviewTabId, queueTabId, exchangeTabId } from '../store/app-store'
 import { ContextMenu, useContextMenu, type MenuItem } from './ContextMenu'
 import { buildQueueMenu } from '../lib/queue-menu'
 import { buildExchangeMenu } from '../lib/exchange-menu'
@@ -51,8 +51,7 @@ function ConnectionNode({
   openMenu: OpenMenu
 }) {
   const selectedId = useAppStore((s) => s.selectedConnectionId)
-  const selectedQueue = useAppStore((s) => s.selectedQueue)
-  const selectedExchange = useAppStore((s) => s.selectedExchange)
+  const activeTabId = useAppStore((s) => s.activeTabId)
   const collapsed = useAppStore((s) => s.connectionCollapsed)
   const state = useAppStore((s) => s.statuses[connection.id]?.state ?? 'disconnected')
   const select = useAppStore((s) => s.selectConnection)
@@ -67,7 +66,7 @@ function ConnectionNode({
   const isSelected = selectedId === connection.id
   const expanded = isSelected && !collapsed
   const isConnected = isSelected && state === 'connected'
-  const showingOverview = isSelected && !selectedQueue && !selectedExchange
+  const showingOverview = activeTabId === overviewTabId(connection.id)
 
   function menuItems(): MenuItem[] {
     const items: MenuItem[] = []
@@ -161,8 +160,8 @@ function ConnectionChildren({
   openMenu: OpenMenu
 }) {
   const state = useAppStore((s) => s.statuses[connectionId]?.state)
-  const queues = useAppStore((s) => s.queues)
-  const exchanges = useAppStore((s) => s.exchanges)
+  const queues = useAppStore((s) => s.queuesByConn[connectionId]) ?? []
+  const exchanges = useAppStore((s) => s.exchangesByConn[connectionId]) ?? []
   const queuesCollapsed = useAppStore((s) => s.queuesCollapsed)
   const exchangesCollapsed = useAppStore((s) => s.exchangesCollapsed)
   const toggleQueues = useAppStore((s) => s.toggleQueuesCollapsed)
@@ -181,7 +180,9 @@ function ConnectionChildren({
         {queues.length === 0 ? (
           <div className="tree__empty" style={{ paddingLeft: 46 }}>No queues.</div>
         ) : (
-          queues.map((q) => <QueueNode key={q.name} queue={q} openMenu={openMenu} />)
+          queues.map((q) => (
+            <QueueNode key={q.name} connectionId={connectionId} queue={q} openMenu={openMenu} />
+          ))
         )}
       </TreeGroup>
       <TreeGroup
@@ -193,7 +194,14 @@ function ConnectionChildren({
         {exchanges.length === 0 ? (
           <div className="tree__empty" style={{ paddingLeft: 46 }}>No exchanges.</div>
         ) : (
-          exchanges.map((x) => <ExchangeNode key={x.name || '(default)'} exchange={x} openMenu={openMenu} />)
+          exchanges.map((x) => (
+            <ExchangeNode
+              key={x.name || '(default)'}
+              connectionId={connectionId}
+              exchange={x}
+              openMenu={openMenu}
+            />
+          ))
         )}
       </TreeGroup>
     </>
@@ -227,16 +235,25 @@ function TreeGroup({
   )
 }
 
-function QueueNode({ queue: q, openMenu }: { queue: QueueInfo; openMenu: OpenMenu }) {
-  const selectedQueue = useAppStore((s) => s.selectedQueue)
-  const selectQueue = useAppStore((s) => s.selectQueue)
+function QueueNode({
+  connectionId,
+  queue: q,
+  openMenu
+}: {
+  connectionId: string
+  queue: QueueInfo
+  openMenu: OpenMenu
+}) {
+  const activeTabId = useAppStore((s) => s.activeTabId)
+  const openQueueTab = useAppStore((s) => s.openQueueTab)
+  const isActive = activeTabId === queueTabId(connectionId, q.name)
   return (
     <div
-      className={`tree-row ${selectedQueue === q.name ? 'is-active' : ''}`}
+      className={`tree-row ${isActive ? 'is-active' : ''}`}
       style={{ paddingLeft: 46 }}
       data-queue={q.name}
-      onClick={() => selectQueue(q.name)}
-      onContextMenu={(e) => openMenu(e, buildQueueMenu(q))}
+      onClick={() => openQueueTab(connectionId, q.name)}
+      onContextMenu={(e) => openMenu(e, buildQueueMenu(connectionId, q))}
     >
       <span className="tree-row__twisty" />
       <span className="tree-row__icon">
@@ -252,17 +269,26 @@ function QueueNode({ queue: q, openMenu }: { queue: QueueInfo; openMenu: OpenMen
   )
 }
 
-function ExchangeNode({ exchange: x, openMenu }: { exchange: ExchangeInfo; openMenu: OpenMenu }) {
-  const selectedExchange = useAppStore((s) => s.selectedExchange)
-  const selectExchange = useAppStore((s) => s.selectExchange)
+function ExchangeNode({
+  connectionId,
+  exchange: x,
+  openMenu
+}: {
+  connectionId: string
+  exchange: ExchangeInfo
+  openMenu: OpenMenu
+}) {
+  const activeTabId = useAppStore((s) => s.activeTabId)
+  const openExchangeTab = useAppStore((s) => s.openExchangeTab)
+  const isActive = activeTabId === exchangeTabId(connectionId, x.name)
   const label = x.name === '' ? '(AMQP default)' : x.name
   return (
     <div
-      className={`tree-row ${selectedExchange === x.name ? 'is-active' : ''}`}
+      className={`tree-row ${isActive ? 'is-active' : ''}`}
       style={{ paddingLeft: 46 }}
       data-exchange={x.name}
-      onClick={() => void selectExchange(x.name)}
-      onContextMenu={(e) => openMenu(e, buildExchangeMenu(x))}
+      onClick={() => void openExchangeTab(connectionId, x.name)}
+      onContextMenu={(e) => openMenu(e, buildExchangeMenu(connectionId, x))}
     >
       <span className="tree-row__twisty" />
       <span className="tree-row__icon">
