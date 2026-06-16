@@ -203,8 +203,13 @@ export function MessagePeekPanel({ tab }: { tab: QueueTab }) {
         {peeks.length === 0 && <div className="placeholder">Waiting for messages…</div>}
       </div>
 
-      <div className="peek__resizer-h" onMouseDown={onResizeMouseDown} role="separator" />
-      <div className="peek__resizer-h" onMouseDown={onResizeMouseDown} role="separator" aria-orientation="horizontal" />
+      <div
+        className="peek__resizer-h"
+        onMouseDown={onResizeMouseDown}
+        role="separator"
+        aria-orientation="horizontal"
+      />
+
       <div className="peek__detail" style={{ height: paneHeight }}>
         {selected ? (
           <MessageDetailPane
@@ -271,7 +276,9 @@ function MessageDetailPane({
           <span>
             Exchange: <code>{m.exchange || '(default)'}</code>
           </span>
-          <span>Routing key: <code>{m.routingKey || '(none)'}</code></span>
+          <span>
+            Routing key: <code>{m.routingKey || '(none)'}</code>
+          </span>
           <span>Size: {formatBytes(byteSize(m))}</span>
         </div>
 
@@ -338,7 +345,12 @@ function MessageDetailPane({
         )}
       </div>
 
-      <div className="msg-detail__resizer" onMouseDown={onMetaResize} role="separator" aria-orientation="vertical" />
+      <div
+        className="msg-detail__resizer"
+        onMouseDown={onMetaResize}
+        role="separator"
+        aria-orientation="vertical"
+      />
 
       <div className="msg-detail__payload">
         <div className="peek-item__section" style={{ margin: '0 0 6px' }}>
