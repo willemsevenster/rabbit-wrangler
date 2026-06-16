@@ -26,7 +26,7 @@ export function useContextMenu() {
   function openMenu(e: ReactMouseEvent, items: MenuItem[]) {
     e.preventDefault()
     e.stopPropagation()
-    const width = 220
+    const width = 340
     const height = items.length * 28 + 8
     setMenu({
       x: Math.max(4, Math.min(e.clientX, window.innerWidth - width - 4)),
