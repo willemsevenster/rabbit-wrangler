@@ -61,11 +61,11 @@ Defined in [`src/shared/ipc.ts`](../src/shared/ipc.ts), bridged in
 
 | Method                                    | IPC channel          | Behavior                                                                |
 | ----------------------------------------- | -------------------- | ----------------------------------------------------------------------- |
-| `startPeek(connectionId, queue): void`    | `peek:start`         | Starts a NACK-and-requeue consumer; messages stream over the WebSocket. |
-| `stopPeek(connectionId, queue): void`     | `peek:stop`          | Cancels the consumer and releases held messages.                        |
-| `moveMessages(request): OperationResult`  | `messages:move`      | Confirm-channel drain + republish (see §3).                             |
-| `moveMessage(request): OperationResult`   | `messages:moveOne`   | Move one message, matched by fingerprint (see §3).                      |
-| `deleteMessage(request): OperationResult` | `messages:deleteOne` | Delete one message, matched by fingerprint (see §3).                    |
+| `startPeek(connectionId: string, queue: string): Promise<void>`    | `peek:start`         | Starts a NACK-and-requeue consumer; messages stream over the WebSocket. |
+| `stopPeek(connectionId: string, queue: string): Promise<void>`     | `peek:stop`          | Cancels the consumer and releases held messages.                        |
+| `moveMessages(request: MoveMessagesRequest): Promise<OperationResult>`  | `messages:move`      | Confirm-channel drain + republish (see §3).                             |
+| `moveMessage(request: MoveMessageRequest): Promise<OperationResult>`    | `messages:moveOne`   | Move one message, matched by fingerprint (see §3).                      |
+| `deleteMessage(request: DeleteMessageRequest): Promise<OperationResult>` | `messages:deleteOne` | Delete one message, matched by fingerprint (see §3).                    |
 
 ### Bootstrap & utilities
 
