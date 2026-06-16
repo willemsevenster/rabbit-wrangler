@@ -4,6 +4,10 @@ export interface MenuItem {
   label?: string
   /** codicon name without the `codicon-` prefix. */
   icon?: string
+  /** Optional right-aligned badge (e.g. an unread count). */
+  badge?: string
+  /** Native tooltip — useful when the label is ellipsized. */
+  title?: string
   onClick?: () => void
   danger?: boolean
   disabled?: boolean
@@ -22,7 +26,7 @@ export function useContextMenu() {
   function openMenu(e: ReactMouseEvent, items: MenuItem[]) {
     e.preventDefault()
     e.stopPropagation()
-    const width = 220
+    const width = 340
     const height = items.length * 28 + 8
     setMenu({
       x: Math.max(4, Math.min(e.clientX, window.innerWidth - width - 4)),
@@ -77,7 +81,10 @@ export function ContextMenu({ x, y, items, onClose }: MenuState & { onClose: () 
             <span className="context-menu__icon">
               {item.icon && <span className={`codicon codicon-${item.icon}`} />}
             </span>
-            <span className="context-menu__label">{item.label}</span>
+            <span className="context-menu__label" title={item.title}>
+              {item.label}
+            </span>
+            {item.badge != null && <span className="context-menu__badge">{item.badge}</span>}
           </button>
         )
       )}

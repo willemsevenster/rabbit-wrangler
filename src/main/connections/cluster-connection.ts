@@ -1,13 +1,15 @@
 import { eventBus } from '../event-bus'
 import { ManagementApi } from '../rabbitmq/management-api'
 import { MessagePeeker } from '../rabbitmq/message-peeker'
-import { moveMessages } from '../rabbitmq/operations'
+import { deleteMessage, moveMessage, moveMessages } from '../rabbitmq/operations'
 import { connectAmqp, type AmqpConnection } from '../rabbitmq/amqp'
 import type {
   BindingInfo,
   ConnectionConfig,
   ConnectionState,
+  DeleteMessageRequest,
   ExchangeInfo,
+  MoveMessageRequest,
   MoveMessagesRequest,
   OperationResult,
   PublishMessageRequest,
@@ -117,6 +119,17 @@ export class ClusterConnection {
     // the move's get-loop wouldn't see them. Release it first.
     await this.stopPeek(req.sourceQueue)
     return moveMessages(await this.amqpConnection(), req)
+  }
+
+  async moveMessage(req: MoveMessageRequest): Promise<OperationResult> {
+    // Release the peeker so the scan can pull the target (held unacked otherwise).
+    await this.stopPeek(req.sourceQueue)
+    return moveMessage(await this.amqpConnection(), req)
+  }
+
+  async deleteMessage(req: DeleteMessageRequest): Promise<OperationResult> {
+    await this.stopPeek(req.sourceQueue)
+    return deleteMessage(await this.amqpConnection(), req)
   }
 
   async dispose(): Promise<void> {

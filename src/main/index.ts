@@ -13,6 +13,9 @@ function createWindow(): void {
     minHeight: 600,
     show: false,
     title: 'Rabbit Wrangler',
+    // Dev taskbar/window icon. Packaged builds get their icon from the executable
+    // (electron-builder embeds build/icon.* there), so this is only needed in dev.
+    ...(is.dev ? { icon: join(import.meta.dirname, '../../build/icon.png') } : {}),
     // VSCode-style chrome: hide the OS title bar but keep the native window
     // controls (min/max/close) drawn in an overlay so we don't reimplement them.
     titleBarStyle: 'hidden',

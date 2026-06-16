@@ -5,7 +5,9 @@ import type {
   BindingInfo,
   ConnectionConfig,
   ConnectionStatus,
+  DeleteMessageRequest,
   ExchangeInfo,
+  MoveMessageRequest,
   MoveMessagesRequest,
   OperationResult,
   PeekedMessage,
@@ -13,6 +15,12 @@ import type {
   QueueInfo,
   SafeConnectionConfig
 } from '@shared/types'
+
+/** Last move destination chosen for a source queue, keyed by `${connId}:${queue}`. */
+interface MoveTarget {
+  exchange: string
+  routingKey: string
+}
 
 /** Most recent peeked messages retained per queue tab, oldest dropped. */
 const PEEK_BUFFER = 500
@@ -74,17 +82,22 @@ interface AppState {
   dialogOpen: boolean
   editing: SafeConnectionConfig | null
 
-  /** Target of the open Move-messages dialog (null = closed). Carries the
-   * connection so a move launched from a background-connection tab is correct. */
-  moveDialog: { connectionId: string; queue: string } | null
+  /** Target of the open Move dialog (null = closed). Carries the connection so a
+   * move launched from a background-connection tab is correct; `fingerprint` set
+   * ⇒ move a single message, absent ⇒ bulk-move the whole queue. */
+  moveDialog: { connectionId: string; queue: string; fingerprint?: string } | null
   /** Target of the open Publish-message dialog (null = closed). */
   publishDialog: { connectionId: string; exchange: string } | null
+  /** Last-used move destination per source queue (persisted), for default values. */
+  lastMoveTargets: Record<string, MoveTarget>
 
   /** Sidebar layout: persisted width and collapse state. */
   sidebarWidth: number
   sidebarVisible: boolean
   /** Persisted height of the message-detail pane in the peek view. */
   peekPaneHeight: number
+  /** Persisted width of the properties column in the message-detail pane. */
+  detailMetaWidth: number
 
   init(): Promise<void>
   refreshConnections(): Promise<void>
@@ -99,14 +112,20 @@ interface AppState {
   openExchangeTab(connectionId: string, exchange: string): Promise<void>
   setActiveTab(id: string): void
   closeTab(id: string): void
+  closeAllTabs(): void
+  closeTabsToRight(id: string): void
+  moveTab(id: string, to: 'left' | 'right' | 'start' | 'end'): void
+  reorderTab(id: string, toIndex: number): void
   refreshTab(id: string): Promise<void>
   selectTabMessage(tabId: string, messageId: string | null): void
 
   refreshQueues(connectionId?: string): Promise<void>
   purgeQueue(queue: string, connectionId?: string): Promise<OperationResult>
-  openMoveDialog(queue: string, connectionId?: string): void
+  openMoveDialog(queue: string, connectionId?: string, fingerprint?: string): void
   closeMoveDialog(): void
   moveMessages(req: MoveMessagesRequest): Promise<OperationResult>
+  moveMessage(req: MoveMessageRequest): Promise<OperationResult>
+  deleteMessage(req: DeleteMessageRequest): Promise<OperationResult>
 
   refreshExchanges(connectionId?: string): Promise<void>
   deleteExchange(name: string, connectionId?: string): Promise<OperationResult>
@@ -119,6 +138,7 @@ interface AppState {
   setSidebarWidth(width: number): void
   toggleSidebar(): void
   setPeekPaneHeight(height: number): void
+  setDetailMetaWidth(width: number): void
 
   openNewConnection(): void
   editConnection(connection: SafeConnectionConfig): void
@@ -146,6 +166,22 @@ const clampPaneHeight = (h: number): number =>
   Math.min(PEEK_PANE_MAX, Math.max(PEEK_PANE_MIN, Math.round(h)))
 const initialPeekPaneHeight = clampPaneHeight(Number(localStorage.getItem('rw.peekPaneHeight')) || 260)
 
+const DETAIL_META_MIN = 160
+const DETAIL_META_MAX = 640
+const clampMetaWidth = (w: number): number =>
+  Math.min(DETAIL_META_MAX, Math.max(DETAIL_META_MIN, Math.round(w)))
+const initialDetailMetaWidth = clampMetaWidth(Number(localStorage.getItem('rw.detailMetaWidth')) || 320)
+
+const MOVE_TARGETS_KEY = 'rw.lastMoveTargets'
+const moveTargetKey = (connectionId: string, queue: string): string => `${connectionId}:${queue}`
+function loadMoveTargets(): Record<string, MoveTarget> {
+  try {
+    return JSON.parse(localStorage.getItem(MOVE_TARGETS_KEY) ?? '{}') as Record<string, MoveTarget>
+  } catch {
+    return {}
+  }
+}
+
 export const useAppStore = create<AppState>((set, get) => ({
   connections: [],
   statuses: {},
@@ -161,9 +197,11 @@ export const useAppStore = create<AppState>((set, get) => ({
   editing: null,
   moveDialog: null,
   publishDialog: null,
+  lastMoveTargets: loadMoveTargets(),
   sidebarWidth: initialSidebarWidth,
   sidebarVisible: true,
   peekPaneHeight: initialPeekPaneHeight,
+  detailMetaWidth: initialDetailMetaWidth,
 
   async init() {
     if (initialized) return
@@ -297,8 +335,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     const { tabs, activeTabId } = get()
     const idx = tabs.findIndex((t) => t.id === id)
     if (idx === -1) return
-    const tab = tabs[idx]
-    if (tab.kind === 'queue') void window.api.stopPeek(tab.connectionId, tab.queue)
+    stopTabPeek(tabs[idx])
     const remaining = tabs.filter((t) => t.id !== id)
     let nextActive = activeTabId
     if (activeTabId === id) {
@@ -306,6 +343,45 @@ export const useAppStore = create<AppState>((set, get) => ({
       nextActive = neighbor ? neighbor.id : null
     }
     set({ tabs: remaining, activeTabId: nextActive })
+  },
+
+  closeAllTabs() {
+    for (const t of get().tabs) stopTabPeek(t)
+    set({ tabs: [], activeTabId: null })
+  },
+
+  closeTabsToRight(id) {
+    const { tabs, activeTabId } = get()
+    const idx = tabs.findIndex((t) => t.id === id)
+    if (idx === -1) return
+    for (const t of tabs.slice(idx + 1)) stopTabPeek(t)
+    const remaining = tabs.slice(0, idx + 1)
+    set({
+      tabs: remaining,
+      // If the active tab was one of those closed, fall back to the anchor tab.
+      activeTabId: remaining.some((t) => t.id === activeTabId) ? activeTabId : id
+    })
+  },
+
+  moveTab(id, to) {
+    const tabs = get().tabs
+    const i = tabs.findIndex((t) => t.id === id)
+    if (i === -1) return
+    const target =
+      to === 'left' ? i - 1 : to === 'right' ? i + 1 : to === 'start' ? 0 : tabs.length - 1
+    get().reorderTab(id, target)
+  },
+
+  reorderTab(id, toIndex) {
+    const current = get().tabs
+    const from = current.findIndex((t) => t.id === id)
+    if (from === -1) return
+    const target = Math.max(0, Math.min(toIndex, current.length - 1))
+    if (from === target) return
+    const next = [...current]
+    const [moved] = next.splice(from, 1)
+    next.splice(target, 0, moved)
+    set({ tabs: next })
   },
 
   async refreshTab(id) {
@@ -399,10 +475,10 @@ export const useAppStore = create<AppState>((set, get) => ({
     return result
   },
 
-  openMoveDialog(queue, connectionId) {
+  openMoveDialog(queue, connectionId, fingerprint) {
     const cid = connectionId ?? get().selectedConnectionId
     if (!cid) return
-    set({ moveDialog: { connectionId: cid, queue } })
+    set({ moveDialog: { connectionId: cid, queue, fingerprint } })
   },
 
   closeMoveDialog() {
@@ -413,13 +489,30 @@ export const useAppStore = create<AppState>((set, get) => ({
     // main releases the source peeker before draining (see ClusterConnection).
     const result = await window.api.moveMessages(req)
     if (result.ok) {
+      rememberMoveTarget(set, get, req)
       set({ moveDialog: null })
       // The source was drained; clear its tab and resume its peek if open.
-      const tid = queueTabId(req.connectionId, req.sourceQueue)
-      if (get().tabs.some((t) => t.id === tid)) {
-        set({ tabs: clearQueueTab(get().tabs, tid) })
-        void window.api.startPeek(req.connectionId, req.sourceQueue)
-      }
+      afterSourceMutated(set, get, req.connectionId, req.sourceQueue)
+      await get().refreshQueues(req.connectionId)
+    }
+    return result
+  },
+
+  async moveMessage(req) {
+    const result = await window.api.moveMessage(req)
+    if (result.ok) {
+      rememberMoveTarget(set, get, req)
+      set({ moveDialog: null })
+      afterSourceMutated(set, get, req.connectionId, req.sourceQueue)
+      await get().refreshQueues(req.connectionId)
+    }
+    return result
+  },
+
+  async deleteMessage(req) {
+    const result = await window.api.deleteMessage(req)
+    if (result.ok) {
+      afterSourceMutated(set, get, req.connectionId, req.sourceQueue)
       await get().refreshQueues(req.connectionId)
     }
     return result
@@ -490,6 +583,12 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ peekPaneHeight: h })
   },
 
+  setDetailMetaWidth(width) {
+    const w = clampMetaWidth(width)
+    localStorage.setItem('rw.detailMetaWidth', String(w))
+    set({ detailMetaWidth: w })
+  },
+
   openNewConnection() {
     set({ dialogOpen: true, editing: null })
   },
@@ -516,6 +615,11 @@ export const useAppStore = create<AppState>((set, get) => ({
   }
 }))
 
+/** Stop the broker-side peeker backing a queue tab (no-op for other kinds). */
+function stopTabPeek(tab: EditorTab): void {
+  if (tab.kind === 'queue') void window.api.stopPeek(tab.connectionId, tab.queue)
+}
+
 /** Reset a queue tab's accumulated context (peeks/unread/selection). */
 function clearQueueTab(tabs: EditorTab[], tabId: string): EditorTab[] {
   return tabs.map((t) =>
@@ -523,6 +627,41 @@ function clearQueueTab(tabs: EditorTab[], tabId: string): EditorTab[] {
       ? { ...t, peeks: [], unread: 0, selectedMessageId: null }
       : t
   )
+}
+
+/** Persist the chosen move destination for a source queue, for default values. */
+function rememberMoveTarget(
+  set: (partial: Partial<AppState>) => void,
+  get: () => AppState,
+  req: { connectionId: string; sourceQueue: string; targetExchange: string; targetRoutingKey: string }
+): void {
+  const targets = {
+    ...get().lastMoveTargets,
+    [moveTargetKey(req.connectionId, req.sourceQueue)]: {
+      exchange: req.targetExchange,
+      routingKey: req.targetRoutingKey
+    }
+  }
+  try {
+    localStorage.setItem(MOVE_TARGETS_KEY, JSON.stringify(targets))
+  } catch {
+    // storage unavailable; keep in-memory only
+  }
+  set({ lastMoveTargets: targets })
+}
+
+/** After a move/delete changed a queue, refresh its open tab's live peek. */
+function afterSourceMutated(
+  set: (partial: Partial<AppState>) => void,
+  get: () => AppState,
+  connectionId: string,
+  sourceQueue: string
+): void {
+  const tid = queueTabId(connectionId, sourceQueue)
+  if (get().tabs.some((t) => t.id === tid)) {
+    set({ tabs: clearQueueTab(get().tabs, tid) })
+    void window.api.startPeek(connectionId, sourceQueue)
+  }
 }
 
 /** Close every tab belonging to a connection (on disconnect/delete) and stop
@@ -534,9 +673,7 @@ function closeTabsFor(
 ): void {
   const { tabs, activeTabId } = get()
   for (const t of tabs) {
-    if (t.connectionId === connectionId && t.kind === 'queue') {
-      void window.api.stopPeek(t.connectionId, t.queue)
-    }
+    if (t.connectionId === connectionId) stopTabPeek(t)
   }
   const remaining = tabs.filter((t) => t.connectionId !== connectionId)
   const activeAlive = remaining.some((t) => t.id === activeTabId)

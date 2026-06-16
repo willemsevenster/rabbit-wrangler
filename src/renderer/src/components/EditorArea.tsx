@@ -1,12 +1,21 @@
+import { useEffect, useRef, useState } from 'react'
 import { useAppStore, type EditorTab } from '../store/app-store'
 import { QueueTable } from './QueueTable'
 import { MessagePeekPanel } from './MessagePeekPanel'
 import { ExchangeDetail } from './ExchangeDetail'
+import { ContextMenu, useContextMenu, type MenuItem } from './ContextMenu'
 
 const TAB_ICON: Record<EditorTab['kind'], string> = {
   overview: 'codicon-database',
   queue: 'codicon-inbox',
   exchange: 'codicon-symbol-namespace'
+}
+
+/** Same icons, bare names, for the context-menu (overflow) list. */
+const TAB_MENU_ICON: Record<EditorTab['kind'], string> = {
+  overview: 'database',
+  queue: 'inbox',
+  exchange: 'symbol-namespace'
 }
 
 /**
@@ -39,50 +48,186 @@ function TabBar() {
   const activeTabId = useAppStore((s) => s.activeTabId)
   const setActiveTab = useAppStore((s) => s.setActiveTab)
   const closeTab = useAppStore((s) => s.closeTab)
+  const closeAllTabs = useAppStore((s) => s.closeAllTabs)
+  const closeTabsToRight = useAppStore((s) => s.closeTabsToRight)
+  const moveTab = useAppStore((s) => s.moveTab)
+  const reorderTab = useAppStore((s) => s.reorderTab)
+  const stripRef = useRef<HTMLDivElement>(null)
+  const dragId = useRef<string | null>(null)
+  const [dragOverId, setDragOverId] = useState<string | null>(null)
+  const [overflow, setOverflow] = useState<{ x: number; y: number } | null>(null)
+  const { menu, openMenu, close } = useContextMenu()
+
+  // Keep the active tab scrolled into view (e.g. after picking it from the overflow menu).
+  useEffect(() => {
+    const strip = stripRef.current
+    if (!strip || !activeTabId) return
+    const el = [...strip.querySelectorAll('[data-tab]')].find(
+      (n) => n.getAttribute('data-tab') === activeTabId
+    )
+    el?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+  }, [activeTabId])
+
+  // Right-align the dropdown under the chevron (ContextMenu positions by its left edge).
+  function openOverflow(el: HTMLElement) {
+    const r = el.getBoundingClientRect()
+    setOverflow({ x: Math.max(4, r.right - 340), y: r.bottom })
+  }
+
+  function tabMenu(t: EditorTab, index: number): MenuItem[] {
+    const last = tabs.length - 1
+    return [
+      { label: 'Close Tab', icon: 'close', onClick: () => closeTab(t.id) },
+      { label: 'Close All Tabs', icon: 'close-all', onClick: () => closeAllTabs() },
+      {
+        label: 'Close Tabs to the Right',
+        icon: 'chevron-right',
+        disabled: index >= last,
+        onClick: () => closeTabsToRight(t.id)
+      },
+      { separator: true },
+      {
+        label: 'Move Left',
+        icon: 'arrow-left',
+        disabled: index === 0,
+        onClick: () => moveTab(t.id, 'left')
+      },
+      {
+        label: 'Move Right',
+        icon: 'arrow-right',
+        disabled: index >= last,
+        onClick: () => moveTab(t.id, 'right')
+      },
+      {
+        label: 'Move to Start',
+        icon: 'arrow-circle-left',
+        disabled: index === 0,
+        onClick: () => moveTab(t.id, 'start')
+      },
+      {
+        label: 'Move to End',
+        icon: 'arrow-circle-right',
+        disabled: index >= last,
+        onClick: () => moveTab(t.id, 'end')
+      }
+    ]
+  }
+
+  const overflowItems: MenuItem[] = tabs.map((t) => {
+    const unread = t.kind === 'queue' ? t.unread : 0
+    return {
+      label: t.title,
+      title: t.title,
+      icon: TAB_MENU_ICON[t.kind],
+      badge: unread > 0 ? (unread > 99 ? '99+' : String(unread)) : undefined,
+      onClick: () => setActiveTab(t.id)
+    }
+  })
 
   return (
-    <div className="tabbar" role="tablist">
-      {tabs.map((t) => {
-        const isActive = t.id === activeTabId
-        const unread = t.kind === 'queue' ? t.unread : 0
-        return (
-          <div
-            key={t.id}
-            className={`tab ${isActive ? 'is-active' : ''}`}
-            data-tab={t.id}
-            title={t.title}
-            role="tab"
-            aria-selected={isActive}
-            onClick={() => setActiveTab(t.id)}
-            onAuxClick={(e) => {
-              if (e.button === 1) {
-                e.preventDefault()
-                closeTab(t.id)
-              }
-            }}
-          >
-            <span className="tab__icon">
-              <span className={`codicon ${TAB_ICON[t.kind]}`} />
-            </span>
-            <span className="tab__label">{t.title}</span>
-            <span className="tab__trailing">
-              {unread > 0 && !isActive && (
-                <span className="tab__badge">{unread > 99 ? '99+' : unread}</span>
-              )}
-              <button
-                className="tab__close"
-                title="Close tab"
-                onClick={(e) => {
-                  e.stopPropagation()
+    <div className="tabbar">
+      <div
+        className="tabbar__tabs"
+        ref={stripRef}
+        role="tablist"
+        onWheel={(e) => {
+          // Translate vertical wheel into horizontal tab scrolling.
+          if (e.deltaY !== 0 && stripRef.current) stripRef.current.scrollLeft += e.deltaY
+        }}
+      >
+        {tabs.map((t, i) => {
+          const isActive = t.id === activeTabId
+          const unread = t.kind === 'queue' ? t.unread : 0
+          return (
+            <div
+              key={t.id}
+              className={`tab ${isActive ? 'is-active' : ''} ${dragOverId === t.id ? 'is-dragover' : ''}`}
+              data-tab={t.id}
+              title={t.title}
+              role="tab"
+              aria-selected={isActive}
+              draggable
+              onClick={() => setActiveTab(t.id)}
+              onAuxClick={(e) => {
+                if (e.button === 1) {
+                  e.preventDefault()
                   closeTab(t.id)
-                }}
-              >
-                <span className="codicon codicon-close" />
-              </button>
-            </span>
-          </div>
-        )
-      })}
+                }
+              }}
+              onContextMenu={(e) => openMenu(e, tabMenu(t, i))}
+              onDragStart={(e) => {
+                dragId.current = t.id
+                e.dataTransfer.effectAllowed = 'move'
+              }}
+              onDragOver={(e) => {
+                if (dragId.current && dragId.current !== t.id) {
+                  e.preventDefault()
+                  e.dataTransfer.dropEffect = 'move'
+                  setDragOverId(t.id)
+                }
+              }}
+              onDrop={(e) => {
+                e.preventDefault()
+                const from = dragId.current
+                if (from && from !== t.id) {
+                  reorderTab(
+                    from,
+                    tabs.findIndex((x) => x.id === t.id)
+                  )
+                }
+                dragId.current = null
+                setDragOverId(null)
+              }}
+              onDragEnd={() => {
+                dragId.current = null
+                setDragOverId(null)
+              }}
+            >
+              <span className="tab__icon">
+                <span className={`codicon ${TAB_ICON[t.kind]}`} />
+              </span>
+              <span className="tab__label">{t.title}</span>
+              <span className="tab__trailing">
+                {unread > 0 && !isActive && (
+                  <span className="tab__badge">{unread > 99 ? '99+' : unread}</span>
+                )}
+                <button
+                  className="tab__close"
+                  title="Close tab"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    closeTab(t.id)
+                  }}
+                >
+                  <span className="codicon codicon-close" />
+                </button>
+              </span>
+            </div>
+          )
+        })}
+      </div>
+
+      {tabs.length > 0 && (
+        <button
+          className="tabbar__overflow"
+          title="Show all tabs"
+          aria-label="Show all open tabs"
+          onClick={(e) => (overflow ? setOverflow(null) : openOverflow(e.currentTarget))}
+        >
+          <span className="codicon codicon-chevron-down" />
+        </button>
+      )}
+
+      {overflow && (
+        <ContextMenu
+          x={overflow.x}
+          y={overflow.y}
+          items={overflowItems}
+          onClose={() => setOverflow(null)}
+        />
+      )}
+
+      {menu && <ContextMenu {...menu} onClose={close} />}
     </div>
   )
 }

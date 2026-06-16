@@ -1,5 +1,14 @@
-import type { MoveMessagesRequest, OperationResult } from '@shared/types'
+import type {
+  DeleteMessageRequest,
+  MoveMessageRequest,
+  MoveMessagesRequest,
+  OperationResult
+} from '@shared/types'
+import { fingerprintOf } from './fingerprint'
 import type { AmqpConnection } from './amqp'
+
+type ConfirmChannel = Awaited<ReturnType<AmqpConnection['createConfirmChannel']>>
+type GetMsg = Exclude<Awaited<ReturnType<ConfirmChannel['get']>>, false>
 
 /**
  * Destructive, message-level operations performed over AMQP.
@@ -64,4 +73,100 @@ export async function moveMessages(
   } finally {
     await channel.close().catch(() => undefined)
   }
+}
+
+/** How many head messages to scan looking for the target before giving up. The
+ * UI can only ever select a message from the head window, so this is generous. */
+const MAX_SCAN = 1000
+
+/**
+ * Pull messages one at a time until one matches `fingerprint`, run `act` on it,
+ * then requeue everything else pulled. Non-matching messages are held unacked
+ * and put back via nack(requeue) — and the broker also requeues any still-unacked
+ * on channel close, so nothing is lost even if `act` throws.
+ */
+async function findAndAct(
+  conn: AmqpConnection,
+  queue: string,
+  fingerprint: string,
+  act: (channel: ConfirmChannel, msg: GetMsg) => Promise<OperationResult>
+): Promise<OperationResult> {
+  const channel = await conn.createConfirmChannel()
+  const held: GetMsg[] = []
+  const requeueHeld = (): void => {
+    for (const h of held) {
+      try {
+        channel.nack(h, false, true)
+      } catch {
+        // channel closing — broker requeues unacked anyway
+      }
+    }
+  }
+  try {
+    for (let scanned = 0; scanned < MAX_SCAN; scanned++) {
+      const msg = await channel.get(queue, { noAck: false })
+      if (msg === false) break // queue empty
+      if (fingerprintOf(msg) === fingerprint) {
+        const result = await act(channel, msg)
+        requeueHeld()
+        return result
+      }
+      held.push(msg)
+    }
+    requeueHeld()
+    return {
+      ok: false,
+      affected: 0,
+      error: 'Message not found in the queue (it may have already been consumed, moved or deleted).'
+    }
+  } catch (err) {
+    requeueHeld()
+    return { ok: false, affected: 0, error: err instanceof Error ? err.message : String(err) }
+  } finally {
+    await channel.close().catch(() => undefined)
+  }
+}
+
+/** Move exactly one message (matched by fingerprint) to a target, confirmed. */
+export async function moveMessage(
+  conn: AmqpConnection,
+  req: MoveMessageRequest
+): Promise<OperationResult> {
+  return findAndAct(conn, req.sourceQueue, req.fingerprint, async (channel, msg) => {
+    let returned = false
+    const onReturn = (): void => {
+      returned = true
+    }
+    channel.once('return', onReturn)
+    channel.publish(req.targetExchange, req.targetRoutingKey, msg.content, {
+      ...msg.properties,
+      headers: msg.properties.headers,
+      mandatory: true
+    })
+    await channel.waitForConfirms()
+    channel.removeListener('return', onReturn)
+    if (returned) {
+      channel.nack(msg, false, true)
+      return {
+        ok: false,
+        affected: 0,
+        error:
+          `Target is unroutable (exchange "${req.targetExchange || '(default)'}", ` +
+          `routing key "${req.targetRoutingKey}"). The message was left in "${req.sourceQueue}".`
+      }
+    }
+    channel.ack(msg)
+    return { ok: true, affected: 1 }
+  })
+}
+
+/** Delete exactly one message (matched by fingerprint) from its queue. */
+export async function deleteMessage(
+  conn: AmqpConnection,
+  req: DeleteMessageRequest
+): Promise<OperationResult> {
+  return findAndAct(conn, req.sourceQueue, req.fingerprint, async (channel, msg) => {
+    channel.ack(msg)
+    return { ok: true, affected: 1 }
+  })
 }

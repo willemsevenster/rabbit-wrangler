@@ -13,7 +13,9 @@
 import type {
   BindingInfo,
   ConnectionConfig,
+  DeleteMessageRequest,
   ExchangeInfo,
+  MoveMessageRequest,
   MoveMessagesRequest,
   OperationResult,
   PeekedMessage,
@@ -44,9 +46,14 @@ export const IPC = {
   startPeek: 'peek:start',
   stopPeek: 'peek:stop',
   moveMessages: 'messages:move',
+  moveMessage: 'messages:moveOne',
+  deleteMessage: 'messages:deleteOne',
 
   // event stream bootstrap
-  getEventStreamPort: 'events:port'
+  getEventStreamPort: 'events:port',
+
+  // app lifecycle
+  quitApp: 'app:quit'
 } as const
 
 /** The API surface the preload exposes on `window.api`. */
@@ -69,9 +76,16 @@ export interface RabbitApi {
   startPeek(connectionId: string, queue: string): Promise<void>
   stopPeek(connectionId: string, queue: string): Promise<void>
   moveMessages(request: MoveMessagesRequest): Promise<OperationResult>
+  /** Move one peeked message (by fingerprint) to a target exchange/routing key. */
+  moveMessage(request: MoveMessageRequest): Promise<OperationResult>
+  /** Delete one peeked message (by fingerprint) from its queue. */
+  deleteMessage(request: DeleteMessageRequest): Promise<OperationResult>
 
   /** Port of the localhost WebSocket carrying the live event stream. */
   getEventStreamPort(): Promise<number>
+
+  /** Quit the whole application. */
+  quitApp(): Promise<void>
 
   /** Write text to the system clipboard. Handled in the preload — no IPC. */
   copyText(text: string): void
