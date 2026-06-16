@@ -338,7 +338,7 @@ function MessageDetailPane({
         )}
       </div>
 
-      <div className="msg-detail__resizer" onMouseDown={onMetaResize} role="separator" />
+      <div className="msg-detail__resizer" onMouseDown={onMetaResize} role="separator" aria-orientation="vertical" />
 
       <div className="msg-detail__payload">
         <div className="peek-item__section" style={{ margin: '0 0 6px' }}>
