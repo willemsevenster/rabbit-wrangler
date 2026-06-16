@@ -159,6 +159,31 @@ code {
   background: rgba(255, 255, 255, 0.12);
 }
 
+/* ---------- auto-update ---------- */
+/* title-bar update button — sized to fit the 30px bar */
+.titlebar__update {
+  height: 22px;
+  margin-left: 6px;
+  -webkit-app-region: no-drag;
+}
+
+/* transient feedback banner for manual update checks */
+.update-toast {
+  position: fixed;
+  bottom: 34px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1200;
+  padding: 8px 14px;
+  background: #252526;
+  border: 1px solid #454545;
+  border-radius: 6px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
+  color: var(--text);
+  font-size: 12px;
+  cursor: default;
+}
+
 .app-body {
   display: grid;
   grid-template-columns: 48px 300px 1fr;

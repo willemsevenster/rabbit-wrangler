@@ -12,13 +12,22 @@ asarUnpack:
 win:
   target:
     - nsis
-mac:
-  target:
-    - dmg
-  category: public.app-category.developer-tools
+  # --- Windows code signing (signing-ready; off until a cert is set up) ---
+  # electron-builder auto-reads CSC_LINK + CSC_KEY_PASSWORD from the environment
+  # at build time, so enabling signing later is just adding those CI secrets —
+  # no config/code change needed here.
+nsis:
+  oneClick: true
+  perMachine: false # per-user install ⇒ unsigned auto-updates apply without a UAC prompt
+  allowToChangeInstallationDirectory: false
 linux:
   target:
     - AppImage
   category: Development
 npmRebuild: false
-publish: null
+# Installers + update metadata (latest.yml / latest-linux.yml + blockmaps) publish
+# to GitHub Releases; the running app reads the same source via app-update.yml.
+publish:
+  provider: github
+  owner: willemsevenster
+  repo: rabbit-wrangler

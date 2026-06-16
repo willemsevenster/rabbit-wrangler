@@ -15,8 +15,14 @@ export function MenuBar() {
   const activeTab = useAppStore((s) => s.tabs.find((t) => t.id === s.activeTabId) ?? null)
   const sidebarVisible = useAppStore((s) => s.sidebarVisible)
   const toggleSidebar = useAppStore((s) => s.toggleSidebar)
+  const checkForUpdates = useAppStore((s) => s.checkForUpdates)
 
   const activeQueue = activeTab?.kind === 'queue' ? activeTab : null
+
+  async function showAbout(): Promise<void> {
+    const version = await window.api.getAppVersion()
+    alert(`Rabbit Wrangler ${version}\nRabbitMQ management tool`)
+  }
 
   const menus: { label: string; items: () => MenuItem[] }[] = [
     {
@@ -75,10 +81,12 @@ export function MenuBar() {
     {
       label: 'Help',
       items: () => [
+        { label: 'Check for Updates…', icon: 'cloud', onClick: () => checkForUpdates() },
+        { separator: true },
         {
           label: 'About Rabbit Wrangler',
           icon: 'info',
-          onClick: () => alert('Rabbit Wrangler — RabbitMQ management tool')
+          onClick: () => void showAbout()
         }
       ]
     }

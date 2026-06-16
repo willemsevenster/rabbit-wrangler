@@ -9,6 +9,8 @@ import { MoveMessagesDialog } from './components/MoveMessagesDialog'
 import { PublishMessageDialog } from './components/PublishMessageDialog'
 import { MenuBar } from './components/MenuBar'
 import { Resizer } from './components/Resizer'
+import { UpdateButton } from './components/UpdateButton'
+import { UpdateToast } from './components/UpdateToast'
 
 function App() {
   const init = useAppStore((s) => s.init)
@@ -30,6 +32,7 @@ function App() {
         <div className="titlebar__left">
           <span className="titlebar__icon">🐰</span>
           <MenuBar />
+          <UpdateButton />
         </div>
         <span className="titlebar__title">Rabbit Wrangler</span>
       </div>
@@ -43,6 +46,7 @@ function App() {
       {dialogOpen && <ConnectionDialog />}
       {moveDialog && <MoveMessagesDialog />}
       {publishDialog && <PublishMessageDialog />}
+      <UpdateToast />
     </div>
   )
 }

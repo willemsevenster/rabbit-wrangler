@@ -1,5 +1,6 @@
 import { app, ipcMain } from 'electron'
 import { IPC } from '@shared/ipc'
+import { checkForUpdates, downloadUpdate, quitAndInstall } from './updater'
 import { configStore } from './store/config-store'
 import { connectionManager } from './connections/connection-manager'
 import { eventStreamServer } from './websocket-server'
@@ -79,4 +80,9 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(IPC.getEventStreamPort, () => eventStreamServer.getPort())
 
   ipcMain.handle(IPC.quitApp, () => app.quit())
+
+  ipcMain.handle(IPC.getAppVersion, () => app.getVersion())
+  ipcMain.handle(IPC.checkForUpdates, () => checkForUpdates())
+  ipcMain.handle(IPC.downloadUpdate, () => downloadUpdate())
+  ipcMain.handle(IPC.quitAndInstall, () => quitAndInstall())
 }

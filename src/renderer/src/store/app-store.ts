@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { EventSocket } from '../lib/event-socket'
-import type { StreamEvent } from '@shared/ipc'
+import type { StreamEvent, UpdateStatusPayload } from '@shared/ipc'
 import type {
   BindingInfo,
   ConnectionConfig,
@@ -99,6 +99,11 @@ interface AppState {
   /** Persisted width of the properties column in the message-detail pane. */
   detailMetaWidth: number
 
+  /** Auto-update status pushed from main (null until the first event). */
+  updateStatus: UpdateStatusPayload | null
+  /** Transient feedback for manual update checks (e.g. "You're up to date."). */
+  updateToast: string | null
+
   init(): Promise<void>
   refreshConnections(): Promise<void>
   selectConnection(id: string): Promise<void>
@@ -139,6 +144,11 @@ interface AppState {
   toggleSidebar(): void
   setPeekPaneHeight(height: number): void
   setDetailMetaWidth(width: number): void
+
+  checkForUpdates(): void
+  downloadUpdate(): void
+  restartToUpdate(): void
+  dismissUpdateToast(): void
 
   openNewConnection(): void
   editConnection(connection: SafeConnectionConfig): void
@@ -202,6 +212,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   sidebarVisible: true,
   peekPaneHeight: initialPeekPaneHeight,
   detailMetaWidth: initialDetailMetaWidth,
+  updateStatus: null,
+  updateToast: null,
 
   async init() {
     if (initialized) return
@@ -589,6 +601,24 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ detailMetaWidth: w })
   },
 
+  checkForUpdates() {
+    void window.api.checkForUpdates()
+  },
+
+  downloadUpdate() {
+    void window.api.downloadUpdate()
+  },
+
+  restartToUpdate() {
+    const v = get().updateStatus?.version
+    if (!confirm(`Restart now to install Rabbit Wrangler${v ? ` ${v}` : ''}?`)) return
+    void window.api.quitAndInstall()
+  },
+
+  dismissUpdateToast() {
+    set({ updateToast: null })
+  },
+
   openNewConnection() {
     set({ dialogOpen: true, editing: null })
   },
@@ -714,5 +744,17 @@ function applyStreamEvent(
         queuesByConn: { ...get().queuesByConn, [event.payload.connectionId]: event.payload.queues }
       })
       break
+    case 'update-status': {
+      const p = event.payload
+      set({ updateStatus: p })
+      // Only surface a toast for user-initiated checks — never nag mid-task.
+      if (p.manual) {
+        if (p.state === 'checking') set({ updateToast: 'Checking for updates…' })
+        else if (p.state === 'none') set({ updateToast: "You're up to date." })
+        else if (p.state === 'error')
+          set({ updateToast: `Update check failed: ${p.error ?? 'unknown error'}` })
+      }
+      break
+    }
   }
 }

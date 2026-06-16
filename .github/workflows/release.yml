@@ -1,0 +1,77 @@
+name: Release
+
+# Push a semver tag (e.g. v0.1.1) to build installers and publish a GitHub
+# Release with auto-update metadata. The tag must match package.json's version.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write # electron-builder needs this to create/upload the Release
+
+jobs:
+  # Fail fast if the tag and package.json version disagree — the running app
+  # compares its package.json version against the published Release.
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Tag matches package.json version
+        run: |
+          node --input-type=commonjs -e "const fs=require('fs');const v=JSON.parse(fs.readFileSync('package.json','utf8')).version;const t=(process.env.GITHUB_REF_NAME||'').replace(/^v/,'');if(v!==t){console.error('Tag '+process.env.GITHUB_REF_NAME+' does not match package.json version '+v);process.exit(1)}console.log('version ok '+v)"
+
+  windows:
+    needs: verify
+    runs-on: windows-latest
+    env:
+      # CI bundles but never launches Electron, so skip lifecycle scripts (and
+      # pnpm 11's hard "ignored builds" gate). esbuild's binary comes from its
+      # platform optional-dependency, and electron-builder fetches the Electron
+      # dist itself — so packaging still works. Mirrors ci.yml.
+      npm_config_verify_deps_before_run: 'false'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.3.0
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+      - run: pnpm build
+      - name: Package & publish (Windows)
+        run: pnpm exec electron-builder --win --publish always
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # --- Windows signing: add these secrets to enable; no code change ---
+          # CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
+          # CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
+
+  linux:
+    needs: verify
+    runs-on: ubuntu-latest
+    env:
+      npm_config_verify_deps_before_run: 'false'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.3.0
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+      - run: pnpm build
+      - name: Package & publish (Linux)
+        run: pnpm exec electron-builder --linux --publish always
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
