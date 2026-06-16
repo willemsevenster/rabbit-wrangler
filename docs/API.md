@@ -52,10 +52,10 @@ Defined in [`src/shared/ipc.ts`](../src/shared/ipc.ts), bridged in
 
 | Method                                                        | IPC channel          | Maps to broker call                                 |
 | ------------------------------------------------------------- | -------------------- | --------------------------------------------------- |
-| `listExchanges(connectionId): ExchangeInfo[]`                 | `exchanges:list`     | `GET /api/exchanges/{vhost}`                        |
-| `listExchangeBindings(connectionId, exchange): BindingInfo[]` | `exchanges:bindings` | `GET /api/exchanges/{vhost}/{name}/bindings/source` |
-| `deleteExchange(connectionId, exchange): OperationResult`     | `exchanges:delete`   | `DELETE /api/exchanges/{vhost}/{name}`              |
-| `publishMessage(request): OperationResult`                    | `exchanges:publish`  | `POST /api/exchanges/{vhost}/{name}/publish`        |
+| `listExchanges(connectionId: string): Promise<ExchangeInfo[]>`                 | `exchanges:list`     | `GET /api/exchanges/{vhost}`                        |
+| `listExchangeBindings(connectionId: string, exchange: string): Promise<BindingInfo[]>` | `exchanges:bindings` | `GET /api/exchanges/{vhost}/{name}/bindings/source` |
+| `deleteExchange(connectionId: string, exchange: string): Promise<OperationResult>`     | `exchanges:delete`   | `DELETE /api/exchanges/{vhost}/{name}`              |
+| `publishMessage(request: PublishMessageRequest): Promise<OperationResult>`            | `exchanges:publish`  | `POST /api/exchanges/{vhost}/{name}/publish`        |
 
 ### Messages (AMQP plane)
 
