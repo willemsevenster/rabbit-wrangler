@@ -21,7 +21,7 @@ purge, publish, and inspect — across many brokers at once.
 ## Why
 
 The RabbitMQ Management UI is great for cluster operations, but day-to-day
-*message* work — "what's actually flowing through this queue right now?",
+_message_ work — "what's actually flowing through this queue right now?",
 "why did these end up in the dead-letter queue, and can I put them back?" — is
 clumsy in a browser tab. Rabbit Wrangler is a focused desktop app for exactly
 that: a fast, VSCode-style cockpit for the **message plane**, with the safety
@@ -145,7 +145,9 @@ src/
 └─ shared/      types + IPC contract, imported by all three
 ```
 
-See [CLAUDE.md](CLAUDE.md) for a deeper tour of the design and its trade-offs.
+See [CLAUDE.md](CLAUDE.md) for a deeper tour of the design and its trade-offs, and
+[docs/API.md](docs/API.md) for the full API reference (the `window.api` contract,
+RabbitMQ Management API coverage, and a roadmap).
 
 ## Tech stack
 
