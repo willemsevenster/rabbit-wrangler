@@ -71,9 +71,9 @@ Defined in [`src/shared/ipc.ts`](../src/shared/ipc.ts), bridged in
 
 | Method                         | IPC channel   | Notes                                                                     |
 | ------------------------------ | ------------- | ------------------------------------------------------------------------- |
-| `getEventStreamPort(): number` | `events:port` | Ephemeral `127.0.0.1` port of the event WebSocket.                        |
-| `quitApp(): void`              | `app:quit`    | Quits the application (Connections → Exit menu).                          |
-| `copyText(text): void`         | _(none)_      | Handled entirely in preload via Electron `clipboard` — no IPC round-trip. |
+| `getEventStreamPort(): Promise<number>` | `events:port` | Ephemeral `127.0.0.1` port of the event WebSocket.                        |
+| `quitApp(): Promise<void>`              | `app:quit`    | Quits the application (Connections → Exit menu).                          |
+| `copyText(text: string): void`          | _(none)_      | Handled entirely in preload via Electron `clipboard` — no IPC round-trip. |
 
 ### Event stream (WebSocket push)
 
