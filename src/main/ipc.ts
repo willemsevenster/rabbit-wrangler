@@ -1,9 +1,9 @@
-import { app, ipcMain } from 'electron'
+import { app, BrowserWindow, ipcMain } from 'electron'
 import { IPC } from '@shared/ipc'
 import { checkForUpdates, downloadUpdate, quitAndInstall } from './updater'
 import { configStore } from './store/config-store'
 import { exportConnections, readImportFile } from './store/connection-io'
-import { setStoredTheme } from './store/ui-prefs'
+import { setStoredTheme, titleBarOverlayColors } from './store/ui-prefs'
 import { connectionManager } from './connections/connection-manager'
 import { eventStreamServer } from './websocket-server'
 import type {
@@ -82,7 +82,21 @@ export function registerIpcHandlers(): void {
     connectionManager.require(req.connectionId).publishMessage(req)
   )
 
-  ipcMain.handle(IPC.persistTheme, (_e, theme: 'light' | 'dark') => setStoredTheme(theme))
+  ipcMain.handle(IPC.persistTheme, (_e, theme: 'light' | 'dark') => {
+    setStoredTheme(theme)
+    // Re-tint the native window-control overlay to match (Windows/Linux only;
+    // macOS uses traffic lights and has no overlay to update).
+    if (process.platform !== 'darwin') {
+      const overlay = { ...titleBarOverlayColors(theme), height: 30 }
+      for (const win of BrowserWindow.getAllWindows()) {
+        try {
+          win.setTitleBarOverlay(overlay)
+        } catch {
+          // window has no overlay (shouldn't happen on win/linux) — ignore
+        }
+      }
+    }
+  })
 
   ipcMain.handle(IPC.getEventStreamPort, () => eventStreamServer.getPort())
 
