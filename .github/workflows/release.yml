@@ -69,6 +69,10 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
+      # electron-builder bundles fpm for .deb, but .rpm needs the system `rpm`
+      # tool (and `rpmbuild`) present on the runner.
+      - name: Install rpm tooling
+        run: sudo apt-get update && sudo apt-get install -y rpm
       - run: pnpm install --frozen-lockfile --ignore-scripts
       - run: pnpm build
       - name: Package & publish (Linux)
