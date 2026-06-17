@@ -103,6 +103,7 @@ function SettingsModal() {
           <button
             className="icon-button"
             title="Open the Settings manual"
+            aria-label="Open the Settings manual"
             onClick={() => openManual('settings')}
           >
             <span className="codicon codicon-question" />

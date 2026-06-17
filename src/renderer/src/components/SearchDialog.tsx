@@ -156,11 +156,12 @@ function SearchModal() {
             <button
               className="icon-button"
               title="Open the search manual"
+              aria-label="Open the search manual"
               onClick={() => openManual('search')}
             >
               <span className="codicon codicon-question" />
             </button>
-            <button className="icon-button" title="Close" onClick={close}>
+            <button className="icon-button" title="Close" aria-label="Close search" onClick={close}>
               <span className="codicon codicon-close" />
             </button>
           </span>

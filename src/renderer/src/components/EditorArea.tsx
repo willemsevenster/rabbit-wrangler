@@ -323,6 +323,7 @@ function QueueTab({ tab }: { tab: Extract<EditorTab, { kind: 'queue' }> }) {
         <button
           className="icon-button"
           title="How peeking works (manual)"
+          aria-label="How peeking works (manual)"
           onClick={() => openManual('peeking-messages')}
         >
           <span className="codicon codicon-question" />
