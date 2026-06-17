@@ -9,13 +9,20 @@ import { useAppStore } from '../store/app-store'
 export function useTabCycle(): void {
   useEffect(() => {
     function onKey(e: KeyboardEvent): void {
-      if (!e.ctrlKey || e.key !== 'Tab') return
+      // Exactly Ctrl(+Shift)+Tab — ignore when Alt/Meta are also held so we don't
+      // hijack other chords (e.g. Ctrl+Alt+Tab).
+      if (!e.ctrlKey || e.altKey || e.metaKey || e.key !== 'Tab') return
       const { tabs, activeTabId, setActiveTab } = useAppStore.getState()
       if (tabs.length < 2) return
       e.preventDefault()
       const idx = tabs.findIndex((t) => t.id === activeTabId)
-      const from = idx === -1 ? 0 : idx
-      const next = (from + (e.shiftKey ? -1 : 1) + tabs.length) % tabs.length
+      // With no active tab, forward starts at the first tab and reverse at the last.
+      const next =
+        idx === -1
+          ? e.shiftKey
+            ? tabs.length - 1
+            : 0
+          : (idx + (e.shiftKey ? -1 : 1) + tabs.length) % tabs.length
       setActiveTab(tabs[next].id)
     }
     window.addEventListener('keydown', onKey, true)
