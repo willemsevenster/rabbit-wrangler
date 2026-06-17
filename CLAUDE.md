@@ -107,7 +107,10 @@ when the management API already exposes it (e.g. purge is an HTTP `DELETE`).
   lists by connection (`queuesByConn`/`exchangesByConn`), and the Move/Publish
   dialogs carry the target `connectionId` rather than assuming the tree's
   selection. Queue and exchange tabs are titled `{connection} - {name}` (resolved
-  from the connection list when the tab is opened).
+  from the connection list when the tab is opened). **Ctrl+Tab / Ctrl+Shift+Tab**
+  cycle the active tab forward/backward with wrap (`lib/use-tab-cycle.ts`, a global
+  capture-phase keydown so Monaco doesn't swallow it); the focused tab strip also
+  takes Left/Right/Home/End.
 - **Move = drain + republish with confirms** (`rabbitmq/operations.ts`, UI via
   the queue context menu → "Move Messages…"): pulls messages one at a time,
   republishes to the target exchange/routing-key on a **confirm channel**, and
