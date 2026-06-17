@@ -118,13 +118,19 @@ interface AppState {
   sidebarVisible: boolean
   /** Persisted height of the message-detail pane in the peek view. */
   peekPaneHeight: number
+  /** Persisted height of the detail pane in the cross-tab search popup. */
+  searchPaneHeight: number
   /** Persisted width of the properties column in the message-detail pane. */
   detailMetaWidth: number
+  /** Persisted properties-column width in the search popup's detail pane. */
+  searchDetailMetaWidth: number
   /** Active color theme (persisted; first run follows the OS). */
   theme: Theme
 
   /** Settings modal open state. */
   settingsOpen: boolean
+  /** Cross-tab message search popup open state. */
+  searchOpen: boolean
   /** Max peeked messages retained per queue tab (oldest dropped past this). */
   maxMessages: number
   /** Name suffixes that mark a queue as a dead-letter queue (user-customizable). */
@@ -197,13 +203,17 @@ interface AppState {
   setSidebarWidth(width: number): void
   toggleSidebar(): void
   setPeekPaneHeight(height: number): void
+  setSearchPaneHeight(height: number): void
   setDetailMetaWidth(width: number): void
+  setSearchDetailMetaWidth(width: number): void
   setTheme(theme: Theme): void
   toggleTheme(): void
 
   // settings
   openSettings(): void
   closeSettings(): void
+  openSearch(): void
+  closeSearch(): void
   setMaxMessages(n: number): void
   setDlqSuffixes(suffixes: string[]): void
   setConfirmDestructive(on: boolean): void
@@ -258,12 +268,18 @@ const PEEK_PANE_MAX = 700
 const clampPaneHeight = (h: number): number =>
   Math.min(PEEK_PANE_MAX, Math.max(PEEK_PANE_MIN, Math.round(h)))
 const initialPeekPaneHeight = clampPaneHeight(Number(localStorage.getItem('rw.peekPaneHeight')) || 260)
+const initialSearchPaneHeight = clampPaneHeight(
+  Number(localStorage.getItem('rw.searchPaneHeight')) || 300
+)
 
 const DETAIL_META_MIN = 160
 const DETAIL_META_MAX = 640
 const clampMetaWidth = (w: number): number =>
   Math.min(DETAIL_META_MAX, Math.max(DETAIL_META_MIN, Math.round(w)))
 const initialDetailMetaWidth = clampMetaWidth(Number(localStorage.getItem('rw.detailMetaWidth')) || 320)
+const initialSearchDetailMetaWidth = clampMetaWidth(
+  Number(localStorage.getItem('rw.searchDetailMetaWidth')) || 320
+)
 
 const MAX_MESSAGES_KEY = 'rw.maxMessages'
 const clampMaxMessages = (n: number): number =>
@@ -337,9 +353,12 @@ export const useAppStore = create<AppState>((set, get) => ({
   sidebarWidth: initialSidebarWidth,
   sidebarVisible: true,
   peekPaneHeight: initialPeekPaneHeight,
+  searchPaneHeight: initialSearchPaneHeight,
   detailMetaWidth: initialDetailMetaWidth,
+  searchDetailMetaWidth: initialSearchDetailMetaWidth,
   theme: initialTheme,
   settingsOpen: false,
+  searchOpen: false,
   maxMessages: initialMaxMessages,
   dlqSuffixes: loadDlqSuffixes(),
   confirmDestructive: initialConfirmDestructive,
@@ -817,10 +836,22 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ peekPaneHeight: h })
   },
 
+  setSearchPaneHeight(height) {
+    const h = clampPaneHeight(height)
+    localStorage.setItem('rw.searchPaneHeight', String(h))
+    set({ searchPaneHeight: h })
+  },
+
   setDetailMetaWidth(width) {
     const w = clampMetaWidth(width)
     localStorage.setItem('rw.detailMetaWidth', String(w))
     set({ detailMetaWidth: w })
+  },
+
+  setSearchDetailMetaWidth(width) {
+    const w = clampMetaWidth(width)
+    localStorage.setItem('rw.searchDetailMetaWidth', String(w))
+    set({ searchDetailMetaWidth: w })
   },
 
   setTheme(theme) {
@@ -841,6 +872,14 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   closeSettings() {
     set({ settingsOpen: false })
+  },
+
+  openSearch() {
+    set({ searchOpen: true })
+  },
+
+  closeSearch() {
+    set({ searchOpen: false })
   },
 
   setMaxMessages(n) {

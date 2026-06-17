@@ -1,81 +1,11 @@
 import { useRef, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent } from 'react'
 import { useAppStore, type EditorTab } from '../store/app-store'
 import { ContextMenu, useContextMenu, type MenuItem } from './ContextMenu'
-import { MonacoViewer } from './MonacoViewer'
+import { MessageDetail } from './MessageDetail'
+import { byteSize, formatBytes } from '../lib/message-format'
 import type { PeekedMessage } from '@shared/types'
 
 type QueueTab = Extract<EditorTab, { kind: 'queue' }>
-
-/** amqplib exposes properties camelCased; show the familiar RabbitMQ names, in order. */
-const PROP_ORDER: [string, string][] = [
-  ['contentType', 'content_type'],
-  ['contentEncoding', 'content_encoding'],
-  ['deliveryMode', 'delivery_mode'],
-  ['priority', 'priority'],
-  ['correlationId', 'correlation_id'],
-  ['replyTo', 'reply_to'],
-  ['expiration', 'expiration'],
-  ['messageId', 'message_id'],
-  ['timestamp', 'timestamp'],
-  ['type', 'type'],
-  ['userId', 'user_id'],
-  ['appId', 'app_id'],
-  ['clusterId', 'cluster_id']
-]
-
-function formatBytes(n: number): string {
-  if (n < 1024) return `${n} B`
-  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`
-  return `${(n / (1024 * 1024)).toFixed(1)} MB`
-}
-
-function byteSize(m: PeekedMessage): number {
-  if (m.isBinary) {
-    try {
-      return atob(m.payload).length
-    } catch {
-      return m.payload.length
-    }
-  }
-  return new TextEncoder().encode(m.payload).length
-}
-
-function displayValue(key: string, value: unknown): string {
-  if (key === 'deliveryMode') return value === 2 ? '2 (persistent)' : `${value} (transient)`
-  if (value && typeof value === 'object') return JSON.stringify(value)
-  return String(value)
-}
-
-function propertyRows(props: Record<string, unknown>): [string, string][] {
-  const rows: [string, string][] = []
-  const seen = new Set<string>()
-  for (const [key, label] of PROP_ORDER) {
-    const v = props[key]
-    if (v != null && v !== '') {
-      rows.push([label, displayValue(key, v)])
-      seen.add(key)
-    }
-  }
-  for (const [key, v] of Object.entries(props)) {
-    if (!seen.has(key) && v != null && v !== '') rows.push([key, displayValue(key, v)])
-  }
-  return rows
-}
-
-function deathRecords(headers: Record<string, unknown>): Record<string, unknown>[] {
-  const xd = headers['x-death']
-  return Array.isArray(xd) ? (xd as Record<string, unknown>[]) : []
-}
-
-function detectLanguage(m: PeekedMessage): string {
-  const ct = String(m.properties.contentType ?? '').toLowerCase()
-  if (ct.includes('json')) return 'json'
-  if (!m.isBinary) {
-    const t = m.payload.trimStart()
-    if (t.startsWith('{') || t.startsWith('[')) return 'json'
-  }
-  return 'plaintext'
-}
 
 function menuFor(m: PeekedMessage): MenuItem[] {
   let prettyJson: string | null = null
@@ -121,6 +51,8 @@ export function MessagePeekPanel({ tab }: { tab: QueueTab }) {
   const deleteMessage = useAppStore((s) => s.deleteMessage)
   const maybeConfirm = useAppStore((s) => s.maybeConfirm)
   const addToast = useAppStore((s) => s.addToast)
+  const metaWidth = useAppStore((s) => s.detailMetaWidth)
+  const setMetaWidth = useAppStore((s) => s.setDetailMetaWidth)
 
   const setSelectedId = (id: string): void => selectMessage(tab.id, id)
   const selected = peeks.find((m) => m.id === selectedId) ?? null
@@ -247,10 +179,12 @@ export function MessagePeekPanel({ tab }: { tab: QueueTab }) {
 
       <div className="peek__detail" style={{ height: paneHeight }}>
         {selected ? (
-          <MessageDetailPane
+          <MessageDetail
             message={selected}
             onMove={() => moveMessage(selected)}
             onDelete={() => void removeMessage(selected)}
+            metaWidth={metaWidth}
+            onMetaWidthChange={setMetaWidth}
           />
         ) : (
           <div className="placeholder">Select a message to view its details and payload.</div>
@@ -258,143 +192,6 @@ export function MessagePeekPanel({ tab }: { tab: QueueTab }) {
       </div>
 
       {menu && <ContextMenu {...menu} onClose={close} />}
-    </div>
-  )
-}
-
-function MessageDetailPane({
-  message: m,
-  onMove,
-  onDelete
-}: {
-  message: PeekedMessage
-  onMove: () => void
-  onDelete: () => void
-}) {
-  const props = propertyRows(m.properties)
-  const deaths = deathRecords(m.headers)
-  const otherHeaders = Object.entries(m.headers).filter(([k]) => k !== 'x-death')
-  const metaWidth = useAppStore((s) => s.detailMetaWidth)
-  const setMetaWidth = useAppStore((s) => s.setDetailMetaWidth)
-  const detailRef = useRef<HTMLDivElement>(null)
-
-  function onMetaResize(e: MouseEvent) {
-    e.preventDefault()
-    const onMove = (ev: globalThis.MouseEvent) => {
-      const rect = detailRef.current?.getBoundingClientRect()
-      if (rect) setMetaWidth(ev.clientX - rect.left)
-    }
-    const onUp = () => {
-      window.removeEventListener('mousemove', onMove)
-      window.removeEventListener('mouseup', onUp)
-      document.body.classList.remove('resizing')
-    }
-    window.addEventListener('mousemove', onMove)
-    window.addEventListener('mouseup', onUp)
-    document.body.classList.add('resizing')
-  }
-
-  return (
-    <div className="msg-detail" ref={detailRef}>
-      <div className="msg-detail__meta" style={{ width: metaWidth }}>
-        <div className="msg-detail__actions">
-          <button className="btn btn--sm btn--secondary" onClick={onMove}>
-            <span className="codicon codicon-arrow-right" />
-            Move
-          </button>
-          <button className="btn btn--sm btn--danger" onClick={onDelete}>
-            <span className="codicon codicon-trash" />
-            Delete
-          </button>
-        </div>
-        <div className="peek-item__summary">
-          <span>
-            Exchange: <code>{m.exchange || '(default)'}</code>
-          </span>
-          <span>
-            Routing key: <code>{m.routingKey || '(none)'}</code>
-          </span>
-          <span>Size: {formatBytes(byteSize(m))}</span>
-        </div>
-
-        {props.length > 0 && (
-          <>
-            <div className="peek-item__section">Properties</div>
-            <table className="kv-table">
-              <tbody>
-                {props.map(([k, v]) => (
-                  <tr key={k}>
-                    <td>{k}</td>
-                    <td>{v}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </>
-        )}
-
-        {deaths.length > 0 && (
-          <>
-            <div className="peek-item__section">Dead-letter history (x-death)</div>
-            <table className="kv-table">
-              <thead>
-                <tr>
-                  <th>Queue</th>
-                  <th>Reason</th>
-                  <th>Count</th>
-                  <th>Routing key(s)</th>
-                </tr>
-              </thead>
-              <tbody>
-                {deaths.map((d, i) => (
-                  <tr key={i}>
-                    <td>{String(d.queue ?? '')}</td>
-                    <td>{String(d.reason ?? '')}</td>
-                    <td>{String(d.count ?? '')}</td>
-                    <td>
-                      {Array.isArray(d['routing-keys'])
-                        ? (d['routing-keys'] as unknown[]).join(', ')
-                        : ''}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </>
-        )}
-
-        {otherHeaders.length > 0 && (
-          <>
-            <div className="peek-item__section">Headers</div>
-            <table className="kv-table">
-              <tbody>
-                {otherHeaders.map(([k, v]) => (
-                  <tr key={k}>
-                    <td>{k}</td>
-                    <td>{typeof v === 'object' ? JSON.stringify(v) : String(v)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </>
-        )}
-      </div>
-
-      <div
-        className="msg-detail__resizer"
-        onMouseDown={onMetaResize}
-        role="separator"
-        aria-orientation="vertical"
-      />
-
-      <div className="msg-detail__payload">
-        <div className="peek-item__section" style={{ margin: '0 0 6px' }}>
-          Payload {m.isBinary && '(base64)'}
-        </div>
-        <div className="msg-detail__editor">
-          <MonacoViewer value={m.payload} language={detectLanguage(m)} />
-        </div>
-      </div>
     </div>
   )
 }

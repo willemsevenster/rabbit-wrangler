@@ -13,6 +13,8 @@ import { Resizer } from './components/Resizer'
 import { UpdateButton } from './components/UpdateButton'
 import { useFocusCycle } from './lib/use-focus-cycle'
 import { useTabCycle } from './lib/use-tab-cycle'
+import { useSearchHotkey } from './lib/use-search-hotkey'
+import { SearchDialog } from './components/SearchDialog'
 import { Toaster } from './components/Toaster'
 import { ConfirmDialog } from './components/ConfirmDialog'
 import { AboutDialog } from './components/AboutDialog'
@@ -29,6 +31,7 @@ function App() {
 
   useFocusCycle()
   useTabCycle()
+  useSearchHotkey()
 
   useEffect(() => {
     void init()
@@ -55,6 +58,8 @@ function App() {
       <StatusBar />
       {dialogOpen && <ConnectionDialog />}
       {importDialog && <ImportConnectionsDialog />}
+      {/* Mounted before move/confirm dialogs so those stack on top when opened from search. */}
+      <SearchDialog />
       {moveDialog && <MoveMessagesDialog />}
       {publishDialog && <PublishMessageDialog />}
       <ConfirmDialog />
