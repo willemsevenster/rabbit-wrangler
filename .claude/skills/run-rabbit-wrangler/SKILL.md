@@ -96,7 +96,14 @@ avoids the blocking prompt.
 | `type <text>` / `press <key>` | keyboard input |
 | `wait <css-sel>` | wait up to 10s for a selector |
 | `windows` | list open window URLs |
+| `seed [n]` | populate a local broker with sample data (n msgs, default 60) so there are queues + messages to drive — see the `seed-test-broker` skill / `scripts/seed-broker.mjs` |
+| `unseed` | remove the sample topology the seeder created |
 | `quit` | close app and exit |
+
+`seed`/`unseed` target a broker at `guest@localhost:5672` and let an e2e flow
+self-populate before driving (e.g. `launch` → `seed 80` → connect → peek a queue
+with messages). For the full test rig (volume, stress payloads, deterministic
+runs, docker compose) see `docs/TESTING.md` and the `seed-test-broker` skill.
 
 ## Run (human path)
 

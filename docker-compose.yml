@@ -1,0 +1,47 @@
+# Local RabbitMQ for developing / testing Rabbit Wrangler.
+#
+#   docker compose up -d                 # just the broker (management UI on :15672)
+#   docker compose --profile seed up     # broker + one-shot seed of sample data
+#   docker compose down -v               # stop and wipe
+#
+# Then connect Rabbit Wrangler to localhost:5672 / mgmt 15672 (guest / guest).
+# Tune the seed with SEED_MESSAGES / SEED_STRESS env vars.
+services:
+  rabbitmq:
+    image: rabbitmq:4-management
+    container_name: rw-rabbitmq
+    ports:
+      - '5672:5672' # AMQP
+      - '15672:15672' # management HTTP API + UI
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ['CMD', 'rabbitmq-diagnostics', '-q', 'ping']
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  # One-shot seeder (opt-in via the "seed" profile). Installs amqplib on the fly
+  # and runs scripts/seed-broker.mjs against the broker once it's healthy, then
+  # exits. The broker keeps running.
+  seed:
+    image: node:24-alpine
+    profiles: ['seed']
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    working_dir: /app
+    volumes:
+      - ./scripts:/app/scripts:ro
+    command:
+      - sh
+      - -c
+      - >
+        npm i amqplib@^2 --no-save --silent &&
+        node scripts/seed-broker.mjs
+        --url amqp://guest:guest@rabbitmq:5672
+        --messages ${SEED_MESSAGES:-200}
+        --stress ${SEED_STRESS:-6}
+
+volumes:
+  rabbitmq_data:

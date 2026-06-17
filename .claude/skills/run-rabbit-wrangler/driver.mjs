@@ -11,6 +11,7 @@
 // Headless Linux: wrap the node call in `xvfb-run -a` (verified on Windows).
 import { _electron as electron } from 'playwright-core'
 import electronPath from 'electron'
+import { execFileSync } from 'node:child_process'
 import * as readline from 'node:readline'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
@@ -18,6 +19,19 @@ import * as path from 'node:path'
 const APP_DIR = path.resolve(import.meta.dirname, '../../..')
 const SHOT_DIR = process.env.SCREENSHOT_DIR || path.join(import.meta.dirname, 'shots')
 fs.mkdirSync(SHOT_DIR, { recursive: true })
+
+/** Run a sibling Node script in scripts/ (used by the seed/unseed commands). */
+function runScript(name, scriptArgs) {
+  try {
+    const out = execFileSync('node', [path.join(APP_DIR, 'scripts', name), ...scriptArgs], {
+      cwd: APP_DIR,
+      encoding: 'utf8'
+    })
+    console.log(out.trim())
+  } catch (e) {
+    console.log(`${name} failed:`, e.message)
+  }
+}
 
 let app = null
 let page = null
@@ -226,6 +240,18 @@ const COMMANDS = {
   async windows() {
     if (!app) return console.log('ERROR: launch first')
     for (const w of app.windows()) console.log(' ', w.url())
+  },
+
+  // seed [n] — populate a local broker with sample data so the app has queues +
+  // messages to drive (see scripts/seed-broker.mjs). Targets guest@localhost.
+  seed(n) {
+    const count = Number(n) || 60
+    runScript('seed-broker.mjs', ['--messages', String(count), '--stress', '4'])
+  },
+
+  // unseed — remove the sample topology the seeder created.
+  unseed() {
+    runScript('seed-broker.mjs', ['--clean'])
   },
 
   async quit() {

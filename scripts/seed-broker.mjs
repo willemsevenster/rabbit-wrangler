@@ -7,12 +7,14 @@
 //   node scripts/seed-broker.mjs                  # default one-shot seed (~60 msgs)
 //   node scripts/seed-broker.mjs --messages 1000  # many
 //   node scripts/seed-broker.mjs --messages 8     # few
+//   node scripts/seed-broker.mjs --stress 8       # edge-case payloads (huge/nested/unicode)
+//   node scripts/seed-broker.mjs --seed 42        # deterministic, reproducible data
 //   node scripts/seed-broker.mjs --rate 5         # live: ~5 msgs/sec until Ctrl-C
 //   node scripts/seed-broker.mjs --clean          # delete everything it created
 //   node scripts/seed-broker.mjs --url amqp://guest:guest@host:5672 --prefix demo
 //
-// Flags: --url, --prefix, --messages <n>, --rate <n>, --clean, --durable, --help.
-// Env fallbacks: RABBIT_URL.
+// Flags: --url, --prefix, --messages <n>, --stress <n>, --seed <n>, --rate <n>,
+//        --clean, --durable, --help.   Env fallbacks: RABBIT_URL.
 import amqp from 'amqplib'
 import { randomUUID, randomBytes } from 'node:crypto'
 
@@ -25,6 +27,8 @@ function parseArgs(argv) {
     else if (a === '--durable') out.durable = true
     else if (a === '--help' || a === '-h') out.help = true
     else if (a === '--messages' || a === '-m') out.messages = Number(argv[++i])
+    else if (a === '--stress') out.stress = Number(argv[++i])
+    else if (a === '--seed') out.seed = Number(argv[++i])
     else if (a === '--rate' || a === '-r') out.rate = Number(argv[++i])
     else if (a === '--url') out.url = argv[++i]
     else if (a === '--prefix') out.prefix = argv[++i]
@@ -48,6 +52,8 @@ if (args.help) {
       '',
       'Usage: node scripts/seed-broker.mjs [options]',
       '  --messages, -m <n>  total messages for a one-shot seed (default 60)',
+      '  --stress <n>        also publish n edge-case payloads (huge/nested/unicode/…)',
+      '  --seed <n>          deterministic RNG seed → reproducible data',
       '  --rate, -r <n>      live mode: publish ~n msgs/sec until Ctrl-C',
       '  --clean             delete the sample topology and exit',
       '  --durable           make the queues/exchange durable (default: transient)',
@@ -58,6 +64,36 @@ if (args.help) {
   )
   process.exit(0)
 }
+
+// ---------- deterministic RNG (when --seed) ----------
+// Default to crypto/Math.random; with --seed, use a tiny seeded PRNG so the data
+// (including ids + binary bytes + timestamps) is byte-for-byte reproducible.
+const SEEDED = Number.isFinite(args.seed)
+const FIXED_NOW = 1_700_000_000_000
+function makeRng(seed) {
+  if (!SEEDED) return { next: Math.random, uuid: randomUUID, bytes: randomBytes }
+  let s = seed >>> 0
+  const next = () => {
+    s = (s + 0x6d2b79f5) | 0
+    let t = Math.imul(s ^ (s >>> 15), 1 | s)
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+  }
+  const hex = '0123456789abcdef'
+  const uuid = () => {
+    let o = ''
+    for (let i = 0; i < 32; i++) o += hex[Math.floor(next() * 16)]
+    return `${o.slice(0, 8)}-${o.slice(8, 12)}-4${o.slice(13, 16)}-a${o.slice(17, 20)}-${o.slice(20, 32)}`
+  }
+  const bytes = (n) => {
+    const b = Buffer.alloc(n)
+    for (let i = 0; i < n; i++) b[i] = Math.floor(next() * 256)
+    return b
+  }
+  return { next, uuid, bytes }
+}
+const rng = makeRng(args.seed)
+const nowMs = () => (SEEDED ? FIXED_NOW : Date.now())
 
 // ---------- topology (derived from the prefix so seed + clean agree) ----------
 const EXCHANGE = `${PREFIX}.events`
@@ -71,13 +107,14 @@ const WORK_QUEUES = [
 // Dead-letter queues (name ends in .dlq so the app flags them). Populated by real
 // dead-lettering (see seedDlqs) so each message carries an authentic x-death.
 const DLQ_QUEUES = [`${PREFIX}.orders.dlq`, `${PREFIX}.payments.dlq`]
-const ALL_QUEUES = [...WORK_QUEUES.map(([n]) => n), ...DLQ_QUEUES]
+const STRESS_QUEUE = `${PREFIX}.stress`
+const ALL_QUEUES = [...WORK_QUEUES.map(([n]) => n), ...DLQ_QUEUES, STRESS_QUEUE]
 const feederFor = (dlq) => `${dlq}.src`
 
 // ---------- random helpers ----------
-const pick = (arr) => arr[Math.floor(Math.random() * arr.length)]
-const randInt = (lo, hi) => lo + Math.floor(Math.random() * (hi - lo + 1))
-const chance = (p) => Math.random() < p
+const pick = (arr) => arr[Math.floor(rng.next() * arr.length)]
+const randInt = (lo, hi) => lo + Math.floor(rng.next() * (hi - lo + 1))
+const chance = (p) => rng.next() < p
 const delay = (ms) => new Promise((r) => setTimeout(r, ms))
 
 const FIRST = ['Ada', 'Lin', 'Sam', 'Wei', 'Noa', 'Ravi', 'Mia', 'Tom', 'Zoe', 'Ivan']
@@ -90,7 +127,7 @@ const CHANNELS = ['email', 'sms', 'push', 'webhook']
 /** Build one random message: { key, body (Buffer), options }. */
 function makeMessage() {
   const kind = pick(['order', 'payment', 'notify', 'user', 'log', 'log', 'binary'])
-  const now = Date.now()
+  const now = nowMs()
   const baseHeaders = {
     'x-source': 'seed-broker',
     'x-schema-version': randInt(1, 3),
@@ -100,14 +137,14 @@ function makeMessage() {
     timestamp: now,
     appId: 'rw-seeder',
     // ~70% carry a publisher messageId; the rest exercise the body-hash fingerprint.
-    ...(chance(0.7) ? { messageId: randomUUID() } : {}),
-    ...(chance(0.4) ? { correlationId: randomUUID() } : {})
+    ...(chance(0.7) ? { messageId: rng.uuid() } : {}),
+    ...(chance(0.4) ? { correlationId: rng.uuid() } : {})
   }
 
   if (kind === 'binary') {
     return {
       key: `log.binary.${pick(['snapshot', 'thumbnail', 'blob'])}`,
-      body: randomBytes(randInt(24, 256)),
+      body: rng.bytes(randInt(24, 256)),
       options: {
         ...common,
         contentType: 'application/octet-stream',
@@ -139,7 +176,7 @@ function makeMessage() {
         sku: `${pick(PRODUCTS).toUpperCase()}-${randInt(100, 999)}`,
         qty: randInt(1, 5)
       })),
-      total: Number((Math.random() * 500 + 5).toFixed(2)),
+      total: Number((rng.next() * 500 + 5).toFixed(2)),
       currency: pick(CURRENCIES),
       status: pick(['pending', 'paid', 'shipped'])
     }
@@ -149,7 +186,7 @@ function makeMessage() {
     payload = {
       paymentId: `pay_${randInt(10000, 99999)}`,
       orderId: `ord_${randInt(10000, 99999)}`,
-      amount: Number((Math.random() * 500 + 5).toFixed(2)),
+      amount: Number((rng.next() * 500 + 5).toFixed(2)),
       currency: pick(CURRENCIES),
       method: pick(METHODS),
       status: pick(['ok', 'declined', 'pending'])
@@ -177,6 +214,61 @@ function makeMessage() {
     key,
     body: Buffer.from(JSON.stringify(payload, null, 2), 'utf8'),
     options: { ...common, contentType: 'application/json', type, headers: baseHeaders }
+  }
+}
+
+// ---------- stress payloads (edge cases for the Monaco viewer) ----------
+function nest(depth) {
+  let o = { leaf: true }
+  for (let i = 0; i < depth; i++) o = { [`level_${depth - i}`]: o }
+  return o
+}
+/** A rotating set of awkward payloads: huge, deeply nested, unicode, minified,
+ * long single line, pretty, and heavy escapes. */
+function stressPayload(i) {
+  const cases = [
+    () => ({
+      name: 'large.json',
+      ct: 'application/json',
+      body: JSON.stringify(
+        { note: 'large array', items: Array.from({ length: 5000 }, (_, k) => ({ k, name: `item-${k}`, active: k % 2 === 0 })) },
+        null,
+        2
+      )
+    }),
+    () => ({ name: 'deeply-nested.json', ct: 'application/json', body: JSON.stringify(nest(40), null, 2) }),
+    () => ({
+      name: 'unicode.json',
+      ct: 'application/json',
+      body: JSON.stringify(
+        { emoji: '🐰🚀✅🔥🎉', cjk: '日本語テスト · 中文测试 · 한국어', rtl: 'مرحبا بالعالم', math: '∑∫√π≠≈∞', combining: 'é à', zalgo: 'Z̸̧͕a̷l̷g̵o̶' },
+        null,
+        2
+      )
+    }),
+    () => ({
+      name: 'minified-huge.json',
+      ct: 'application/json',
+      body: JSON.stringify({ rows: Array.from({ length: 3000 }, (_, k) => ({ k, v: Math.round(rng.next() * 1e6) })) })
+    }),
+    () => ({ name: 'long-single-line.txt', ct: 'text/plain', body: 'lorem-ipsum-'.repeat(2000) }),
+    () => ({
+      name: 'escapes.json',
+      ct: 'application/json',
+      body: JSON.stringify({ quotes: 'He said "hi"', tab: 'a\tb', newline: 'line1\nline2', backslash: 'a\\b\\c', unicodeEscape: 'é☃' }, null, 2)
+    })
+  ]
+  const c = cases[i % cases.length]()
+  return {
+    body: Buffer.from(c.body, 'utf8'),
+    options: {
+      timestamp: nowMs(),
+      appId: 'rw-seeder',
+      messageId: rng.uuid(),
+      contentType: c.ct,
+      type: `stress.${c.name}`,
+      headers: { 'x-source': 'seed-broker', 'x-stress-case': c.name }
+    }
   }
 }
 
@@ -221,8 +313,8 @@ function publishRouted(ch) {
  * Populate the DLQs with REAL dead-lettered messages: publish to a transient
  * feeder queue that has TTL 0 + a dead-letter route to the DLQ, so the broker
  * itself adds an authentic x-death header. (A client-supplied x-death is stripped
- * by RabbitMQ, so faking it via headers doesn't work.) The feeders are removed
- * once the broker has dead-lettered everything.
+ * by RabbitMQ, so faking it via headers doesn't work.) Feeders are removed once
+ * the broker has dead-lettered everything.
  */
 async function seedDlqs(ch, total) {
   if (total <= 0) return
@@ -248,16 +340,26 @@ async function seedDlqs(ch, total) {
   for (const dlq of DLQ_QUEUES) await ch.deleteQueue(feederFor(dlq)).catch(() => {})
 }
 
+async function seedStress(ch, n) {
+  if (n <= 0) return
+  await ch.assertQueue(STRESS_QUEUE, { durable: DURABLE })
+  for (let i = 0; i < n; i++) {
+    const m = stressPayload(i)
+    ch.sendToQueue(STRESS_QUEUE, m.body, { ...m.options, persistent: DURABLE })
+  }
+  await ch.waitForConfirms()
+}
+
 async function clean() {
   await withChannel(async (ch) => {
     for (const name of ALL_QUEUES) await ch.deleteQueue(name).catch(() => {})
     for (const dlq of DLQ_QUEUES) await ch.deleteQueue(feederFor(dlq)).catch(() => {})
     await ch.deleteExchange(EXCHANGE).catch(() => {})
   })
-  console.log(`Removed sample topology under "${PREFIX}" (${ALL_QUEUES.length} queues + 1 exchange).`)
+  console.log(`Removed sample topology under "${PREFIX}".`)
 }
 
-async function seedOnce(total) {
+async function seedOnce(total, stress) {
   const dlqTotal = Math.round(total * 0.18)
   const routed = Math.max(0, total - dlqTotal)
   await withChannel(async (ch) => {
@@ -268,10 +370,12 @@ async function seedOnce(total) {
     }
     await ch.waitForConfirms()
     await seedDlqs(ch, dlqTotal)
+    await seedStress(ch, stress)
   })
+  const extra = stress > 0 ? ` + ${stress} stress` : ''
   console.log(
-    `Seeded ${total} messages (${routed} routed + ${dlqTotal} dead-lettered) into "${EXCHANGE}" → ` +
-      `${WORK_QUEUES.length} queues (+ ${DLQ_QUEUES.length} DLQs). Open them in Rabbit Wrangler to peek.`
+    `Seeded ${total} messages (${routed} routed + ${dlqTotal} dead-lettered${extra})` +
+      `${SEEDED ? ` [seed=${args.seed}]` : ''} into "${EXCHANGE}". Open the queues in Rabbit Wrangler.`
   )
 }
 
@@ -312,6 +416,7 @@ if (args.clean) {
 } else if (args.rate && args.rate > 0) {
   await seedLive(args.rate)
 } else {
-  const total = Number.isFinite(args.messages) && args.messages > 0 ? Math.floor(args.messages) : 60
-  await seedOnce(total)
+  const total = Number.isFinite(args.messages) && args.messages >= 0 ? Math.floor(args.messages) : 60
+  const stress = Number.isFinite(args.stress) && args.stress > 0 ? Math.floor(args.stress) : 0
+  await seedOnce(total, stress)
 }
