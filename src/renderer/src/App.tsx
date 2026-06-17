@@ -11,6 +11,7 @@ import { PublishMessageDialog } from './components/PublishMessageDialog'
 import { MenuBar } from './components/MenuBar'
 import { Resizer } from './components/Resizer'
 import { UpdateButton } from './components/UpdateButton'
+import { useFocusCycle } from './lib/use-focus-cycle'
 import { Toaster } from './components/Toaster'
 import { ConfirmDialog } from './components/ConfirmDialog'
 import { AboutDialog } from './components/AboutDialog'
@@ -23,6 +24,8 @@ function App() {
   const importDialog = useAppStore((s) => s.importDialog)
   const sidebarWidth = useAppStore((s) => s.sidebarWidth)
   const sidebarVisible = useAppStore((s) => s.sidebarVisible)
+
+  useFocusCycle()
 
   useEffect(() => {
     void init()
