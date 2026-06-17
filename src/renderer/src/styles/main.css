@@ -34,7 +34,86 @@
   --warning: #cca700;
   --success: #89d185;
 
+  /* Surfaces that used to be hardcoded — now themeable. */
+  --titlebar-fg: #cccccc;
+  --tab-bg: #2d2d2d;
+  --tab-hover-bg: #333333;
+  --hover-bg: rgba(255, 255, 255, 0.08);
+  --hover-bg-strong: rgba(255, 255, 255, 0.14);
+  --overlay-bg: rgba(0, 0, 0, 0.5);
+  --modal-border: #454545;
+  --menu-bg: #252526;
+  --menu-border: #454545;
+  --toast-bg: #252526;
+  --toast-border: #454545;
+  --table-border: #2424248c;
+  --rk-color: #4ec9b0;
+  --button-secondary-fg: #ffffff;
+  --scrollbar-thumb: #424242;
+  --scrollbar-thumb-hover: #4f4f4f;
+  --diagram-exchange-fill: #3a2e1c;
+  --diagram-queue-fill: #16293a;
+  --diagram-queue-stroke: #3794ff;
+
   --row-height: 22px;
+}
+
+/* Light theme — overrides the dark defaults above. Applied by toggling
+   document.documentElement[data-theme="light"] (see app-store setTheme). */
+:root[data-theme='light'] {
+  --bg: #ffffff;
+  --titlebar-bg: #dddddd;
+  --titlebar-fg: #333333;
+  --activitybar-bg: #f3f3f3;
+  --activitybar-fg: #616161;
+  --activitybar-fg-active: #1e1e1e;
+  --activitybar-active-border: #007acc;
+  --sidebar-bg: #f3f3f3;
+  --sidebar-title: #6f6f6f;
+  --editor-bg: #ffffff;
+  --statusbar-bg: #007acc;
+  --statusbar-fg: #ffffff;
+  --border: #e7e7e7;
+  --panel-border: #c8c8c8;
+  --focus-border: #007acc;
+  --list-hover-bg: #e8e8e8;
+  --list-active-bg: #0060c0;
+  --list-inactive-bg: #e4e6f1;
+  --text: #1e1e1e;
+  --text-muted: #6f6f6f;
+  --text-bright: #000000;
+  --input-bg: #ffffff;
+  --input-fg: #1e1e1e;
+  --input-border: #cecece;
+  --input-focus: #007acc;
+  --button-bg: #007acc;
+  --button-hover: #0062a3;
+  --button-fg: #ffffff;
+  --button-secondary-bg: #e4e4e4;
+  --button-secondary-hover: #d6d6d6;
+  --button-secondary-fg: #1e1e1e;
+  --badge-bg: #c4c4c4;
+  --error: #e51400;
+  --warning: #bf8803;
+  --success: #388a34;
+
+  --tab-bg: #ececec;
+  --tab-hover-bg: #e0e0e0;
+  --hover-bg: rgba(0, 0, 0, 0.06);
+  --hover-bg-strong: rgba(0, 0, 0, 0.1);
+  --overlay-bg: rgba(0, 0, 0, 0.3);
+  --modal-border: #c8c8c8;
+  --menu-bg: #ffffff;
+  --menu-border: #c8c8c8;
+  --toast-bg: #ffffff;
+  --toast-border: #c8c8c8;
+  --table-border: #e5e5e5;
+  --rk-color: #267f99;
+  --scrollbar-thumb: #c2c2c2;
+  --scrollbar-thumb-hover: #a6a6a6;
+  --diagram-exchange-fill: #fff4e0;
+  --diagram-queue-fill: #e3f0ff;
+  --diagram-queue-stroke: #2f7fd6;
 }
 
 * {
@@ -92,6 +171,27 @@ code {
   font-family: 'Cascadia Code', 'Consolas', ui-monospace, monospace;
 }
 
+/* ---------- scrollbars (theme-aware) ---------- */
+::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border: 3px solid transparent;
+  background-clip: padding-box;
+  border-radius: 7px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
+  border: 3px solid transparent;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-track,
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
 /* ---------- shell layout ---------- */
 .app-shell {
   display: grid;
@@ -104,7 +204,7 @@ code {
   display: flex;
   align-items: center;
   font-size: 12px;
-  color: #cccccc;
+  color: var(--titlebar-fg);
   position: relative;
   padding-left: 8px;
   /* reserve room for the native window-control overlay (min/max/close) */
@@ -132,7 +232,7 @@ code {
   right: 0;
   text-align: center;
   pointer-events: none;
-  color: #bbbbbb;
+  color: var(--text-muted);
 }
 
 /* ---------- menu bar ---------- */
@@ -150,13 +250,13 @@ code {
   align-items: center;
   background: transparent;
   border: none;
-  color: #cccccc;
+  color: var(--titlebar-fg);
   font-size: 12px;
 }
 
 .menubar__item:hover,
 .menubar__item.is-open {
-  background: rgba(255, 255, 255, 0.12);
+  background: var(--hover-bg-strong);
 }
 
 /* ---------- auto-update ---------- */
@@ -175,8 +275,8 @@ code {
   transform: translateX(-50%);
   z-index: 1200;
   padding: 8px 14px;
-  background: #252526;
-  border: 1px solid #454545;
+  background: var(--toast-bg);
+  border: 1px solid var(--toast-border);
   border-radius: 6px;
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
   color: var(--text);
@@ -545,7 +645,7 @@ body.resizing {
 }
 
 .tabbar__overflow:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--hover-bg);
 }
 
 .tabbar__overflow .codicon {
@@ -560,7 +660,7 @@ body.resizing {
   max-width: 220px;
   height: 100%;
   padding: 0 8px 0 12px;
-  background: #2d2d2d;
+  background: var(--tab-bg);
   color: var(--text-muted);
   border-right: 1px solid var(--border);
   cursor: pointer;
@@ -569,7 +669,7 @@ body.resizing {
 }
 
 .tab:hover {
-  background: #333333;
+  background: var(--tab-hover-bg);
 }
 
 .tab.is-active {
@@ -654,7 +754,7 @@ body.resizing {
 }
 
 .tab__close:hover {
-  background: rgba(255, 255, 255, 0.14);
+  background: var(--hover-bg-strong);
 }
 
 .tab__close .codicon {
@@ -730,7 +830,7 @@ body.resizing {
 
 .queue-table td {
   padding: 5px 12px;
-  border-bottom: 1px solid #2424248c;
+  border-bottom: 1px solid var(--table-border);
 }
 
 .queue-table tbody tr {
@@ -793,7 +893,7 @@ body.resizing {
 
 .msg-table td {
   padding: 4px 12px;
-  border-bottom: 1px solid #2424248c;
+  border-bottom: 1px solid var(--table-border);
   white-space: nowrap;
 }
 
@@ -816,7 +916,7 @@ body.resizing {
 
 .msg-table__rk {
   font-family: 'Cascadia Code', ui-monospace, monospace;
-  color: #4ec9b0;
+  color: var(--rk-color);
   margin-right: 6px;
 }
 
@@ -935,7 +1035,7 @@ body.resizing .msg-detail__resizer {
 .kv-table td {
   text-align: left;
   padding: 3px 10px 3px 0;
-  border-top: 1px solid #2424248c;
+  border-top: 1px solid var(--table-border);
   vertical-align: top;
   word-break: break-word;
   font-family: 'Cascadia Code', ui-monospace, monospace;
@@ -964,6 +1064,7 @@ body.resizing .msg-detail__resizer {
 
 .btn--secondary {
   background: var(--button-secondary-bg);
+  color: var(--button-secondary-fg);
 }
 
 .btn--secondary:hover {
@@ -1040,7 +1141,7 @@ body.resizing .msg-detail__resizer {
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: var(--overlay-bg);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1055,7 +1156,7 @@ body.resizing .msg-detail__resizer {
   display: flex;
   flex-direction: column;
   background: var(--sidebar-bg);
-  border: 1px solid #454545;
+  border: 1px solid var(--modal-border);
   border-radius: 6px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
   overflow: hidden;
@@ -1180,8 +1281,8 @@ body.resizing .msg-detail__resizer {
   width: 300px;
   max-width: calc(100vw - 16px);
   padding: 10px 12px;
-  background: #252526;
-  border: 1px solid #454545;
+  background: var(--menu-bg);
+  border: 1px solid var(--menu-border);
   border-radius: 5px;
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
   font-size: 12px;
@@ -1238,8 +1339,8 @@ body.resizing .msg-detail__resizer {
   z-index: 1000;
   min-width: 200px;
   max-width: 340px;
-  background: #252526;
-  border: 1px solid #454545;
+  background: var(--menu-bg);
+  border: 1px solid var(--menu-border);
   border-radius: 5px;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.45);
   padding: 4px;
@@ -1354,13 +1455,13 @@ body.resizing .msg-detail__resizer {
 
 /* ---------- binding diagram ---------- */
 .diagram__exchange {
-  fill: #3a2e1c;
+  fill: var(--diagram-exchange-fill);
   stroke: var(--warning);
 }
 
 .diagram__queue {
-  fill: #16293a;
-  stroke: #3794ff;
+  fill: var(--diagram-queue-fill);
+  stroke: var(--diagram-queue-stroke);
 }
 
 .diagram__node-title {
