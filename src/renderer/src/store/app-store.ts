@@ -292,6 +292,9 @@ export const useAppStore = create<AppState>((set, get) => ({
   async init() {
     if (initialized) return
     initialized = true
+    // Mirror the resolved theme to main so the next launch opens with the right
+    // window background (no white flash) even if the user never toggles it.
+    void window.api.persistTheme(get().theme)
     socket = new EventSocket((event) => applyStreamEvent(set, get, event))
     await socket.connect()
     await get().refreshConnections()
@@ -752,6 +755,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     localStorage.setItem(THEME_KEY, theme)
     applyTheme(theme)
     set({ theme })
+    // Remember it main-side too, for the next launch's window background.
+    void window.api.persistTheme(theme)
   },
 
   toggleTheme() {

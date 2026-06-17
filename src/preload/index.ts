@@ -44,6 +44,8 @@ const api: RabbitApi = {
   publishMessage: (request: PublishMessageRequest) =>
     ipcRenderer.invoke(IPC.publishMessage, request),
 
+  persistTheme: (theme: 'light' | 'dark') => ipcRenderer.invoke(IPC.persistTheme, theme),
+
   getEventStreamPort: () => ipcRenderer.invoke(IPC.getEventStreamPort),
 
   quitApp: () => ipcRenderer.invoke(IPC.quitApp),

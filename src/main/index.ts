@@ -6,6 +6,7 @@ import { eventStreamServer } from './websocket-server'
 import { connectionManager } from './connections/connection-manager'
 import { initUpdater, disposeUpdater } from './updater'
 import { savedWindowOptions, savedWindowFlags, trackWindowState } from './store/window-state'
+import { startupBackgroundColor } from './store/ui-prefs'
 
 function createWindow(): void {
   const mainWindow = new BrowserWindow({
@@ -13,6 +14,9 @@ function createWindow(): void {
     minWidth: 900,
     minHeight: 600,
     show: false,
+    // Paint the window in the theme's background up-front so a dark-mode user
+    // doesn't get a white flash before the renderer's CSS loads (and vice-versa).
+    backgroundColor: startupBackgroundColor(),
     title: 'Rabbit Wrangler',
     // Dev taskbar/window icon. Packaged builds get their icon from the executable
     // (electron-builder embeds build/icon.* there), so this is only needed in dev.

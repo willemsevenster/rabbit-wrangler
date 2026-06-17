@@ -56,6 +56,9 @@ export const IPC = {
   // event stream bootstrap
   getEventStreamPort: 'events:port',
 
+  // ui preferences the main process needs before the renderer runs
+  persistTheme: 'ui:persist-theme',
+
   // app lifecycle + auto-update
   quitApp: 'app:quit',
   getAppVersion: 'app:version',
@@ -92,6 +95,9 @@ export interface RabbitApi {
   moveMessage(request: MoveMessageRequest): Promise<OperationResult>
   /** Delete one peeked message (by fingerprint) from its queue. */
   deleteMessage(request: DeleteMessageRequest): Promise<OperationResult>
+
+  /** Remember the chosen theme so the next launch's window opens without a flash. */
+  persistTheme(theme: 'light' | 'dark'): Promise<void>
 
   /** Port of the localhost WebSocket carrying the live event stream. */
   getEventStreamPort(): Promise<number>
