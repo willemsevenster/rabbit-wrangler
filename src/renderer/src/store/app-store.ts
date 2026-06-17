@@ -110,6 +110,12 @@ interface AppState {
   connectConnection(id: string): Promise<void>
   disconnectConnection(id: string): Promise<void>
   toggleConnectionCollapsed(): void
+  /** Collapse the whole tree to the connections level (global "collapse all"). */
+  collapseTree(): void
+  /** Fully expand one connection — its node and both groups (connects if needed). */
+  expandConnection(id: string): Promise<void>
+  /** Fully collapse one connection's subtree. */
+  collapseConnection(id: string): void
 
   // editor tabs
   openOverviewTab(connectionId: string): void
@@ -247,6 +253,25 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ connectionCollapsed: !get().connectionCollapsed })
   },
 
+  collapseTree() {
+    set({ connectionCollapsed: true })
+  },
+
+  async expandConnection(id) {
+    // Only the selected connection's children render, so expanding makes `id` the
+    // selected one (connecting first if needed), then opens its node + both groups.
+    if (get().statuses[id]?.state !== 'connected') {
+      await get().connectConnection(id)
+    } else {
+      set({ selectedConnectionId: id })
+    }
+    set({ connectionCollapsed: false, queuesCollapsed: false, exchangesCollapsed: false })
+  },
+
+  collapseConnection(id) {
+    if (get().selectedConnectionId === id) set({ connectionCollapsed: true })
+  },
+
   async connectConnection(id) {
     set({
       selectedConnectionId: id,
@@ -299,12 +324,13 @@ export const useAppStore = create<AppState>((set, get) => ({
       })
       return
     }
+    const connName = get().connections.find((c) => c.id === connectionId)?.name ?? connectionId
     const tab: EditorTab = {
       id,
       kind: 'queue',
       connectionId,
       queue,
-      title: queue,
+      title: `${connName} - ${queue}`,
       peeks: [],
       selectedMessageId: null,
       unread: 0
@@ -319,7 +345,9 @@ export const useAppStore = create<AppState>((set, get) => ({
       set({ activeTabId: id })
       return
     }
-    const title = exchange === '' ? '(AMQP default)' : exchange
+    const connName = get().connections.find((c) => c.id === connectionId)?.name ?? connectionId
+    const exLabel = exchange === '' ? '(AMQP default)' : exchange
+    const title = `${connName} - ${exLabel}`
     set({
       tabs: [...get().tabs, { id, kind: 'exchange', connectionId, exchange, title, bindings: [] }],
       activeTabId: id
