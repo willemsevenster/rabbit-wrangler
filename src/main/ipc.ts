@@ -2,6 +2,7 @@ import { app, ipcMain } from 'electron'
 import { IPC } from '@shared/ipc'
 import { checkForUpdates, downloadUpdate, quitAndInstall } from './updater'
 import { configStore } from './store/config-store'
+import { exportConnections, readImportFile } from './store/connection-io'
 import { connectionManager } from './connections/connection-manager'
 import { eventStreamServer } from './websocket-server'
 import type {
@@ -32,6 +33,9 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle(IPC.connect, (_e, id: string) => connectionManager.connect(id))
   ipcMain.handle(IPC.disconnect, (_e, id: string) => connectionManager.disconnect(id))
+
+  ipcMain.handle(IPC.exportConnections, () => exportConnections(new Date().toISOString()))
+  ipcMain.handle(IPC.importConnections, () => readImportFile())
 
   ipcMain.handle(IPC.listQueues, (_e, connectionId: string) =>
     connectionManager.require(connectionId).listQueues()

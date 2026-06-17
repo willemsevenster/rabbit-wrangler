@@ -25,6 +25,28 @@ export interface ConnectionConfig {
 /** A connection config without secrets, safe to ship to the renderer. */
 export type SafeConnectionConfig = Omit<ConnectionConfig, 'password'>
 
+/** Result of exporting connections to a JSON file (passwords excluded). */
+export interface ExportResult {
+  ok: boolean
+  /** Absolute path written, on success. */
+  path?: string
+  /** Number of connections written. */
+  count?: number
+  /** True when the user dismissed the save dialog. */
+  canceled?: boolean
+  error?: string
+}
+
+/** Result of reading a connections JSON file for import (passwords excluded — the
+ * user sets them in the import dialog). */
+export interface ImportResult {
+  ok: boolean
+  connections?: SafeConnectionConfig[]
+  /** True when the user dismissed the open dialog. */
+  canceled?: boolean
+  error?: string
+}
+
 export type ConnectionState = 'disconnected' | 'connecting' | 'connected' | 'error'
 
 export interface ConnectionStatus {

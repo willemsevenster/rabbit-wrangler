@@ -5,6 +5,7 @@ import { SideBar } from './components/SideBar'
 import { EditorArea } from './components/EditorArea'
 import { StatusBar } from './components/StatusBar'
 import { ConnectionDialog } from './components/ConnectionDialog'
+import { ImportConnectionsDialog } from './components/ImportConnectionsDialog'
 import { MoveMessagesDialog } from './components/MoveMessagesDialog'
 import { PublishMessageDialog } from './components/PublishMessageDialog'
 import { MenuBar } from './components/MenuBar'
@@ -19,6 +20,7 @@ function App() {
   const dialogOpen = useAppStore((s) => s.dialogOpen)
   const moveDialog = useAppStore((s) => s.moveDialog)
   const publishDialog = useAppStore((s) => s.publishDialog)
+  const importDialog = useAppStore((s) => s.importDialog)
   const sidebarWidth = useAppStore((s) => s.sidebarWidth)
   const sidebarVisible = useAppStore((s) => s.sidebarVisible)
 
@@ -46,6 +48,7 @@ function App() {
       </div>
       <StatusBar />
       {dialogOpen && <ConnectionDialog />}
+      {importDialog && <ImportConnectionsDialog />}
       {moveDialog && <MoveMessagesDialog />}
       {publishDialog && <PublishMessageDialog />}
       <ConfirmDialog />

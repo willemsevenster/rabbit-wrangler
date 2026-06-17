@@ -1310,6 +1310,53 @@ body.resizing .msg-detail__resizer {
   color: var(--text-muted);
 }
 
+/* ---------- import-connections dialog ---------- */
+.import-list {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.import-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid var(--panel-border);
+  border-radius: 4px;
+}
+
+.import-row__main {
+  flex: 1;
+  min-width: 0;
+}
+
+.import-row__name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.import-row__sub {
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.import-row__action {
+  flex: 0 0 130px;
+}
+
+.import-row__pass {
+  flex: 0 0 170px;
+}
+
 /* publish form: key = value [type] rows */
 .field__heading {
   display: flex;

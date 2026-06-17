@@ -96,6 +96,9 @@ interface AppState {
   /** Connection editor modal. `editing` null + open ⇒ creating a new one. */
   dialogOpen: boolean
   editing: SafeConnectionConfig | null
+  /** Parsed candidates for the import dialog (null = closed). Passwords are set
+   * by the user in that dialog before saving. */
+  importDialog: SafeConnectionConfig[] | null
 
   /** Target of the open Move dialog (null = closed). Carries the connection so a
    * move launched from a background-connection tab is correct; `fingerprint` set
@@ -191,6 +194,11 @@ interface AppState {
   closeDialog(): void
   saveConnection(config: ConnectionConfig): Promise<void>
   deleteConnection(id: string): Promise<void>
+  /** Export all saved connections (passwords excluded) to a JSON file. */
+  exportConnections(): Promise<void>
+  /** Pick a JSON file and open the import dialog with its connections. */
+  startImport(): Promise<void>
+  closeImport(): void
 }
 
 let socket: EventSocket | null = null
@@ -260,6 +268,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   activeTabId: null,
   dialogOpen: false,
   editing: null,
+  importDialog: null,
   moveDialog: null,
   publishDialog: null,
   lastMoveTargets: loadMoveTargets(),
@@ -771,6 +780,22 @@ export const useAppStore = create<AppState>((set, get) => ({
     closeTabsFor(set, get, id)
     if (get().selectedConnectionId === id) set({ selectedConnectionId: null })
     await get().refreshConnections()
+  },
+
+  async exportConnections() {
+    const r = await window.api.exportConnections()
+    if (r.ok) get().addToast('success', `Exported ${r.count} connection${r.count === 1 ? '' : 's'}.`)
+    else if (!r.canceled) get().addToast('error', `Export failed: ${r.error ?? 'unknown error'}`)
+  },
+
+  async startImport() {
+    const r = await window.api.importConnections()
+    if (r.ok && r.connections) set({ importDialog: r.connections })
+    else if (!r.canceled) get().addToast('error', `Import failed: ${r.error ?? 'unknown error'}`)
+  },
+
+  closeImport() {
+    set({ importDialog: null })
   }
 }))
 

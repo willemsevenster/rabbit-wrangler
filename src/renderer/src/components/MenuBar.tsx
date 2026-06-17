@@ -21,6 +21,8 @@ export function MenuBar() {
   const confirm = useAppStore((s) => s.confirm)
   const addToast = useAppStore((s) => s.addToast)
   const openAbout = useAppStore((s) => s.openAbout)
+  const exportConnections = useAppStore((s) => s.exportConnections)
+  const startImport = useAppStore((s) => s.startImport)
 
   const activeQueue = activeTab?.kind === 'queue' ? activeTab : null
 
@@ -30,6 +32,9 @@ export function MenuBar() {
       items: () => [
         { label: 'Add Connection…', icon: 'add', onClick: openNew },
         { label: 'Refresh Connections', icon: 'refresh', onClick: () => void refreshConnections() },
+        { separator: true },
+        { label: 'Import Connections…', icon: 'cloud-download', onClick: () => void startImport() },
+        { label: 'Export Connections…', icon: 'save', onClick: () => void exportConnections() },
         { separator: true },
         {
           label: 'Disconnect',
