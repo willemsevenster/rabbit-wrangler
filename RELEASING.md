@@ -31,13 +31,20 @@ git push origin v0.1.1
 The workflow then, on `windows-latest` + `ubuntu-latest`:
 
 - builds the app (`pnpm build`),
-- packages the **NSIS installer** (Windows) and **AppImage** (Linux) with
-  `electron-builder --publish always`,
+- packages the **NSIS installer** (Windows) and **AppImage + `.deb` + `.rpm`**
+  (Linux) with `electron-builder --publish always` (the Linux job installs the
+  `rpm` tool first, which `.rpm` packaging needs),
 - uploads them plus the update metadata (`latest.yml`, `latest-linux.yml`, and
   `*.blockmap` for differential downloads) to a new GitHub Release for the tag.
 
 Existing installs detect the new version on next launch (or via **Help → Check
 for Updates…**) and offer to download + restart.
+
+> **Linux installers:** the **AppImage** is the auto-updating artifact —
+> `electron-updater` only self-updates the AppImage on Linux. The **`.deb`** and
+> **`.rpm`** are conventional installers (apt/dnf) and are **manual-install /
+> manual-upgrade**: install a newer release through the package manager. (`.deb`
+> requires the `maintainer` field set in `electron-builder.yml`.)
 
 ## Code signing (not yet enabled)
 

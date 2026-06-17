@@ -21,9 +21,15 @@ nsis:
   perMachine: false # per-user install ⇒ unsigned auto-updates apply without a UAC prompt
   allowToChangeInstallationDirectory: false
 linux:
+  # AppImage is the auto-updating artifact (electron-updater only self-updates the
+  # AppImage on Linux); deb + rpm are conventional installers for apt/dnf distros.
   target:
     - AppImage
+    - deb
+    - rpm
   category: Development
+  maintainer: frontforge <willem@frontforge.com> # required for .deb packages
+  synopsis: Desktop tool for operating RabbitMQ clusters
 npmRebuild: false
 # Installers + update metadata (latest.yml / latest-linux.yml + blockmaps) publish
 # to GitHub Releases; the running app reads the same source via app-update.yml.
