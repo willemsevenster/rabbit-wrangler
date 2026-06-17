@@ -64,7 +64,9 @@ export const IPC = {
   getAppVersion: 'app:version',
   checkForUpdates: 'update:check',
   downloadUpdate: 'update:download',
-  quitAndInstall: 'update:install'
+  quitAndInstall: 'update:install',
+  getUpdatePrefs: 'update:get-prefs',
+  setAutoDownload: 'update:set-auto-download'
 } as const
 
 /** The API surface the preload exposes on `window.api`. */
@@ -113,9 +115,19 @@ export interface RabbitApi {
   downloadUpdate(): Promise<void>
   /** Quit and install the downloaded update (relaunches the app). */
   quitAndInstall(): Promise<void>
+  /** Current update preferences (auto-download), read by the Settings dialog. */
+  getUpdatePrefs(): Promise<UpdatePrefs>
+  /** Toggle whether available updates download automatically. */
+  setAutoDownload(enabled: boolean): Promise<void>
 
   /** Write text to the system clipboard. Handled in the preload — no IPC. */
   copyText(text: string): void
+}
+
+/** User-tunable auto-update preferences (persisted in the main process). */
+export interface UpdatePrefs {
+  /** When true, an available update downloads automatically (install stays manual). */
+  autoDownload: boolean
 }
 
 /** Auto-update lifecycle, pushed from the main-process updater. */

@@ -119,7 +119,7 @@ export function MessagePeekPanel({ tab }: { tab: QueueTab }) {
 
   const openMoveDialog = useAppStore((s) => s.openMoveDialog)
   const deleteMessage = useAppStore((s) => s.deleteMessage)
-  const confirm = useAppStore((s) => s.confirm)
+  const maybeConfirm = useAppStore((s) => s.maybeConfirm)
   const addToast = useAppStore((s) => s.addToast)
 
   const setSelectedId = (id: string): void => selectMessage(tab.id, id)
@@ -130,7 +130,7 @@ export function MessagePeekPanel({ tab }: { tab: QueueTab }) {
   }
 
   async function removeMessage(m: PeekedMessage): Promise<void> {
-    const ok = await confirm({
+    const ok = await maybeConfirm({
       title: 'Delete message',
       message: `Delete this message from "${tab.queue}"? This cannot be undone.`,
       confirmLabel: 'Delete',

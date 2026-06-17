@@ -17,8 +17,9 @@ export function MenuBar() {
   const toggleSidebar = useAppStore((s) => s.toggleSidebar)
   const theme = useAppStore((s) => s.theme)
   const toggleTheme = useAppStore((s) => s.toggleTheme)
+  const openSettings = useAppStore((s) => s.openSettings)
   const checkForUpdates = useAppStore((s) => s.checkForUpdates)
-  const confirm = useAppStore((s) => s.confirm)
+  const maybeConfirm = useAppStore((s) => s.maybeConfirm)
   const addToast = useAppStore((s) => s.addToast)
   const openAbout = useAppStore((s) => s.openAbout)
   const exportConnections = useAppStore((s) => s.exportConnections)
@@ -63,7 +64,7 @@ export function MenuBar() {
           disabled: !activeQueue,
           onClick: async () => {
             if (!activeQueue) return
-            const ok = await confirm({
+            const ok = await maybeConfirm({
               title: 'Purge queue',
               message: `Purge all messages from "${activeQueue.queue}"? This cannot be undone.`,
               confirmLabel: 'Purge',
@@ -89,6 +90,8 @@ export function MenuBar() {
           icon: 'color-mode',
           onClick: toggleTheme
         },
+        { separator: true },
+        { label: 'Settings…', icon: 'settings-gear', onClick: openSettings },
         { label: 'Reload', icon: 'refresh', onClick: () => location.reload() }
       ]
     },

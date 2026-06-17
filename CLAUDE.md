@@ -162,6 +162,24 @@ when the management API already exposes it (e.g. purge is an HTTP `DELETE`).
   (`prefers-color-scheme`). Toggle in the View menu. Monaco follows (`vs`/`vs-dark`),
   and scrollbars + the SVG binding diagram are themed too. Add new colors as
   variables (with a light override), not hardcoded hex.
+- **Settings** (`SettingsDialog`, opened by the activity-bar gear or View →
+  Settings): a store-driven modal (`settingsOpen`) mirroring the About/Confirm
+  pattern. Surfaces theme, **max messages to show** (`maxMessages`, default 1000,
+  clamp 10–9,999 — the per-tab peek-buffer cap; the `'peek'` reducer slices to it
+  and `setMaxMessages` trims existing buffers), **confirm-before-destructive**
+  (`confirmDestructive` → `store.maybeConfirm` wraps purge/delete; off skips the
+  prompt — connection-delete stays always-confirmed), **auto-connect on launch**
+  (`autoConnectOnLaunch`; `init()` connects every saved cluster), update controls
+  (check + **auto-download**), and the **DLQ suffix list**. These persist in
+  localStorage except auto-download, which is **main-owned** (`store/update-prefs.ts`,
+  read by `initUpdater`, toggled live over the `getUpdatePrefs`/`setAutoDownload` IPC).
+- **DLQ detection is renderer-side** (`lib/dlq.ts` `isDeadLetterQueue(name, suffixes)`):
+  a queue is a DLQ when its name ends with any configured suffix (default `.dlq`,
+  `.dead`, `_dlq`, `deadletter`, `_error`, `_skipped`; editable in Settings, stored
+  at `rw.dlqSuffixes`). Consumers (`SideBar`, `QueueTable`, `queue-menu.ts`) read
+  `dlqSuffixes` from the store and compute the flag live, so suffix changes re-badge
+  instantly with no refresh. `QueueInfo` carries **no** `isDeadLetter` field — main
+  no longer computes it.
 - **Dialogs & toasts — no native `confirm`/`alert`** (`Toaster`, `ConfirmDialog`,
   `AboutDialog`): status/result messages use a generalized toast queue
   (`store.addToast` / `toasts`, auto-dismiss, info/success/error). Decisions use a

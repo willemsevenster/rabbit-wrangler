@@ -12,6 +12,7 @@ import { ContextMenu, useContextMenu, type MenuItem } from './ContextMenu'
 import { buildQueueMenu } from '../lib/queue-menu'
 import { buildExchangeMenu } from '../lib/exchange-menu'
 import { buildGroupMenu } from '../lib/group-menu'
+import { isDeadLetterQueue } from '../lib/dlq'
 import {
   connNodeId,
   groupNodeId,
@@ -490,7 +491,9 @@ function QueueNode({
 }) {
   const activeTabId = useAppStore((s) => s.activeTabId)
   const openQueueTab = useAppStore((s) => s.openQueueTab)
+  const dlqSuffixes = useAppStore((s) => s.dlqSuffixes)
   const isActive = activeTabId === queueTabId(connectionId, q.name)
+  const isDeadLetter = isDeadLetterQueue(q.name, dlqSuffixes)
   const rowFocus = useRowFocus(queueNodeId(connectionId, q.name))
   return (
     <div
@@ -509,11 +512,11 @@ function QueueNode({
       <span className="tree-row__icon">
         <span
           className="codicon codicon-inbox"
-          style={q.isDeadLetter ? { color: 'var(--warning)' } : undefined}
+          style={isDeadLetter ? { color: 'var(--warning)' } : undefined}
         />
       </span>
       <span className="tree-row__label">{q.name}</span>
-      {q.isDeadLetter && <span className="badge badge--dlq">DLQ</span>}
+      {isDeadLetter && <span className="badge badge--dlq">DLQ</span>}
       <span className="tree-row__detail">{q.messages}</span>
     </div>
   )

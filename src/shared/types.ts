@@ -67,8 +67,6 @@ export interface QueueInfo {
   messagesReady: number
   messagesUnacknowledged: number
   consumers: number
-  /** Heuristic: name matches the configured DLQ pattern (e.g. ends in ".dlq"). */
-  isDeadLetter: boolean
 }
 
 /** A single message captured while peeking a queue. */

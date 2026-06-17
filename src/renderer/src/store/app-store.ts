@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { EventSocket } from '../lib/event-socket'
+import { DEFAULT_DLQ_SUFFIXES } from '../lib/dlq'
 import type { StreamEvent, UpdateStatusPayload } from '@shared/ipc'
 import type {
   BindingInfo,
@@ -22,8 +23,11 @@ interface MoveTarget {
   routingKey: string
 }
 
-/** Most recent peeked messages retained per queue tab, oldest dropped. */
-const PEEK_BUFFER = 500
+/** Bounds for the per-tab peek buffer ("max messages to show" setting). When a
+ * tab hits the cap, the oldest message drops off as new ones arrive. */
+const MAX_MESSAGES_MIN = 10
+const MAX_MESSAGES_MAX = 9999
+const MAX_MESSAGES_DEFAULT = 1000
 
 /**
  * An open tab in the editor area. Tabs are independent: a queue tab keeps its own
@@ -119,6 +123,19 @@ interface AppState {
   /** Active color theme (persisted; first run follows the OS). */
   theme: Theme
 
+  /** Settings modal open state. */
+  settingsOpen: boolean
+  /** Max peeked messages retained per queue tab (oldest dropped past this). */
+  maxMessages: number
+  /** Name suffixes that mark a queue as a dead-letter queue (user-customizable). */
+  dlqSuffixes: string[]
+  /** Whether purge/delete prompt for confirmation first. */
+  confirmDestructive: boolean
+  /** Whether saved connections auto-connect when the app launches. */
+  autoConnectOnLaunch: boolean
+  /** Whether available updates auto-download (mirrors the main-owned pref). */
+  autoDownloadUpdates: boolean
+
   /** Auto-update status pushed from main (null until the first event). */
   updateStatus: UpdateStatusPayload | null
   /** Transient toast notifications (auto-dismiss). */
@@ -184,6 +201,17 @@ interface AppState {
   setTheme(theme: Theme): void
   toggleTheme(): void
 
+  // settings
+  openSettings(): void
+  closeSettings(): void
+  setMaxMessages(n: number): void
+  setDlqSuffixes(suffixes: string[]): void
+  setConfirmDestructive(on: boolean): void
+  setAutoConnectOnLaunch(on: boolean): void
+  setAutoDownloadUpdates(on: boolean): void
+  /** Confirm only when confirm-before-destructive is on; otherwise resolve true. */
+  maybeConfirm(req: ConfirmRequest): Promise<boolean>
+
   checkForUpdates(): void
   downloadUpdate(): void
   restartToUpdate(): Promise<void>
@@ -237,6 +265,33 @@ const clampMetaWidth = (w: number): number =>
   Math.min(DETAIL_META_MAX, Math.max(DETAIL_META_MIN, Math.round(w)))
 const initialDetailMetaWidth = clampMetaWidth(Number(localStorage.getItem('rw.detailMetaWidth')) || 320)
 
+const MAX_MESSAGES_KEY = 'rw.maxMessages'
+const clampMaxMessages = (n: number): number =>
+  Math.min(MAX_MESSAGES_MAX, Math.max(MAX_MESSAGES_MIN, Math.round(n)))
+const initialMaxMessages = clampMaxMessages(
+  Number(localStorage.getItem(MAX_MESSAGES_KEY)) || MAX_MESSAGES_DEFAULT
+)
+
+const DLQ_SUFFIXES_KEY = 'rw.dlqSuffixes'
+function loadDlqSuffixes(): string[] {
+  try {
+    const raw = JSON.parse(localStorage.getItem(DLQ_SUFFIXES_KEY) ?? 'null')
+    if (Array.isArray(raw)) {
+      const cleaned = raw.map((s) => String(s).trim()).filter(Boolean)
+      if (cleaned.length > 0) return cleaned
+    }
+  } catch {
+    // fall through to defaults
+  }
+  return [...DEFAULT_DLQ_SUFFIXES]
+}
+
+const CONFIRM_DESTRUCTIVE_KEY = 'rw.confirmDestructive'
+const initialConfirmDestructive = localStorage.getItem(CONFIRM_DESTRUCTIVE_KEY) !== 'false'
+
+const AUTO_CONNECT_KEY = 'rw.autoConnect'
+const initialAutoConnect = localStorage.getItem(AUTO_CONNECT_KEY) === 'true'
+
 type Theme = 'light' | 'dark'
 const THEME_KEY = 'rw.theme'
 /** Stored choice wins; first run follows the OS (prefers-color-scheme). */
@@ -284,6 +339,12 @@ export const useAppStore = create<AppState>((set, get) => ({
   peekPaneHeight: initialPeekPaneHeight,
   detailMetaWidth: initialDetailMetaWidth,
   theme: initialTheme,
+  settingsOpen: false,
+  maxMessages: initialMaxMessages,
+  dlqSuffixes: loadDlqSuffixes(),
+  confirmDestructive: initialConfirmDestructive,
+  autoConnectOnLaunch: initialAutoConnect,
+  autoDownloadUpdates: false,
   updateStatus: null,
   toasts: [],
   confirmRequest: null,
@@ -295,9 +356,20 @@ export const useAppStore = create<AppState>((set, get) => ({
     // Mirror the resolved theme to main so the next launch opens with the right
     // window background (no white flash) even if the user never toggles it.
     void window.api.persistTheme(get().theme)
+    // Mirror the main-owned auto-download pref into the store for the Settings UI.
+    void window.api
+      .getUpdatePrefs()
+      .then((p) => set({ autoDownloadUpdates: p.autoDownload }))
+      .catch(() => {
+        /* keep the default (false) if the pref can't be read */
+      })
     socket = new EventSocket((event) => applyStreamEvent(set, get, event))
     await socket.connect()
     await get().refreshConnections()
+    // Optionally reconnect every saved cluster on launch (last one ends up selected).
+    if (get().autoConnectOnLaunch) {
+      for (const c of get().connections) void get().connectConnection(c.id)
+    }
     // Keep queue counts fresh: RabbitMQ stats sample ~5s, and peeking shifts
     // messages between ready/unacked, so a one-time snapshot goes stale fast.
     setInterval(() => {
@@ -763,6 +835,66 @@ export const useAppStore = create<AppState>((set, get) => ({
     get().setTheme(get().theme === 'dark' ? 'light' : 'dark')
   },
 
+  openSettings() {
+    set({ settingsOpen: true })
+  },
+
+  closeSettings() {
+    set({ settingsOpen: false })
+  },
+
+  setMaxMessages(n) {
+    const max = clampMaxMessages(n)
+    localStorage.setItem(MAX_MESSAGES_KEY, String(max))
+    // Trim any over-cap buffers immediately so lowering the limit takes effect now.
+    set({
+      maxMessages: max,
+      tabs: get().tabs.map((t) =>
+        t.kind === 'queue' && t.peeks.length > max ? { ...t, peeks: t.peeks.slice(0, max) } : t
+      )
+    })
+  },
+
+  setDlqSuffixes(suffixes) {
+    // Normalize: trim, drop blanks, de-dupe (case-insensitive); fall back to defaults.
+    const seen = new Set<string>()
+    const cleaned: string[] = []
+    for (const s of suffixes) {
+      const v = s.trim()
+      const key = v.toLowerCase()
+      if (v && !seen.has(key)) {
+        seen.add(key)
+        cleaned.push(v)
+      }
+    }
+    const next = cleaned.length > 0 ? cleaned : [...DEFAULT_DLQ_SUFFIXES]
+    localStorage.setItem(DLQ_SUFFIXES_KEY, JSON.stringify(next))
+    set({ dlqSuffixes: next })
+  },
+
+  setConfirmDestructive(on) {
+    localStorage.setItem(CONFIRM_DESTRUCTIVE_KEY, String(on))
+    set({ confirmDestructive: on })
+  },
+
+  setAutoConnectOnLaunch(on) {
+    localStorage.setItem(AUTO_CONNECT_KEY, String(on))
+    set({ autoConnectOnLaunch: on })
+  },
+
+  setAutoDownloadUpdates(on) {
+    set({ autoDownloadUpdates: on })
+    // Revert the toggle if main couldn't persist it, so the UI matches the truth.
+    window.api.setAutoDownload(on).catch(() => {
+      set({ autoDownloadUpdates: !on })
+      get().addToast('error', 'Could not save the auto-download setting.')
+    })
+  },
+
+  maybeConfirm(req) {
+    return get().confirmDestructive ? get().confirm(req) : Promise.resolve(true)
+  },
+
   checkForUpdates() {
     void window.api.checkForUpdates()
   },
@@ -949,7 +1081,7 @@ function applyStreamEvent(
           if (t.id !== tid || t.kind !== 'queue') return t
           return {
             ...t,
-            peeks: [event.payload, ...t.peeks].slice(0, PEEK_BUFFER),
+            peeks: [event.payload, ...t.peeks].slice(0, get().maxMessages),
             unread: t.id === activeTabId ? t.unread : t.unread + 1
           }
         })

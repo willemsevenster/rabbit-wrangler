@@ -7,9 +7,6 @@ import type {
   QueueInfo
 } from '@shared/types'
 
-/** Names matching this are flagged as dead-letter queues in the UI. */
-const DLQ_PATTERN = /(\.dlq|\.dead|_dlq|deadletter)$/i
-
 /** The complete set of AMQP basic message properties RabbitMQ accepts on publish. */
 const VALID_PROPERTIES = new Set([
   'content_type',
@@ -96,8 +93,7 @@ export class ManagementApi {
       messages: q.messages ?? 0,
       messagesReady: q.messages_ready ?? 0,
       messagesUnacknowledged: q.messages_unacknowledged ?? 0,
-      consumers: q.consumers ?? 0,
-      isDeadLetter: DLQ_PATTERN.test(q.name)
+      consumers: q.consumers ?? 0
     }))
   }
 

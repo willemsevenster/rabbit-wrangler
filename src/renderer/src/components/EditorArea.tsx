@@ -277,11 +277,11 @@ function QueueTab({ tab }: { tab: Extract<EditorTab, { kind: 'queue' }> }) {
   const purgeQueue = useAppStore((s) => s.purgeQueue)
   const refreshTab = useAppStore((s) => s.refreshTab)
   const openMoveDialog = useAppStore((s) => s.openMoveDialog)
-  const confirm = useAppStore((s) => s.confirm)
+  const maybeConfirm = useAppStore((s) => s.maybeConfirm)
   const addToast = useAppStore((s) => s.addToast)
 
   async function purge() {
-    const ok = await confirm({
+    const ok = await maybeConfirm({
       title: 'Purge queue',
       message: `Purge all messages from "${tab.queue}"? This cannot be undone.`,
       confirmLabel: 'Purge',
