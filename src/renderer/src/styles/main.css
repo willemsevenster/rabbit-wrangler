@@ -1424,8 +1424,30 @@ body.resizing .msg-detail__resizer {
 .search__input:focus {
   border-color: var(--input-focus);
 }
-.search__controls .field--check {
-  margin-top: 0;
+.search__toggle {
+  flex: 0 0 auto;
+  min-width: 28px;
+  height: 28px;
+  padding: 0 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--input-bg);
+  color: var(--text-muted);
+  border: 1px solid var(--panel-border);
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+}
+.search__toggle:hover {
+  color: var(--text);
+  border-color: var(--input-focus);
+}
+.search__toggle.is-active {
+  background: var(--focus-border);
+  border-color: var(--focus-border);
+  color: #fff;
 }
 .search__meta {
   flex: 0 0 auto;

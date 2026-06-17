@@ -160,24 +160,26 @@ function SearchModal() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
-          <label className="field--check" title="Match case">
-            <input
-              id="search-matchcase"
-              type="checkbox"
-              checked={matchCase}
-              onChange={(e) => setMatchCase(e.target.checked)}
-            />
+          <button
+            id="search-matchcase"
+            type="button"
+            className={`search__toggle ${matchCase ? 'is-active' : ''}`}
+            title="Match case"
+            aria-pressed={matchCase}
+            onClick={() => setMatchCase((v) => !v)}
+          >
             Aa
-          </label>
-          <label className="field--check" title="Use regular expression">
-            <input
-              id="search-regex"
-              type="checkbox"
-              checked={regex}
-              onChange={(e) => setRegex(e.target.checked)}
-            />
+          </button>
+          <button
+            id="search-regex"
+            type="button"
+            className={`search__toggle ${regex ? 'is-active' : ''}`}
+            title="Use regular expression"
+            aria-pressed={regex}
+            onClick={() => setRegex((v) => !v)}
+          >
             .*
-          </label>
+          </button>
         </div>
 
         <div className="search__meta">
