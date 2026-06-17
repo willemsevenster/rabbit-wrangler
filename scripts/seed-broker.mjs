@@ -134,7 +134,7 @@ function makeMessage() {
     'x-attempt': randInt(1, 4)
   }
   const common = {
-    timestamp: now,
+    timestamp: Math.floor(now / 1000), // AMQP timestamp is Unix time in *seconds*
     appId: 'rw-seeder',
     // ~70% carry a publisher messageId; the rest exercise the body-hash fingerprint.
     ...(chance(0.7) ? { messageId: rng.uuid() } : {}),
@@ -262,7 +262,7 @@ function stressPayload(i) {
   return {
     body: Buffer.from(c.body, 'utf8'),
     options: {
-      timestamp: nowMs(),
+      timestamp: Math.floor(nowMs() / 1000),
       appId: 'rw-seeder',
       messageId: rng.uuid(),
       contentType: c.ct,
@@ -318,8 +318,12 @@ function publishRouted(ch) {
  */
 async function seedDlqs(ch, total) {
   if (total <= 0) return
-  const per = Math.max(1, Math.round(total / DLQ_QUEUES.length))
-  for (const dlq of DLQ_QUEUES) {
+  const len = DLQ_QUEUES.length
+  for (let qi = 0; qi < len; qi++) {
+    // Distribute `total` exactly across the DLQs (no rounding overshoot).
+    const count = Math.floor(total / len) + (qi < total % len ? 1 : 0)
+    if (count === 0) continue
+    const dlq = DLQ_QUEUES[qi]
     const feeder = feederFor(dlq)
     await ch.deleteQueue(feeder).catch(() => {}) // avoid arg-mismatch on a leftover
     await ch.assertQueue(feeder, {
@@ -330,7 +334,7 @@ async function seedDlqs(ch, total) {
         'x-message-ttl': 0
       }
     })
-    for (let i = 0; i < per; i++) {
+    for (let i = 0; i < count; i++) {
       const m = makeMessage()
       ch.sendToQueue(feeder, m.body, { ...m.options, persistent: DURABLE })
     }
