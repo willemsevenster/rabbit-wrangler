@@ -12,6 +12,7 @@ import { MenuBar } from './components/MenuBar'
 import { Resizer } from './components/Resizer'
 import { UpdateButton } from './components/UpdateButton'
 import { useFocusCycle } from './lib/use-focus-cycle'
+import { useTabCycle } from './lib/use-tab-cycle'
 import { Toaster } from './components/Toaster'
 import { ConfirmDialog } from './components/ConfirmDialog'
 import { AboutDialog } from './components/AboutDialog'
@@ -26,6 +27,7 @@ function App() {
   const sidebarVisible = useAppStore((s) => s.sidebarVisible)
 
   useFocusCycle()
+  useTabCycle()
 
   useEffect(() => {
     void init()
