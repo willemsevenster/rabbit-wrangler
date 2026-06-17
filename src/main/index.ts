@@ -5,14 +5,24 @@ import { registerIpcHandlers } from './ipc'
 import { eventStreamServer } from './websocket-server'
 import { connectionManager } from './connections/connection-manager'
 import { initUpdater, disposeUpdater } from './updater'
+import {
+  savedWindowOptions,
+  savedWindowFlags,
+  trackWindowState,
+  MIN_WIDTH,
+  MIN_HEIGHT
+} from './store/window-state'
+import { startupBackgroundColor } from './store/ui-prefs'
 
 function createWindow(): void {
   const mainWindow = new BrowserWindow({
-    width: 1280,
-    height: 800,
-    minWidth: 900,
-    minHeight: 600,
+    ...savedWindowOptions(),
+    minWidth: MIN_WIDTH,
+    minHeight: MIN_HEIGHT,
     show: false,
+    // Paint the window in the theme's background up-front so a dark-mode user
+    // doesn't get a white flash before the renderer's CSS loads (and vice-versa).
+    backgroundColor: startupBackgroundColor(),
     title: 'Rabbit Wrangler',
     // Dev taskbar/window icon. Packaged builds get their icon from the executable
     // (electron-builder embeds build/icon.* there), so this is only needed in dev.
@@ -30,6 +40,12 @@ function createWindow(): void {
       contextIsolation: true
     }
   })
+
+  // Restore maximize/fullscreen, then keep the saved geometry up to date.
+  const flags = savedWindowFlags()
+  if (flags.fullscreen) mainWindow.setFullScreen(true)
+  else if (flags.maximized) mainWindow.maximize()
+  trackWindowState(mainWindow)
 
   mainWindow.on('ready-to-show', () => mainWindow.show())
 

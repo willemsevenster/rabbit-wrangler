@@ -3,6 +3,7 @@ import { IPC } from '@shared/ipc'
 import { checkForUpdates, downloadUpdate, quitAndInstall } from './updater'
 import { configStore } from './store/config-store'
 import { exportConnections, readImportFile } from './store/connection-io'
+import { setStoredTheme } from './store/ui-prefs'
 import { connectionManager } from './connections/connection-manager'
 import { eventStreamServer } from './websocket-server'
 import type {
@@ -80,6 +81,8 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(IPC.publishMessage, (_e, req: PublishMessageRequest) =>
     connectionManager.require(req.connectionId).publishMessage(req)
   )
+
+  ipcMain.handle(IPC.persistTheme, (_e, theme: 'light' | 'dark') => setStoredTheme(theme))
 
   ipcMain.handle(IPC.getEventStreamPort, () => eventStreamServer.getPort())
 
