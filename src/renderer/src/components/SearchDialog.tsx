@@ -91,7 +91,10 @@ function SearchModal() {
       }
       return { matches: rows.filter((r) => re.test(r.haystack)), error: null }
     }
-    const needle = matchCase ? query : query.toLowerCase()
+    // Plain search uses the trimmed term (accidental surrounding whitespace
+    // shouldn't matter); regex keeps the raw query since whitespace can be
+    // significant in a pattern.
+    const needle = matchCase ? q : q.toLowerCase()
     return {
       matches: rows.filter((r) => (matchCase ? r.haystack : r.haystackLower).includes(needle)),
       error: null
@@ -158,6 +161,7 @@ function SearchModal() {
             ref={inputRef}
             type="text"
             className="search__input"
+            aria-label="Search messages"
             placeholder={regex ? 'Regular expression…' : 'Search open queue tabs…'}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
