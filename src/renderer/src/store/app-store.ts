@@ -357,7 +357,12 @@ export const useAppStore = create<AppState>((set, get) => ({
     // window background (no white flash) even if the user never toggles it.
     void window.api.persistTheme(get().theme)
     // Mirror the main-owned auto-download pref into the store for the Settings UI.
-    void window.api.getUpdatePrefs().then((p) => set({ autoDownloadUpdates: p.autoDownload }))
+    void window.api
+      .getUpdatePrefs()
+      .then((p) => set({ autoDownloadUpdates: p.autoDownload }))
+      .catch(() => {
+        /* keep the default (false) if the pref can't be read */
+      })
     socket = new EventSocket((event) => applyStreamEvent(set, get, event))
     await socket.connect()
     await get().refreshConnections()
@@ -879,7 +884,11 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   setAutoDownloadUpdates(on) {
     set({ autoDownloadUpdates: on })
-    void window.api.setAutoDownload(on)
+    // Revert the toggle if main couldn't persist it, so the UI matches the truth.
+    window.api.setAutoDownload(on).catch(() => {
+      set({ autoDownloadUpdates: !on })
+      get().addToast('error', 'Could not save the auto-download setting.')
+    })
   },
 
   maybeConfirm(req) {
