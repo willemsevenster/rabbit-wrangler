@@ -12,9 +12,11 @@ export function ConfirmDialog() {
 
   useEffect(() => {
     if (!req) return
+    // Escape cancels. Enter is intentionally NOT bound globally — the confirm
+    // button is autofocused, so Enter activates whichever button has focus
+    // (pressing Enter on a tabbed-to Cancel must cancel, not confirm).
     const onKey = (e: KeyboardEvent): void => {
       if (e.key === 'Escape') resolve(false)
-      else if (e.key === 'Enter') resolve(true)
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)

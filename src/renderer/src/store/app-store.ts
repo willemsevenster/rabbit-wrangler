@@ -721,6 +721,8 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   confirm(req) {
     return new Promise<boolean>((resolve) => {
+      // Settle any in-flight confirm as cancelled so its promise never leaks.
+      confirmResolver?.(false)
       confirmResolver = resolve
       set({ confirmRequest: req })
     })

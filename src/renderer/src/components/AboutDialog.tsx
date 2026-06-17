@@ -8,7 +8,7 @@ export function AboutDialog() {
   const [version, setVersion] = useState('')
 
   useEffect(() => {
-    if (open) void window.api.getAppVersion().then(setVersion)
+    if (open) void window.api.getAppVersion().then(setVersion, () => setVersion('unknown'))
   }, [open])
 
   useEffect(() => {
