@@ -57,7 +57,14 @@ export const configStore = {
 
   save(config: ConnectionConfig): SafeConnectionConfig {
     const { password, ...rest } = config
-    const stored: StoredConnection = { ...rest, encryptedPassword: encrypt(password) }
+    // An empty password on save means "keep the existing one" — the renderer never
+    // receives the plaintext, so editing a connection leaves the field blank. Only
+    // overwrite the stored blob when the user actually typed a new password. (A new
+    // connection has no prior record, so a blank password is stored as blank.)
+    const existing = store.get('connections')[config.id]
+    const encryptedPassword =
+      password === '' && existing?.encryptedPassword ? existing.encryptedPassword : encrypt(password)
+    const stored: StoredConnection = { ...rest, encryptedPassword }
     store.set(`connections.${config.id}`, stored)
     return strip(stored)
   },

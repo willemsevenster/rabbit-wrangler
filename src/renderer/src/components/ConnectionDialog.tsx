@@ -120,6 +120,7 @@ export function ConnectionDialog() {
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                placeholder={editing ? '•••••• (unchanged — type to replace)' : ''}
               />
             </div>
           </div>
