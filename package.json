@@ -1,6 +1,6 @@
 {
   "name": "rabbit-wrangler",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "Desktop tool for managing RabbitMQ clusters: peek messages, move DLQ messages, purge queues across multiple connections.",
   "main": "./out/main/index.js",
   "author": "frontforge",
