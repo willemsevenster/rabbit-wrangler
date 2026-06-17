@@ -18,13 +18,11 @@ export function MenuBar() {
   const theme = useAppStore((s) => s.theme)
   const toggleTheme = useAppStore((s) => s.toggleTheme)
   const checkForUpdates = useAppStore((s) => s.checkForUpdates)
+  const confirm = useAppStore((s) => s.confirm)
+  const addToast = useAppStore((s) => s.addToast)
+  const openAbout = useAppStore((s) => s.openAbout)
 
   const activeQueue = activeTab?.kind === 'queue' ? activeTab : null
-
-  async function showAbout(): Promise<void> {
-    const version = await window.api.getAppVersion()
-    alert(`Rabbit Wrangler ${version}\nRabbitMQ management tool`)
-  }
 
   const menus: { label: string; items: () => MenuItem[] }[] = [
     {
@@ -60,11 +58,15 @@ export function MenuBar() {
           disabled: !activeQueue,
           onClick: async () => {
             if (!activeQueue) return
-            if (!confirm(`Purge all messages from "${activeQueue.queue}"? This cannot be undone.`)) {
-              return
-            }
+            const ok = await confirm({
+              title: 'Purge queue',
+              message: `Purge all messages from "${activeQueue.queue}"? This cannot be undone.`,
+              confirmLabel: 'Purge',
+              danger: true
+            })
+            if (!ok) return
             const r = await purgeQueue(activeQueue.queue, activeQueue.connectionId)
-            if (!r.ok) alert(`Purge failed: ${r.error ?? 'unknown error'}`)
+            if (!r.ok) addToast('error', `Purge failed: ${r.error ?? 'unknown error'}`)
           }
         }
       ]
@@ -93,7 +95,7 @@ export function MenuBar() {
         {
           label: 'About Rabbit Wrangler',
           icon: 'info',
-          onClick: () => void showAbout()
+          onClick: openAbout
         }
       ]
     }

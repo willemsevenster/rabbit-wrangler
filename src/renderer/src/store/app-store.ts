@@ -59,6 +59,21 @@ export const overviewTabId = (c: string): string => `o:${c}`
 export const queueTabId = (c: string, q: string): string => `q:${c}:${q}`
 export const exchangeTabId = (c: string, x: string): string => `x:${c}:${x}`
 
+/** A transient toast notification (auto-dismisses). */
+export interface Toast {
+  id: string
+  kind: 'info' | 'success' | 'error'
+  message: string
+}
+
+/** A request to show the themed confirm dialog. */
+export interface ConfirmRequest {
+  title: string
+  message: string
+  confirmLabel?: string
+  danger?: boolean
+}
+
 interface AppState {
   connections: SafeConnectionConfig[]
   statuses: Record<string, ConnectionStatus>
@@ -103,8 +118,12 @@ interface AppState {
 
   /** Auto-update status pushed from main (null until the first event). */
   updateStatus: UpdateStatusPayload | null
-  /** Transient feedback for manual update checks (e.g. "You're up to date."). */
-  updateToast: string | null
+  /** Transient toast notifications (auto-dismiss). */
+  toasts: Toast[]
+  /** Open themed confirm dialog request (null = closed). */
+  confirmRequest: ConfirmRequest | null
+  /** Whether the About dialog is open. */
+  aboutOpen: boolean
 
   init(): Promise<void>
   refreshConnections(): Promise<void>
@@ -157,8 +176,15 @@ interface AppState {
 
   checkForUpdates(): void
   downloadUpdate(): void
-  restartToUpdate(): void
-  dismissUpdateToast(): void
+  restartToUpdate(): Promise<void>
+
+  addToast(kind: Toast['kind'], message: string): void
+  dismissToast(id: string): void
+  /** Show a themed confirm dialog; resolves true on confirm, false on cancel. */
+  confirm(req: ConfirmRequest): Promise<boolean>
+  resolveConfirm(ok: boolean): void
+  openAbout(): void
+  closeAbout(): void
 
   openNewConnection(): void
   editConnection(connection: SafeConnectionConfig): void
@@ -169,6 +195,10 @@ interface AppState {
 
 let socket: EventSocket | null = null
 let initialized = false
+/** Monotonic id source for toasts. */
+let toastSeq = 0
+/** Resolver for the in-flight themed confirm() (only one dialog at a time). */
+let confirmResolver: ((ok: boolean) => void) | null = null
 /** `${connId}:${queue}` → epoch ms of a recent purge, so the ~5s-lagged stats
  * poll doesn't briefly re-show the old count. */
 const purgedAt = new Map<string, number>()
@@ -239,7 +269,9 @@ export const useAppStore = create<AppState>((set, get) => ({
   detailMetaWidth: initialDetailMetaWidth,
   theme: initialTheme,
   updateStatus: null,
-  updateToast: null,
+  toasts: [],
+  confirmRequest: null,
+  aboutOpen: false,
 
   async init() {
     if (initialized) return
@@ -667,14 +699,46 @@ export const useAppStore = create<AppState>((set, get) => ({
     void window.api.downloadUpdate()
   },
 
-  restartToUpdate() {
+  async restartToUpdate() {
     const v = get().updateStatus?.version
-    if (!confirm(`Restart now to install Rabbit Wrangler${v ? ` ${v}` : ''}?`)) return
-    void window.api.quitAndInstall()
+    const ok = await get().confirm({
+      title: 'Restart to update',
+      message: `Restart now to install Rabbit Wrangler${v ? ` ${v}` : ''}?`,
+      confirmLabel: 'Restart'
+    })
+    if (ok) void window.api.quitAndInstall()
   },
 
-  dismissUpdateToast() {
-    set({ updateToast: null })
+  addToast(kind, message) {
+    const id = `t${++toastSeq}`
+    set({ toasts: [...get().toasts, { id, kind, message }] })
+    setTimeout(() => get().dismissToast(id), 4000)
+  },
+
+  dismissToast(id) {
+    set({ toasts: get().toasts.filter((t) => t.id !== id) })
+  },
+
+  confirm(req) {
+    return new Promise<boolean>((resolve) => {
+      confirmResolver = resolve
+      set({ confirmRequest: req })
+    })
+  },
+
+  resolveConfirm(ok) {
+    const resolve = confirmResolver
+    confirmResolver = null
+    set({ confirmRequest: null })
+    resolve?.(ok)
+  },
+
+  openAbout() {
+    set({ aboutOpen: true })
+  },
+
+  closeAbout() {
+    set({ aboutOpen: false })
   },
 
   openNewConnection() {
@@ -812,10 +876,10 @@ function applyStreamEvent(
       set({ updateStatus: p })
       // Only surface a toast for user-initiated checks — never nag mid-task.
       if (p.manual) {
-        if (p.state === 'checking') set({ updateToast: 'Checking for updates…' })
-        else if (p.state === 'none') set({ updateToast: "You're up to date." })
+        if (p.state === 'checking') get().addToast('info', 'Checking for updates…')
+        else if (p.state === 'none') get().addToast('info', "You're up to date.")
         else if (p.state === 'error')
-          set({ updateToast: `Update check failed: ${p.error ?? 'unknown error'}` })
+          get().addToast('error', `Update check failed: ${p.error ?? 'unknown error'}`)
       }
       break
     }

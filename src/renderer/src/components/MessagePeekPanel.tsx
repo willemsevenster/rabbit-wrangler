@@ -119,6 +119,8 @@ export function MessagePeekPanel({ tab }: { tab: QueueTab }) {
 
   const openMoveDialog = useAppStore((s) => s.openMoveDialog)
   const deleteMessage = useAppStore((s) => s.deleteMessage)
+  const confirm = useAppStore((s) => s.confirm)
+  const addToast = useAppStore((s) => s.addToast)
 
   const setSelectedId = (id: string): void => selectMessage(tab.id, id)
   const selected = peeks.find((m) => m.id === selectedId) ?? null
@@ -128,13 +130,19 @@ export function MessagePeekPanel({ tab }: { tab: QueueTab }) {
   }
 
   async function removeMessage(m: PeekedMessage): Promise<void> {
-    if (!confirm(`Delete this message from "${tab.queue}"? This cannot be undone.`)) return
+    const ok = await confirm({
+      title: 'Delete message',
+      message: `Delete this message from "${tab.queue}"? This cannot be undone.`,
+      confirmLabel: 'Delete',
+      danger: true
+    })
+    if (!ok) return
     const r = await deleteMessage({
       connectionId: tab.connectionId,
       sourceQueue: tab.queue,
       fingerprint: m.fingerprint
     })
-    if (!r.ok) alert(`Delete failed: ${r.error ?? 'unknown error'}`)
+    if (!r.ok) addToast('error', `Delete failed: ${r.error ?? 'unknown error'}`)
   }
 
   function messageMenu(m: PeekedMessage): MenuItem[] {

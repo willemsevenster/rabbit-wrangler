@@ -23,7 +23,8 @@ function queueSnapshot(q: QueueInfo) {
  * open-time.
  */
 export function buildQueueMenu(connectionId: string, q: QueueInfo): MenuItem[] {
-  const { openQueueTab, refreshQueues, purgeQueue, openMoveDialog } = useAppStore.getState()
+  const { openQueueTab, refreshQueues, purgeQueue, openMoveDialog, confirm, addToast } =
+    useAppStore.getState()
   return [
     { label: 'Peek Messages', icon: 'eye', onClick: () => openQueueTab(connectionId, q.name) },
     { label: 'Refresh', icon: 'refresh', onClick: () => void refreshQueues(connectionId) },
@@ -45,9 +46,15 @@ export function buildQueueMenu(connectionId: string, q: QueueInfo): MenuItem[] {
       icon: 'trash',
       danger: true,
       onClick: async () => {
-        if (!confirm(`Purge all messages from "${q.name}"? This cannot be undone.`)) return
+        const ok = await confirm({
+          title: 'Purge queue',
+          message: `Purge all messages from "${q.name}"? This cannot be undone.`,
+          confirmLabel: 'Purge',
+          danger: true
+        })
+        if (!ok) return
         const result = await purgeQueue(q.name, connectionId)
-        if (!result.ok) alert(`Purge failed: ${result.error ?? 'unknown error'}`)
+        if (!result.ok) addToast('error', `Purge failed: ${result.error ?? 'unknown error'}`)
       }
     }
   ]
