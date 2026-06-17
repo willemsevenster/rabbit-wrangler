@@ -267,21 +267,41 @@ code {
   -webkit-app-region: no-drag;
 }
 
-/* transient feedback banner for manual update checks */
-.update-toast {
+/* ---------- toasts ---------- */
+/* stacked transient notifications, bottom-center */
+.toaster {
   position: fixed;
   bottom: 34px;
   left: 50%;
   transform: translateX(-50%);
   z-index: 1200;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.toast {
   padding: 8px 14px;
   background: var(--toast-bg);
   border: 1px solid var(--toast-border);
+  border-left-width: 3px;
   border-radius: 6px;
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
   color: var(--text);
   font-size: 12px;
   cursor: default;
+  max-width: 480px;
+}
+
+.toast--success {
+  border-left-color: var(--success);
+}
+.toast--error {
+  border-left-color: var(--error);
+}
+.toast--info {
+  border-left-color: var(--focus-border);
 }
 
 .app-body {
@@ -1243,6 +1263,51 @@ body.resizing .msg-detail__resizer {
 
 .modal--wide {
   width: 580px;
+}
+
+/* ---------- confirm / about dialogs ---------- */
+.modal--confirm,
+.modal--about {
+  width: 420px;
+}
+
+.confirm__message {
+  margin: 4px 0 0;
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.about {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 12px 0 4px;
+}
+
+.about__icon {
+  font-size: 40px;
+  line-height: 1;
+}
+
+.about__name {
+  margin-top: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-bright);
+}
+
+.about__version {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.about__desc {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--text-muted);
 }
 
 /* publish form: key = value [type] rows */

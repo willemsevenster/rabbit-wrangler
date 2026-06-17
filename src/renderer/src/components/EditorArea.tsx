@@ -258,11 +258,19 @@ function QueueTab({ tab }: { tab: Extract<EditorTab, { kind: 'queue' }> }) {
   const purgeQueue = useAppStore((s) => s.purgeQueue)
   const refreshTab = useAppStore((s) => s.refreshTab)
   const openMoveDialog = useAppStore((s) => s.openMoveDialog)
+  const confirm = useAppStore((s) => s.confirm)
+  const addToast = useAppStore((s) => s.addToast)
 
   async function purge() {
-    if (!confirm(`Purge all messages from "${tab.queue}"? This cannot be undone.`)) return
+    const ok = await confirm({
+      title: 'Purge queue',
+      message: `Purge all messages from "${tab.queue}"? This cannot be undone.`,
+      confirmLabel: 'Purge',
+      danger: true
+    })
+    if (!ok) return
     const result = await purgeQueue(tab.queue, tab.connectionId)
-    if (!result.ok) alert(`Purge failed: ${result.error ?? 'unknown error'}`)
+    if (!result.ok) addToast('error', `Purge failed: ${result.error ?? 'unknown error'}`)
   }
 
   return (

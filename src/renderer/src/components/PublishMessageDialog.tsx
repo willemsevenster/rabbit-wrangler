@@ -61,6 +61,7 @@ export function PublishMessageDialog() {
   const queues = useAppStore((s) => (connectionId ? s.queuesByConn[connectionId] : undefined)) ?? []
   const close = useAppStore((s) => s.closePublishDialog)
   const publish = useAppStore((s) => s.publishMessage)
+  const addToast = useAppStore((s) => s.addToast)
 
   const [routingKey, setRoutingKey] = useState('')
   const [deliveryMode, setDeliveryMode] = useState(1)
@@ -132,11 +133,8 @@ export function PublishMessageDialog() {
     }
     const result = await publish(req)
     if (result.ok) {
-      alert(
-        result.affected > 0
-          ? 'Message published and routed.'
-          : 'Message published, but it was not routed to any queue.'
-      )
+      if (result.affected > 0) addToast('success', 'Message published and routed.')
+      else addToast('info', 'Message published, but it was not routed to any queue.')
     } else {
       setError(result.error ?? 'Publish failed.')
       setBusy(false)

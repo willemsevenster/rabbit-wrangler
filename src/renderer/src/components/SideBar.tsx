@@ -68,6 +68,17 @@ function ConnectionNode({
   const refreshExchanges = useAppStore((s) => s.refreshExchanges)
   const edit = useAppStore((s) => s.editConnection)
   const del = useAppStore((s) => s.deleteConnection)
+  const confirm = useAppStore((s) => s.confirm)
+
+  async function confirmDelete(): Promise<void> {
+    const ok = await confirm({
+      title: 'Delete connection',
+      message: `Delete connection "${connection.name}"?`,
+      confirmLabel: 'Delete',
+      danger: true
+    })
+    if (ok) void del(connection.id)
+  }
 
   const isSelected = selectedId === connection.id
   const expanded = isSelected && !collapsed
@@ -99,9 +110,7 @@ function ConnectionNode({
       label: 'Delete Connection',
       icon: 'trash',
       danger: true,
-      onClick: () => {
-        if (confirm(`Delete connection "${connection.name}"?`)) void del(connection.id)
-      }
+      onClick: () => void confirmDelete()
     })
     return items
   }
@@ -157,7 +166,7 @@ function ConnectionNode({
             title="Delete"
             onClick={(e) => {
               e.stopPropagation()
-              if (confirm(`Delete connection "${connection.name}"?`)) void del(connection.id)
+              void confirmDelete()
             }}
           >
             <span className="codicon codicon-trash" />

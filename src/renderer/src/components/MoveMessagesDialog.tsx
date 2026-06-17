@@ -22,6 +22,7 @@ export function MoveMessagesDialog() {
   const close = useAppStore((s) => s.closeMoveDialog)
   const moveMessages = useAppStore((s) => s.moveMessages)
   const moveMessage = useAppStore((s) => s.moveMessage)
+  const addToast = useAppStore((s) => s.addToast)
 
   const [targetExchange, setTargetExchange] = useState(() => remembered?.exchange ?? '')
   const [targetRoutingKey, setTargetRoutingKey] = useState(
@@ -60,7 +61,8 @@ export function MoveMessagesDialog() {
           limit: limit.trim() ? Math.max(1, Math.floor(Number(limit))) : undefined
         } as MoveMessagesRequest)
     if (result.ok) {
-      alert(
+      addToast(
+        'success',
         isSingle
           ? `Moved 1 message from "${sourceQueue}".`
           : `Moved ${result.affected} message${result.affected === 1 ? '' : 's'} from "${sourceQueue}".`

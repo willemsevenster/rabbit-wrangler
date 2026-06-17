@@ -10,15 +10,23 @@ export function ExchangeDetail({ tab }: { tab: ExchangeTab }) {
   const exchanges = useAppStore((s) => s.exchangesByConn[tab.connectionId] ?? [])
   const openPublish = useAppStore((s) => s.openPublishDialog)
   const del = useAppStore((s) => s.deleteExchange)
+  const confirm = useAppStore((s) => s.confirm)
+  const addToast = useAppStore((s) => s.addToast)
 
   const x = exchanges.find((e) => e.name === exchangeName)
   const label = exchangeName === '' ? '(AMQP default)' : exchangeName
   const isBuiltIn = exchangeName === '' || exchangeName.startsWith('amq.')
 
   async function onDelete() {
-    if (!confirm(`Delete exchange "${exchangeName}"? This cannot be undone.`)) return
+    const ok = await confirm({
+      title: 'Delete exchange',
+      message: `Delete exchange "${exchangeName}"? This cannot be undone.`,
+      confirmLabel: 'Delete',
+      danger: true
+    })
+    if (!ok) return
     const result = await del(exchangeName, tab.connectionId)
-    if (!result.ok) alert(`Delete failed: ${result.error ?? 'unknown error'}`)
+    if (!result.ok) addToast('error', `Delete failed: ${result.error ?? 'unknown error'}`)
   }
 
   return (

@@ -10,7 +10,9 @@ import { PublishMessageDialog } from './components/PublishMessageDialog'
 import { MenuBar } from './components/MenuBar'
 import { Resizer } from './components/Resizer'
 import { UpdateButton } from './components/UpdateButton'
-import { UpdateToast } from './components/UpdateToast'
+import { Toaster } from './components/Toaster'
+import { ConfirmDialog } from './components/ConfirmDialog'
+import { AboutDialog } from './components/AboutDialog'
 
 function App() {
   const init = useAppStore((s) => s.init)
@@ -46,7 +48,9 @@ function App() {
       {dialogOpen && <ConnectionDialog />}
       {moveDialog && <MoveMessagesDialog />}
       {publishDialog && <PublishMessageDialog />}
-      <UpdateToast />
+      <ConfirmDialog />
+      <AboutDialog />
+      <Toaster />
     </div>
   )
 }

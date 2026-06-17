@@ -15,7 +15,8 @@ function exchangeSnapshot(x: ExchangeInfo) {
 
 /** Context menu for an exchange, shared by the tree and the detail view. */
 export function buildExchangeMenu(connectionId: string, x: ExchangeInfo): MenuItem[] {
-  const { openExchangeTab, openPublishDialog, deleteExchange } = useAppStore.getState()
+  const { openExchangeTab, openPublishDialog, deleteExchange, confirm, addToast } =
+    useAppStore.getState()
   const isDefault = x.name === ''
   // Built-in exchanges (default + amq.*) can't be deleted.
   const isBuiltIn = isDefault || x.name.startsWith('amq.')
@@ -50,9 +51,15 @@ export function buildExchangeMenu(connectionId: string, x: ExchangeInfo): MenuIt
       danger: true,
       disabled: isBuiltIn,
       onClick: async () => {
-        if (!confirm(`Delete exchange "${x.name}"? This cannot be undone.`)) return
+        const ok = await confirm({
+          title: 'Delete exchange',
+          message: `Delete exchange "${x.name}"? This cannot be undone.`,
+          confirmLabel: 'Delete',
+          danger: true
+        })
+        if (!ok) return
         const result = await deleteExchange(x.name, connectionId)
-        if (!result.ok) alert(`Delete failed: ${result.error ?? 'unknown error'}`)
+        if (!result.ok) addToast('error', `Delete failed: ${result.error ?? 'unknown error'}`)
       }
     }
   ]
