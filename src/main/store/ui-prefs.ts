@@ -21,13 +21,39 @@ function getStoredTheme(): Theme | undefined {
   return t === 'light' || t === 'dark' ? t : undefined
 }
 
+/** The theme the window should open with: the remembered choice, else the OS
+ * preference (matching the renderer's first-run behaviour). */
+function resolveTheme(): Theme {
+  return getStoredTheme() ?? (nativeTheme.shouldUseDarkColors ? 'dark' : 'light')
+}
+
 /**
- * Background colour for the window *before* the renderer paints. Uses the
- * remembered theme; on first run (nothing stored yet) it follows the OS — which
- * matches the renderer's first-run behaviour — so the pre-paint frame matches the
- * theme the renderer is about to apply, and there's no flash.
+ * Background colour for the window *before* the renderer paints, so the pre-paint
+ * frame matches the theme the renderer is about to apply (no white flash).
  */
 export function startupBackgroundColor(): string {
-  const theme = getStoredTheme() ?? (nativeTheme.shouldUseDarkColors ? 'dark' : 'light')
-  return theme === 'light' ? '#ffffff' : '#1e1e1e'
+  return resolveTheme() === 'light' ? '#ffffff' : '#1e1e1e'
+}
+
+/** Native window-control overlay height — matches the 30px title bar (see the
+ * .app-shell grid in main.css). Single source so the creation + toggle paths agree. */
+const TITLEBAR_OVERLAY_HEIGHT = 30
+
+/** Native window-control overlay (min/max/close) options per theme — colours kept
+ * in sync with the title-bar CSS variables (--titlebar-bg / --titlebar-fg). */
+export function titleBarOverlay(theme: Theme): {
+  color: string
+  symbolColor: string
+  height: number
+} {
+  const colors =
+    theme === 'light'
+      ? { color: '#dddddd', symbolColor: '#333333' }
+      : { color: '#323233', symbolColor: '#cccccc' }
+  return { ...colors, height: TITLEBAR_OVERLAY_HEIGHT }
+}
+
+/** Overlay options for the window at creation, for the resolved theme. */
+export function startupTitleBarOverlay(): { color: string; symbolColor: string; height: number } {
+  return titleBarOverlay(resolveTheme())
 }

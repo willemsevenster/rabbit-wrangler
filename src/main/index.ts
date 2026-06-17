@@ -12,7 +12,7 @@ import {
   MIN_WIDTH,
   MIN_HEIGHT
 } from './store/window-state'
-import { startupBackgroundColor } from './store/ui-prefs'
+import { startupBackgroundColor, startupTitleBarOverlay } from './store/ui-prefs'
 
 function createWindow(): void {
   const mainWindow = new BrowserWindow({
@@ -30,10 +30,9 @@ function createWindow(): void {
     // VSCode-style chrome: hide the OS title bar but keep the native window
     // controls (min/max/close) drawn in an overlay so we don't reimplement them.
     titleBarStyle: 'hidden',
-    titleBarOverlay:
-      process.platform === 'darwin'
-        ? false
-        : { color: '#323233', symbolColor: '#cccccc', height: 30 },
+    // Native min/max/close overlay, themed to match the title bar (updated live on
+    // theme change via the persistTheme IPC handler). macOS uses traffic lights.
+    titleBarOverlay: process.platform === 'darwin' ? false : startupTitleBarOverlay(),
     webPreferences: {
       preload: join(import.meta.dirname, '../preload/index.mjs'),
       sandbox: false,
