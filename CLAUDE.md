@@ -174,6 +174,12 @@ when the management API already exposes it (e.g. purge is an HTTP `DELETE`).
   collisions (Skip / Overwrite / Import as new with a `(n)` suffix). Imports save
   straight via `window.api.saveConnection` (bypassing the store action, so the
   batch doesn't auto-connect).
+- **Window state** (`src/main/store/window-state.ts`): the main window's bounds +
+  maximized/fullscreen are persisted to `window-state.json` (electron-store) and
+  reapplied on launch. Geometry comes from `getNormalBounds()` (so a maximized
+  window restores to a sane un-maximized size); a saved position that lands on a
+  now-disconnected display is dropped so the window re-centers. Saved debounced on
+  resize/move and flushed on close.
 - **Auto-update** (`src/main/updater.ts`, `electron-updater` + GitHub Releases):
   `initUpdater()` (called from `index.ts` after `createWindow`) checks for updates
   ~4s after launch and every ~6h. It's a **no-op unless `app.isPackaged`** (the

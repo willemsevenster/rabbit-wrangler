@@ -5,11 +5,11 @@ import { registerIpcHandlers } from './ipc'
 import { eventStreamServer } from './websocket-server'
 import { connectionManager } from './connections/connection-manager'
 import { initUpdater, disposeUpdater } from './updater'
+import { savedWindowOptions, savedWindowFlags, trackWindowState } from './store/window-state'
 
 function createWindow(): void {
   const mainWindow = new BrowserWindow({
-    width: 1280,
-    height: 800,
+    ...savedWindowOptions(),
     minWidth: 900,
     minHeight: 600,
     show: false,
@@ -30,6 +30,12 @@ function createWindow(): void {
       contextIsolation: true
     }
   })
+
+  // Restore maximize/fullscreen, then keep the saved geometry up to date.
+  const flags = savedWindowFlags()
+  if (flags.fullscreen) mainWindow.setFullScreen(true)
+  else if (flags.maximized) mainWindow.maximize()
+  trackWindowState(mainWindow)
 
   mainWindow.on('ready-to-show', () => mainWindow.show())
 
