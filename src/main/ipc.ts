@@ -3,7 +3,7 @@ import { IPC } from '@shared/ipc'
 import { checkForUpdates, downloadUpdate, quitAndInstall } from './updater'
 import { configStore } from './store/config-store'
 import { exportConnections, readImportFile } from './store/connection-io'
-import { setStoredTheme, titleBarOverlayColors } from './store/ui-prefs'
+import { setStoredTheme, titleBarOverlay } from './store/ui-prefs'
 import { connectionManager } from './connections/connection-manager'
 import { eventStreamServer } from './websocket-server'
 import type {
@@ -87,7 +87,7 @@ export function registerIpcHandlers(): void {
     // Re-tint the native window-control overlay to match (Windows/Linux only;
     // macOS uses traffic lights and has no overlay to update).
     if (process.platform !== 'darwin') {
-      const overlay = { ...titleBarOverlayColors(theme), height: 30 }
+      const overlay = titleBarOverlay(theme)
       for (const win of BrowserWindow.getAllWindows()) {
         try {
           win.setTitleBarOverlay(overlay)

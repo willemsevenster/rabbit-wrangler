@@ -35,15 +35,25 @@ export function startupBackgroundColor(): string {
   return resolveTheme() === 'light' ? '#ffffff' : '#1e1e1e'
 }
 
-/** Native window-control overlay (min/max/close) colours per theme — kept in sync
- * with the title-bar CSS variables (--titlebar-bg / --titlebar-fg). */
-export function titleBarOverlayColors(theme: Theme): { color: string; symbolColor: string } {
-  return theme === 'light'
-    ? { color: '#dddddd', symbolColor: '#333333' }
-    : { color: '#323233', symbolColor: '#cccccc' }
+/** Native window-control overlay height — matches the 30px title bar (see the
+ * .app-shell grid in main.css). Single source so the creation + toggle paths agree. */
+const TITLEBAR_OVERLAY_HEIGHT = 30
+
+/** Native window-control overlay (min/max/close) options per theme — colours kept
+ * in sync with the title-bar CSS variables (--titlebar-bg / --titlebar-fg). */
+export function titleBarOverlay(theme: Theme): {
+  color: string
+  symbolColor: string
+  height: number
+} {
+  const colors =
+    theme === 'light'
+      ? { color: '#dddddd', symbolColor: '#333333' }
+      : { color: '#323233', symbolColor: '#cccccc' }
+  return { ...colors, height: TITLEBAR_OVERLAY_HEIGHT }
 }
 
-/** Title-bar overlay options for the window at creation, for the resolved theme. */
+/** Overlay options for the window at creation, for the resolved theme. */
 export function startupTitleBarOverlay(): { color: string; symbolColor: string; height: number } {
-  return { ...titleBarOverlayColors(resolveTheme()), height: 30 }
+  return titleBarOverlay(resolveTheme())
 }
