@@ -479,6 +479,21 @@ body.resizing {
   background: var(--list-active-bg);
 }
 
+/* ---------- keyboard focus ---------- */
+/* Always-visible ring for keyboard navigation in the tree + message table. */
+.tree-row:focus-visible,
+.msg-table tbody tr:focus-visible {
+  outline: 1px solid var(--focus-border);
+  outline-offset: -1px;
+}
+
+/* Transient accent outline applied to a region on F6 (removed after ~1s). */
+.rw-focus-flash {
+  outline: 2px solid var(--focus-border);
+  outline-offset: -2px;
+  border-radius: 2px;
+}
+
 .tree-row__twisty {
   width: 16px;
   display: inline-flex;

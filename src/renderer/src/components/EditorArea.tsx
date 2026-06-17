@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react'
 import { useAppStore, type EditorTab } from '../store/app-store'
 import { QueueTable } from './QueueTable'
 import { MessagePeekPanel } from './MessagePeekPanel'
@@ -68,6 +68,23 @@ function TabBar() {
     el?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
   }, [activeTabId])
 
+  // Left/Right (Home/End) switch the active tab when the tab strip has focus.
+  function onTabsKeyDown(e: ReactKeyboardEvent<HTMLDivElement>): void {
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) return
+    if (tabs.length === 0) return
+    e.preventDefault()
+    const idx = tabs.findIndex((t) => t.id === activeTabId)
+    let next = idx
+    if (e.key === 'ArrowLeft') next = idx <= 0 ? 0 : idx - 1
+    else if (e.key === 'ArrowRight') next = idx < 0 ? 0 : Math.min(tabs.length - 1, idx + 1)
+    else if (e.key === 'Home') next = 0
+    else if (e.key === 'End') next = tabs.length - 1
+    const t = tabs[next]
+    if (!t) return
+    setActiveTab(t.id)
+    stripRef.current?.querySelector<HTMLElement>(`[data-tab="${CSS.escape(t.id)}"]`)?.focus()
+  }
+
   // Right-align the dropdown under the chevron (ContextMenu positions by its left edge).
   function openOverflow(el: HTMLElement) {
     const r = el.getBoundingClientRect()
@@ -130,6 +147,7 @@ function TabBar() {
         className="tabbar__tabs"
         ref={stripRef}
         role="tablist"
+        onKeyDown={onTabsKeyDown}
         onWheel={(e) => {
           // Translate vertical wheel into horizontal tab scrolling.
           if (e.deltaY !== 0 && stripRef.current) stripRef.current.scrollLeft += e.deltaY
@@ -146,6 +164,7 @@ function TabBar() {
               title={t.title}
               role="tab"
               aria-selected={isActive}
+              tabIndex={isActive ? 0 : -1}
               draggable
               onClick={() => setActiveTab(t.id)}
               onAuxClick={(e) => {

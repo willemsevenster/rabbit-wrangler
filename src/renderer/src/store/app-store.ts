@@ -140,11 +140,18 @@ interface AppState {
   expandConnection(id: string): Promise<void>
   /** Fully collapse one connection's subtree. */
   collapseConnection(id: string): void
+  /** Make a connection the expanded tree selection (connecting if needed) WITHOUT
+   * opening a tab — used by keyboard arrow-expand. */
+  revealConnection(id: string): Promise<void>
 
   // editor tabs
   openOverviewTab(connectionId: string): void
   openQueueTab(connectionId: string, queue: string): void
   openExchangeTab(connectionId: string, exchange: string): Promise<void>
+  /** Open a tab for every queue on a connection. */
+  openAllQueueTabs(connectionId: string): void
+  /** Close every open queue tab belonging to a connection. */
+  closeAllQueueTabs(connectionId: string): void
   setActiveTab(id: string): void
   closeTab(id: string): void
   closeAllTabs(): void
@@ -333,6 +340,16 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (get().selectedConnectionId === id) set({ connectionCollapsed: true })
   },
 
+  async revealConnection(id) {
+    // Expand to reveal children without opening a tab. Connecting (when needed)
+    // already selects + un-collapses; for an already-connected one just re-select.
+    if (get().statuses[id]?.state === 'connected') {
+      set({ selectedConnectionId: id, connectionCollapsed: false })
+    } else {
+      await get().connectConnection(id)
+    }
+  },
+
   async connectConnection(id) {
     set({
       selectedConnectionId: id,
@@ -398,6 +415,25 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
     set({ tabs: [...get().tabs, tab], activeTabId: id })
     void window.api.startPeek(connectionId, queue)
+  },
+
+  openAllQueueTabs(connectionId) {
+    for (const q of get().queuesByConn[connectionId] ?? []) {
+      get().openQueueTab(connectionId, q.name)
+    }
+  },
+
+  closeAllQueueTabs(connectionId) {
+    const { tabs, activeTabId } = get()
+    const doomed = tabs.filter((t) => t.kind === 'queue' && t.connectionId === connectionId)
+    if (doomed.length === 0) return
+    for (const t of doomed) stopTabPeek(t)
+    const remaining = tabs.filter((t) => !doomed.includes(t))
+    const activeAlive = remaining.some((t) => t.id === activeTabId)
+    set({
+      tabs: remaining,
+      activeTabId: activeAlive ? activeTabId : (remaining[remaining.length - 1]?.id ?? null)
+    })
   },
 
   async openExchangeTab(connectionId, exchange) {
