@@ -12,6 +12,7 @@ export function SideBar() {
   const connections = useAppStore((s) => s.connections)
   const openNew = useAppStore((s) => s.openNewConnection)
   const refresh = useAppStore((s) => s.refreshConnections)
+  const collapseTree = useAppStore((s) => s.collapseTree)
   const { menu, openMenu, close } = useContextMenu()
 
   return (
@@ -24,6 +25,9 @@ export function SideBar() {
           </button>
           <button className="icon-button" title="Refresh" onClick={() => void refresh()}>
             <span className="codicon codicon-refresh" />
+          </button>
+          <button className="icon-button" title="Collapse All" onClick={collapseTree}>
+            <span className="codicon codicon-collapse-all" />
           </button>
         </div>
       </div>
@@ -58,6 +62,8 @@ function ConnectionNode({
   const connect = useAppStore((s) => s.connectConnection)
   const disconnect = useAppStore((s) => s.disconnectConnection)
   const toggleCollapsed = useAppStore((s) => s.toggleConnectionCollapsed)
+  const expandConnection = useAppStore((s) => s.expandConnection)
+  const collapseConnection = useAppStore((s) => s.collapseConnection)
   const refreshQueues = useAppStore((s) => s.refreshQueues)
   const refreshExchanges = useAppStore((s) => s.refreshExchanges)
   const edit = useAppStore((s) => s.editConnection)
@@ -125,6 +131,17 @@ function ConnectionNode({
         <span className="tree-row__label">{connection.name}</span>
         <span className={`status-dot status-dot--${state}`} style={{ marginLeft: 6 }} />
         <span className="tree-row__actions" style={{ marginLeft: 4 }}>
+          <button
+            className="icon-button"
+            title={expanded ? 'Collapse all' : 'Expand all'}
+            onClick={(e) => {
+              e.stopPropagation()
+              if (expanded) collapseConnection(connection.id)
+              else void expandConnection(connection.id)
+            }}
+          >
+            <span className={`codicon codicon-${expanded ? 'collapse-all' : 'expand-all'}`} />
+          </button>
           <button
             className="icon-button"
             title="Edit"
