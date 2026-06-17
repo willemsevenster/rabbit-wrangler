@@ -1,11 +1,13 @@
 import { useAppStore } from '../store/app-store'
 import { ContextMenu, useContextMenu } from './ContextMenu'
 import { buildQueueMenu } from '../lib/queue-menu'
+import { isDeadLetterQueue } from '../lib/dlq'
 
 /** Queue overview for a connection, shown inside its overview tab. */
 export function QueueTable({ connectionId }: { connectionId: string }) {
   const queues = useAppStore((s) => s.queuesByConn[connectionId]) ?? []
   const openQueueTab = useAppStore((s) => s.openQueueTab)
+  const dlqSuffixes = useAppStore((s) => s.dlqSuffixes)
   const { menu, openMenu, close } = useContextMenu()
 
   return (
@@ -21,7 +23,9 @@ export function QueueTable({ connectionId }: { connectionId: string }) {
           </tr>
         </thead>
         <tbody>
-          {queues.map((q) => (
+          {queues.map((q) => {
+            const isDeadLetter = isDeadLetterQueue(q.name, dlqSuffixes)
+            return (
             <tr
               key={q.name}
               data-queue-row={q.name}
@@ -31,10 +35,10 @@ export function QueueTable({ connectionId }: { connectionId: string }) {
               <td>
                 <span
                   className="codicon codicon-inbox"
-                  style={{ marginRight: 6, color: q.isDeadLetter ? 'var(--warning)' : 'var(--text-muted)' }}
+                  style={{ marginRight: 6, color: isDeadLetter ? 'var(--warning)' : 'var(--text-muted)' }}
                 />
                 {q.name}
-                {q.isDeadLetter && (
+                {isDeadLetter && (
                   <span className="badge badge--dlq" style={{ marginLeft: 6 }}>
                     DLQ
                   </span>
@@ -45,7 +49,8 @@ export function QueueTable({ connectionId }: { connectionId: string }) {
               <td className="num">{q.consumers}</td>
               <td>{q.state}</td>
             </tr>
-          ))}
+            )
+          })}
           {queues.length === 0 && (
             <tr>
               <td colSpan={5} style={{ color: 'var(--text-muted)', padding: 12 }}>

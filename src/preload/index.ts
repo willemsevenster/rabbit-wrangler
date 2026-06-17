@@ -54,6 +54,8 @@ const api: RabbitApi = {
   checkForUpdates: () => ipcRenderer.invoke(IPC.checkForUpdates),
   downloadUpdate: () => ipcRenderer.invoke(IPC.downloadUpdate),
   quitAndInstall: () => ipcRenderer.invoke(IPC.quitAndInstall),
+  getUpdatePrefs: () => ipcRenderer.invoke(IPC.getUpdatePrefs),
+  setAutoDownload: (enabled: boolean) => ipcRenderer.invoke(IPC.setAutoDownload, enabled),
 
   copyText: (text: string) => clipboard.writeText(text)
 }

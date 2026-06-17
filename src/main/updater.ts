@@ -2,6 +2,7 @@ import { app } from 'electron'
 import electronUpdater from 'electron-updater'
 import log from 'electron-log/main'
 import { eventBus } from './event-bus'
+import { getAutoDownload, setAutoDownload } from './store/update-prefs'
 import type { UpdateStatusPayload } from '@shared/ipc'
 
 // electron-updater is CJS; default-import then destructure so it resolves
@@ -37,7 +38,9 @@ export function initUpdater(): void {
   if (initialized || !isActive()) return
   initialized = true
 
-  autoUpdater.autoDownload = false
+  // Auto-download follows the user's persisted preference (default off); install
+  // is always manual (the user is prompted to restart).
+  autoUpdater.autoDownload = getAutoDownload()
   autoUpdater.autoInstallOnAppQuit = false
   autoUpdater.logger = log
   log.transports.file.level = 'info'
@@ -100,6 +103,17 @@ export function quitAndInstall(): void {
   if (!isActive()) return
   // Defer so the IPC reply flushes before the app quits; relaunch after install.
   setImmediate(() => autoUpdater.quitAndInstall(false, true))
+}
+
+/** Whether updates auto-download (read by the Settings dialog). */
+export function getAutoDownloadUpdates(): boolean {
+  return getAutoDownload()
+}
+
+/** Persist the auto-download preference and apply it live to electron-updater. */
+export function setAutoDownloadUpdates(enabled: boolean): void {
+  setAutoDownload(enabled)
+  if (isActive()) autoUpdater.autoDownload = enabled
 }
 
 export function disposeUpdater(): void {

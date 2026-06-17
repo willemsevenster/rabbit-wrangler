@@ -1,9 +1,10 @@
 import { useAppStore } from '../store/app-store'
+import { isDeadLetterQueue } from './dlq'
 import type { MenuItem } from '../components/ContextMenu'
 import type { QueueInfo } from '@shared/types'
 
 /** A plain, copy-friendly view of a queue's stats. */
-function queueSnapshot(q: QueueInfo) {
+function queueSnapshot(q: QueueInfo, isDeadLetter: boolean) {
   return {
     name: q.name,
     vhost: q.vhost,
@@ -13,7 +14,7 @@ function queueSnapshot(q: QueueInfo) {
     messagesReady: q.messagesReady,
     messagesUnacknowledged: q.messagesUnacknowledged,
     consumers: q.consumers,
-    isDeadLetter: q.isDeadLetter
+    isDeadLetter
   }
 }
 
@@ -23,8 +24,9 @@ function queueSnapshot(q: QueueInfo) {
  * open-time.
  */
 export function buildQueueMenu(connectionId: string, q: QueueInfo): MenuItem[] {
-  const { openQueueTab, refreshQueues, purgeQueue, openMoveDialog, confirm, addToast } =
+  const { openQueueTab, refreshQueues, purgeQueue, openMoveDialog, maybeConfirm, addToast, dlqSuffixes } =
     useAppStore.getState()
+  const isDeadLetter = isDeadLetterQueue(q.name, dlqSuffixes)
   return [
     { label: 'Peek Messages', icon: 'eye', onClick: () => openQueueTab(connectionId, q.name) },
     { label: 'Refresh', icon: 'refresh', onClick: () => void refreshQueues(connectionId) },
@@ -33,7 +35,7 @@ export function buildQueueMenu(connectionId: string, q: QueueInfo): MenuItem[] {
     {
       label: 'Copy as JSON',
       icon: 'json',
-      onClick: () => window.api.copyText(JSON.stringify(queueSnapshot(q), null, 2))
+      onClick: () => window.api.copyText(JSON.stringify(queueSnapshot(q, isDeadLetter), null, 2))
     },
     { separator: true },
     {
@@ -46,7 +48,7 @@ export function buildQueueMenu(connectionId: string, q: QueueInfo): MenuItem[] {
       icon: 'trash',
       danger: true,
       onClick: async () => {
-        const ok = await confirm({
+        const ok = await maybeConfirm({
           title: 'Purge queue',
           message: `Purge all messages from "${q.name}"? This cannot be undone.`,
           confirmLabel: 'Purge',

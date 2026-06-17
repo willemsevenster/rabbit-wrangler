@@ -1,6 +1,12 @@
 import { app, BrowserWindow, ipcMain } from 'electron'
 import { IPC } from '@shared/ipc'
-import { checkForUpdates, downloadUpdate, quitAndInstall } from './updater'
+import {
+  checkForUpdates,
+  downloadUpdate,
+  quitAndInstall,
+  getAutoDownloadUpdates,
+  setAutoDownloadUpdates
+} from './updater'
 import { configStore } from './store/config-store'
 import { exportConnections, readImportFile } from './store/connection-io'
 import { setStoredTheme, titleBarOverlay } from './store/ui-prefs'
@@ -106,4 +112,6 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(IPC.checkForUpdates, () => checkForUpdates())
   ipcMain.handle(IPC.downloadUpdate, () => downloadUpdate())
   ipcMain.handle(IPC.quitAndInstall, () => quitAndInstall())
+  ipcMain.handle(IPC.getUpdatePrefs, () => ({ autoDownload: getAutoDownloadUpdates() }))
+  ipcMain.handle(IPC.setAutoDownload, (_e, enabled: boolean) => setAutoDownloadUpdates(enabled))
 }

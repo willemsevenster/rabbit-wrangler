@@ -16,6 +16,7 @@ import { useTabCycle } from './lib/use-tab-cycle'
 import { Toaster } from './components/Toaster'
 import { ConfirmDialog } from './components/ConfirmDialog'
 import { AboutDialog } from './components/AboutDialog'
+import { SettingsDialog } from './components/SettingsDialog'
 
 function App() {
   const init = useAppStore((s) => s.init)
@@ -58,6 +59,7 @@ function App() {
       {publishDialog && <PublishMessageDialog />}
       <ConfirmDialog />
       <AboutDialog />
+      <SettingsDialog />
       <Toaster />
     </div>
   )
