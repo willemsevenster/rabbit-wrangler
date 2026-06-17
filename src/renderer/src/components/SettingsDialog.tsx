@@ -1,6 +1,7 @@
 import { useEffect, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react'
 import { useAppStore } from '../store/app-store'
 import { DEFAULT_DLQ_SUFFIXES } from '../lib/dlq'
+import { openManual } from '../lib/help'
 import type { UpdateStatusPayload } from '@shared/ipc'
 
 /** One-line summary of the current update status for the Settings → Updates row. */
@@ -97,7 +98,17 @@ function SettingsModal() {
       }}
     >
       <div className="modal modal--wide">
-        <div className="modal__header">Settings</div>
+        <div className="modal__header modal__header--row">
+          <span>Settings</span>
+          <button
+            className="icon-button"
+            title="Open the Settings manual"
+            aria-label="Open the Settings manual"
+            onClick={() => openManual('settings')}
+          >
+            <span className="codicon codicon-question" />
+          </button>
+        </div>
         <div className="modal__body settings">
           {/* Appearance */}
           <section className="settings__section">

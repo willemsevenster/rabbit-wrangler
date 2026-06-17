@@ -4,6 +4,7 @@ import { QueueTable } from './QueueTable'
 import { MessagePeekPanel } from './MessagePeekPanel'
 import { ExchangeDetail } from './ExchangeDetail'
 import { ContextMenu, useContextMenu, type MenuItem } from './ContextMenu'
+import { openManual } from '../lib/help'
 
 const TAB_ICON: Record<EditorTab['kind'], string> = {
   overview: 'codicon-database',
@@ -318,6 +319,14 @@ function QueueTab({ tab }: { tab: Extract<EditorTab, { kind: 'queue' }> }) {
         <button className="btn btn--sm btn--danger" onClick={() => void purge()}>
           <span className="codicon codicon-trash" />
           Purge
+        </button>
+        <button
+          className="icon-button"
+          title="How peeking works (manual)"
+          aria-label="How peeking works (manual)"
+          onClick={() => openManual('peeking-messages')}
+        >
+          <span className="codicon codicon-question" />
         </button>
       </div>
       <div className="editor__body" style={{ display: 'flex', flexDirection: 'column' }}>
