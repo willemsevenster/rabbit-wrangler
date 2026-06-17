@@ -106,7 +106,8 @@ when the management API already exposes it (e.g. purge is an HTTP `DELETE`).
   and reopening. Because tabs can span clusters, the store keys queue/exchange
   lists by connection (`queuesByConn`/`exchangesByConn`), and the Move/Publish
   dialogs carry the target `connectionId` rather than assuming the tree's
-  selection.
+  selection. Queue and exchange tabs are titled `{connection} - {name}` (resolved
+  from the connection list when the tab is opened).
 - **Move = drain + republish with confirms** (`rabbitmq/operations.ts`, UI via
   the queue context menu → "Move Messages…"): pulls messages one at a time,
   republishes to the target exchange/routing-key on a **confirm channel**, and
@@ -141,7 +142,38 @@ when the management API already exposes it (e.g. purge is an HTTP `DELETE`).
 - **Credentials**: `config-store.ts` encrypts passwords with the OS vault
   (`safeStorage`) before persisting. `list()` returns `SafeConnectionConfig`
   (no password) — only the main process ever sees plaintext via `get()`. Never
-  send full `ConnectionConfig` to the renderer.
+  send full `ConnectionConfig` to the renderer. On **edit** the renderer never
+  receives the plaintext, so the dialog's password field starts blank;
+  `configStore.save` treats a blank password as "keep existing" and only
+  overwrites the stored blob when the user types a new one. Saving a connection
+  (add or edit) **auto-connects** it (`connectConnection`) and focuses its overview.
+- **Sidebar tree collapse** (`SideBar.tsx`): only one connection's children render
+  at a time (`selectedConnectionId` + global `connectionCollapsed`/`queuesCollapsed`/
+  `exchangesCollapsed`). A toolbar **Collapse All** button collapses the tree to the
+  connections level; each connection row has an **expand/collapse-all** toggle
+  (`expandConnection`/`collapseConnection`) for its own subtree.
+- **Theming** (store `theme`, `styles/main.css`): light + dark via a
+  `:root[data-theme='light']` palette layered over the dark-default CSS variables.
+  The store applies `documentElement[data-theme]` at module load (no flash) and
+  persists the choice at `rw.theme`; **first run follows the OS**
+  (`prefers-color-scheme`). Toggle in the View menu. Monaco follows (`vs`/`vs-dark`),
+  and scrollbars + the SVG binding diagram are themed too. Add new colors as
+  variables (with a light override), not hardcoded hex.
+- **Dialogs & toasts — no native `confirm`/`alert`** (`Toaster`, `ConfirmDialog`,
+  `AboutDialog`): status/result messages use a generalized toast queue
+  (`store.addToast` / `toasts`, auto-dismiss, info/success/error). Decisions use a
+  **promise-based** `store.confirm({ title, message, confirmLabel, danger })` that
+  drives a themed modal — so even non-component callers (the context-menu builders
+  in `lib/queue-menu.ts` / `lib/exchange-menu.ts`) can `await` it. Don't
+  reintroduce `window.confirm` / `window.alert`.
+- **Connection import/export** (`src/main/store/connection-io.ts`, IPC
+  `connections:export` / `connections:import`, `ImportConnectionsDialog`): export
+  writes saved connections to JSON **without passwords** (the OS-vault blob won't
+  decrypt elsewhere); import reads a file (bare array or `{ connections: [...] }`
+  envelope), then a dialog lets the user set a password per row and resolve name
+  collisions (Skip / Overwrite / Import as new with a `(n)` suffix). Imports save
+  straight via `window.api.saveConnection` (bypassing the store action, so the
+  batch doesn't auto-connect).
 - **Auto-update** (`src/main/updater.ts`, `electron-updater` + GitHub Releases):
   `initUpdater()` (called from `index.ts` after `createWindow`) checks for updates
   ~4s after launch and every ~6h. It's a **no-op unless `app.isPackaged`** (the
