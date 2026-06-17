@@ -1,4 +1,4 @@
-import { useRef, type MouseEvent } from 'react'
+import { useRef, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent } from 'react'
 import { useAppStore, type EditorTab } from '../store/app-store'
 import { ContextMenu, useContextMenu, type MenuItem } from './ContextMenu'
 import { MonacoViewer } from './MonacoViewer'
@@ -154,6 +154,30 @@ export function MessagePeekPanel({ tab }: { tab: QueueTab }) {
     ]
   }
 
+  function onTableKeyDown(e: ReactKeyboardEvent<HTMLDivElement>): void {
+    if (peeks.length === 0) return
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      // Hop into the message body (Monaco's focusable textarea).
+      peekRef.current?.querySelector<HTMLElement>('.monaco-host textarea')?.focus()
+      return
+    }
+    if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(e.key)) return
+    e.preventDefault()
+    const idx = peeks.findIndex((m) => m.id === selectedId)
+    let next = idx
+    if (e.key === 'ArrowDown') next = idx < 0 ? 0 : Math.min(peeks.length - 1, idx + 1)
+    else if (e.key === 'ArrowUp') next = idx < 0 ? 0 : Math.max(0, idx - 1)
+    else if (e.key === 'Home') next = 0
+    else if (e.key === 'End') next = peeks.length - 1
+    const m = peeks[next]
+    if (!m) return
+    setSelectedId(m.id)
+    const el = peekRef.current?.querySelector<HTMLElement>(`[data-msg-id="${CSS.escape(m.id)}"]`)
+    el?.focus()
+    el?.scrollIntoView({ block: 'nearest' })
+  }
+
   function onResizeMouseDown(e: MouseEvent) {
     e.preventDefault()
     const onMove = (ev: globalThis.MouseEvent) => {
@@ -178,7 +202,7 @@ export function MessagePeekPanel({ tab }: { tab: QueueTab }) {
         non-destructive
       </div>
 
-      <div className="peek__table-wrap">
+      <div className="peek__table-wrap" onKeyDown={onTableKeyDown}>
         <table className="msg-table">
           <thead>
             <tr>
@@ -189,10 +213,13 @@ export function MessagePeekPanel({ tab }: { tab: QueueTab }) {
             </tr>
           </thead>
           <tbody>
-            {peeks.map((m) => (
+            {peeks.map((m, i) => (
               <tr
                 key={m.id}
                 className={selectedId === m.id ? 'is-selected' : ''}
+                data-msg-id={m.id}
+                aria-selected={selectedId === m.id}
+                tabIndex={selectedId === m.id || (selectedId == null && i === 0) ? 0 : -1}
                 onClick={() => setSelectedId(m.id)}
                 onContextMenu={(e) => openMenu(e, messageMenu(m))}
               >
