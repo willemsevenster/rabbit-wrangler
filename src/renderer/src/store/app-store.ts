@@ -118,6 +118,8 @@ interface AppState {
   sidebarVisible: boolean
   /** Persisted height of the message-detail pane in the peek view. */
   peekPaneHeight: number
+  /** Persisted height of the detail pane in the cross-tab search popup. */
+  searchPaneHeight: number
   /** Persisted width of the properties column in the message-detail pane. */
   detailMetaWidth: number
   /** Active color theme (persisted; first run follows the OS). */
@@ -199,6 +201,7 @@ interface AppState {
   setSidebarWidth(width: number): void
   toggleSidebar(): void
   setPeekPaneHeight(height: number): void
+  setSearchPaneHeight(height: number): void
   setDetailMetaWidth(width: number): void
   setTheme(theme: Theme): void
   toggleTheme(): void
@@ -262,6 +265,9 @@ const PEEK_PANE_MAX = 700
 const clampPaneHeight = (h: number): number =>
   Math.min(PEEK_PANE_MAX, Math.max(PEEK_PANE_MIN, Math.round(h)))
 const initialPeekPaneHeight = clampPaneHeight(Number(localStorage.getItem('rw.peekPaneHeight')) || 260)
+const initialSearchPaneHeight = clampPaneHeight(
+  Number(localStorage.getItem('rw.searchPaneHeight')) || 300
+)
 
 const DETAIL_META_MIN = 160
 const DETAIL_META_MAX = 640
@@ -341,6 +347,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   sidebarWidth: initialSidebarWidth,
   sidebarVisible: true,
   peekPaneHeight: initialPeekPaneHeight,
+  searchPaneHeight: initialSearchPaneHeight,
   detailMetaWidth: initialDetailMetaWidth,
   theme: initialTheme,
   settingsOpen: false,
@@ -820,6 +827,12 @@ export const useAppStore = create<AppState>((set, get) => ({
     const h = clampPaneHeight(height)
     localStorage.setItem('rw.peekPaneHeight', String(h))
     set({ peekPaneHeight: h })
+  },
+
+  setSearchPaneHeight(height) {
+    const h = clampPaneHeight(height)
+    localStorage.setItem('rw.searchPaneHeight', String(h))
+    set({ searchPaneHeight: h })
   },
 
   setDetailMetaWidth(width) {

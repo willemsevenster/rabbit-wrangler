@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react'
 import { useAppStore } from '../store/app-store'
 import { MessageDetail } from './MessageDetail'
 import { byteSize, formatBytes } from '../lib/message-format'
@@ -27,6 +27,10 @@ function SearchModal() {
   const deleteMessage = useAppStore((s) => s.deleteMessage)
   const maybeConfirm = useAppStore((s) => s.maybeConfirm)
   const addToast = useAppStore((s) => s.addToast)
+  // Own persisted detail-pane height (independent of the message-tab pane).
+  const paneHeight = useAppStore((s) => s.searchPaneHeight)
+  const setPaneHeight = useAppStore((s) => s.setSearchPaneHeight)
+  const detailRef = useRef<HTMLDivElement>(null)
 
   const [query, setQuery] = useState('')
   const [regex, setRegex] = useState(false)
@@ -98,6 +102,22 @@ function SearchModal() {
 
   function doMove(m: PeekedMessage): void {
     openMoveDialog(m.queue, m.connectionId, m.fingerprint)
+  }
+
+  function onResizeMouseDown(e: ReactMouseEvent): void {
+    e.preventDefault()
+    const onMove = (ev: globalThis.MouseEvent): void => {
+      const rect = detailRef.current?.getBoundingClientRect()
+      if (rect) setPaneHeight(rect.bottom - ev.clientY)
+    }
+    const onUp = (): void => {
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+      document.body.classList.remove('resizing-v')
+    }
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+    document.body.classList.add('resizing-v')
   }
 
   async function doDelete(m: PeekedMessage): Promise<void> {
@@ -213,7 +233,14 @@ function SearchModal() {
           )}
         </div>
 
-        <div className="search__detail">
+        <div
+          className="peek__resizer-h search__resizer"
+          onMouseDown={onResizeMouseDown}
+          role="separator"
+          aria-orientation="horizontal"
+        />
+
+        <div className="search__detail" ref={detailRef} style={{ height: paneHeight }}>
           {selected ? (
             <MessageDetail
               message={selected}
