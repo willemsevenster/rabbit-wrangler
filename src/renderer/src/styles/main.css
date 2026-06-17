@@ -1091,6 +1091,7 @@ body.resizing .msg-detail__resizer {
   border-radius: 2px;
   background: var(--button-bg);
   color: var(--button-fg);
+  white-space: nowrap;
 }
 
 .btn:hover {
@@ -1315,6 +1316,14 @@ body.resizing .msg-detail__resizer {
   flex: 1;
   font-size: 13px;
   color: var(--text);
+}
+/* Let the suffix input absorb the row's slack so the buttons keep their size. */
+.settings .field--row input[type='text'] {
+  flex: 1;
+  min-width: 0;
+}
+.settings .field--row .btn {
+  flex: none;
 }
 
 /* segmented control (theme picker) */
