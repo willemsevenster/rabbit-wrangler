@@ -111,6 +111,18 @@ when the management API already exposes it (e.g. purge is an HTTP `DELETE`).
   cycle the active tab forward/backward with wrap (`lib/use-tab-cycle.ts`, a global
   capture-phase keydown so Monaco doesn't swallow it); the focused tab strip also
   takes Left/Right/Home/End.
+- **Cross-tab search** (`SearchDialog`, store `searchOpen`, **Ctrl+F** via
+  `lib/use-search-hotkey.ts`): a popup that filters messages **already peeked**
+  across every open queue tab — purely client-side, never queries the broker. Plain
+  substring or **regex** (invalid regex shows inline, never throws) + match-case,
+  over payload + routing key + exchange + stringified headers/properties (haystacks
+  precomputed per message). Results are newest-first and **live** — matching peeks
+  prepend as they arrive (the result list re-derives from the store's `tabs`);
+  rendering is capped at 500 rows (surplus is noted, not hidden). Selecting a result
+  shows the shared **`MessageDetail`** pane (extracted from `MessagePeekPanel`;
+  formatting helpers in `lib/message-format.ts`) with working Move/Delete. Mounted
+  before the move/confirm dialogs in `App.tsx` so those stack on top when launched
+  from a search result.
 - **Move = drain + republish with confirms** (`rabbitmq/operations.ts`, UI via
   the queue context menu → "Move Messages…"): pulls messages one at a time,
   republishes to the target exchange/routing-key on a **confirm channel**, and

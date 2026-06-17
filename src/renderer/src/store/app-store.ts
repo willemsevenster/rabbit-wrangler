@@ -125,6 +125,8 @@ interface AppState {
 
   /** Settings modal open state. */
   settingsOpen: boolean
+  /** Cross-tab message search popup open state. */
+  searchOpen: boolean
   /** Max peeked messages retained per queue tab (oldest dropped past this). */
   maxMessages: number
   /** Name suffixes that mark a queue as a dead-letter queue (user-customizable). */
@@ -204,6 +206,8 @@ interface AppState {
   // settings
   openSettings(): void
   closeSettings(): void
+  openSearch(): void
+  closeSearch(): void
   setMaxMessages(n: number): void
   setDlqSuffixes(suffixes: string[]): void
   setConfirmDestructive(on: boolean): void
@@ -340,6 +344,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   detailMetaWidth: initialDetailMetaWidth,
   theme: initialTheme,
   settingsOpen: false,
+  searchOpen: false,
   maxMessages: initialMaxMessages,
   dlqSuffixes: loadDlqSuffixes(),
   confirmDestructive: initialConfirmDestructive,
@@ -841,6 +846,14 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   closeSettings() {
     set({ settingsOpen: false })
+  },
+
+  openSearch() {
+    set({ searchOpen: true })
+  },
+
+  closeSearch() {
+    set({ searchOpen: false })
   },
 
   setMaxMessages(n) {
