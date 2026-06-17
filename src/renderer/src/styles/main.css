@@ -1206,6 +1206,13 @@ body.resizing .msg-detail__resizer {
   border-bottom: 1px solid var(--border);
 }
 
+/* Header with a title on the left and action buttons (help / close) on the right. */
+.modal__header--row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
 .modal__body {
   flex: 1 1 auto;
   min-height: 0;

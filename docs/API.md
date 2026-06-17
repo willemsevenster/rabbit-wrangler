@@ -1,7 +1,7 @@
 # Rabbit Wrangler — API Reference
 
 Rabbit Wrangler talks to each cluster over **two planes** (see
-[CLAUDE.md](../CLAUDE.md)):
+[CLAUDE.md](https://github.com/willemsevenster/rabbit-wrangler/blob/main/CLAUDE.md)):
 
 - **Management HTTP API** — the `rabbitmq_management` plugin (default port
   `15672`). The management plane: list/inspect/purge, publish, bindings.

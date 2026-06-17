@@ -15,7 +15,7 @@ With Docker (recommended):
 docker compose up -d            # RabbitMQ + management UI
 ```
 
-- AMQP: `localhost:5672`, Management UI/API: <http://localhost:15672> (guest / guest).
+- AMQP: `localhost:5672`, Management UI/API: `http://localhost:15672` (guest / guest).
 - Already have a broker? Skip this and point the scripts at it with `--url` (or
   `$RABBIT_URL`).
 

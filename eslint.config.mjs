@@ -5,7 +5,9 @@ import reactHooks from 'eslint-plugin-react-hooks'
 import prettier from 'eslint-config-prettier'
 
 export default tseslint.config(
-  { ignores: ['out', 'dist', 'node_modules', '.claude', '**/*.d.ts'] },
+  // `docs/` is a separate VitePress project with its own toolchain — never lint
+  // it (especially its built bundles under docs/.vitepress/dist) with the app's config.
+  { ignores: ['out', 'dist', 'node_modules', '.claude', 'docs', '**/*.d.ts'] },
   eslint.configs.recommended,
   ...tseslint.configs.recommended,
   {

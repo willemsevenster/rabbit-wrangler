@@ -1,0 +1,5 @@
+# Standalone docs project — its own pnpm root so VitePress's toolchain (Vite 5 /
+# esbuild) never enters the app's dependency tree. The app caps Vite at 7 for
+# electron-vite; keeping docs isolated avoids that conflict. See ../CLAUDE.md.
+onlyBuiltDependencies:
+  - esbuild

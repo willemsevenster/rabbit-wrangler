@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useAppStore } from '../store/app-store'
 import { ContextMenu, type MenuItem } from './ContextMenu'
+import { openManual } from '../lib/help'
 
 /** VSCode-style menu bar (Connections / Queues / View / Help) in the title bar. */
 export function MenuBar() {
@@ -98,6 +99,8 @@ export function MenuBar() {
     {
       label: 'Help',
       items: () => [
+        { label: 'User Manual', icon: 'book', onClick: () => openManual('getting-started') },
+        { separator: true },
         { label: 'Check for Updates…', icon: 'cloud', onClick: () => checkForUpdates() },
         { separator: true },
         {

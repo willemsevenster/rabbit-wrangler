@@ -20,7 +20,11 @@
     "build:win": "pnpm run build && electron-builder --win",
     "build:mac": "pnpm run build && electron-builder --mac",
     "build:linux": "pnpm run build && electron-builder --linux",
-    "seed": "node scripts/seed-broker.mjs"
+    "seed": "node scripts/seed-broker.mjs",
+    "docs:install": "pnpm --dir docs install",
+    "docs:dev": "pnpm --dir docs dev",
+    "docs:build": "pnpm --dir docs build",
+    "docs:preview": "pnpm --dir docs preview"
   },
   "dependencies": {
     "@electron-toolkit/preload": "^3.0.2",

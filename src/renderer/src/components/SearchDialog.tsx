@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEven
 import { useAppStore } from '../store/app-store'
 import { MessageDetail } from './MessageDetail'
 import { byteSize, formatBytes } from '../lib/message-format'
+import { openManual } from '../lib/help'
 import type { PeekedMessage } from '@shared/types'
 
 /** Max result rows rendered at once (keeps the popup snappy on busy buffers). */
@@ -151,9 +152,18 @@ function SearchModal() {
       <div className="modal modal--search">
         <div className="modal__header search__header">
           <span>Search messages</span>
-          <button className="icon-button" title="Close" onClick={close}>
-            <span className="codicon codicon-close" />
-          </button>
+          <span style={{ display: 'flex', gap: 4 }}>
+            <button
+              className="icon-button"
+              title="Open the search manual"
+              onClick={() => openManual('search')}
+            >
+              <span className="codicon codicon-question" />
+            </button>
+            <button className="icon-button" title="Close" onClick={close}>
+              <span className="codicon codicon-close" />
+            </button>
+          </span>
         </div>
 
         <div className="search__controls">

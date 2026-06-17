@@ -7,6 +7,8 @@
 Peek at live messages without consuming them · rescue dead-lettered messages ·
 purge, publish, and inspect — across many brokers at once.
 
+📖 **[User manual & documentation →](https://willemsevenster.github.io/rabbit-wrangler/)**
+
 ![Electron](https://img.shields.io/badge/Electron-42-47848F?logo=electron&logoColor=white)
 ![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)
 ![TypeScript](https://img.shields.io/badge/TypeScript-6-3178C6?logo=typescript&logoColor=white)

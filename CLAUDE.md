@@ -33,6 +33,16 @@ pnpm build:win       # package installer via electron-builder (also :mac / :linu
 - To launch and **drive** the app (screenshots, DOM inspection) use the
   `/run-rabbit-wrangler` skill — REPL driver at
   `.claude/skills/run-rabbit-wrangler/driver.mjs`.
+- **Docs site** (`docs/`, VitePress) is an **isolated pnpm project** — its own
+  `package.json` + `pnpm-lock.yaml` + `pnpm-workspace.yaml`, so VitePress's Vite 5 /
+  esbuild never enters the app's tree (the app caps Vite at 7). Run it via the root
+  proxy scripts: `pnpm docs:install` (first time; uses `--ignore-scripts` — esbuild's
+  binary ships via its optional dep), then `pnpm docs:dev` / `docs:build` / `docs:preview`.
+  ESLint ignores `docs/`. The site auto-deploys to GitHub Pages on push to `main`
+  (`.github/workflows/pages.yml`); Pages source must be **GitHub Actions**. In-app
+  Help links (`lib/help.ts` `openManual()`, used by the Help menu + `?` buttons on
+  Settings/Search/peek) open `https://willemsevenster.github.io/rabbit-wrangler/`
+  via `window.open` → the main process' `setWindowOpenHandler` → `shell.openExternal`.
 
 ## Architecture
 
