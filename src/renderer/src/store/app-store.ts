@@ -98,6 +98,8 @@ interface AppState {
   peekPaneHeight: number
   /** Persisted width of the properties column in the message-detail pane. */
   detailMetaWidth: number
+  /** Active color theme (persisted; first run follows the OS). */
+  theme: Theme
 
   /** Auto-update status pushed from main (null until the first event). */
   updateStatus: UpdateStatusPayload | null
@@ -150,6 +152,8 @@ interface AppState {
   toggleSidebar(): void
   setPeekPaneHeight(height: number): void
   setDetailMetaWidth(width: number): void
+  setTheme(theme: Theme): void
+  toggleTheme(): void
 
   checkForUpdates(): void
   downloadUpdate(): void
@@ -188,6 +192,21 @@ const clampMetaWidth = (w: number): number =>
   Math.min(DETAIL_META_MAX, Math.max(DETAIL_META_MIN, Math.round(w)))
 const initialDetailMetaWidth = clampMetaWidth(Number(localStorage.getItem('rw.detailMetaWidth')) || 320)
 
+type Theme = 'light' | 'dark'
+const THEME_KEY = 'rw.theme'
+/** Stored choice wins; first run follows the OS (prefers-color-scheme). */
+function initialThemeValue(): Theme {
+  const stored = localStorage.getItem(THEME_KEY)
+  if (stored === 'light' || stored === 'dark') return stored
+  return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'
+}
+const initialTheme = initialThemeValue()
+function applyTheme(theme: Theme): void {
+  document.documentElement.setAttribute('data-theme', theme)
+}
+// Apply before React mounts so there's no flash of the wrong theme.
+applyTheme(initialTheme)
+
 const MOVE_TARGETS_KEY = 'rw.lastMoveTargets'
 const moveTargetKey = (connectionId: string, queue: string): string => `${connectionId}:${queue}`
 function loadMoveTargets(): Record<string, MoveTarget> {
@@ -218,6 +237,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   sidebarVisible: true,
   peekPaneHeight: initialPeekPaneHeight,
   detailMetaWidth: initialDetailMetaWidth,
+  theme: initialTheme,
   updateStatus: null,
   updateToast: null,
 
@@ -627,6 +647,16 @@ export const useAppStore = create<AppState>((set, get) => ({
     const w = clampMetaWidth(width)
     localStorage.setItem('rw.detailMetaWidth', String(w))
     set({ detailMetaWidth: w })
+  },
+
+  setTheme(theme) {
+    localStorage.setItem(THEME_KEY, theme)
+    applyTheme(theme)
+    set({ theme })
+  },
+
+  toggleTheme() {
+    get().setTheme(get().theme === 'dark' ? 'light' : 'dark')
   },
 
   checkForUpdates() {

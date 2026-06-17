@@ -15,6 +15,8 @@ export function MenuBar() {
   const activeTab = useAppStore((s) => s.tabs.find((t) => t.id === s.activeTabId) ?? null)
   const sidebarVisible = useAppStore((s) => s.sidebarVisible)
   const toggleSidebar = useAppStore((s) => s.toggleSidebar)
+  const theme = useAppStore((s) => s.theme)
+  const toggleTheme = useAppStore((s) => s.toggleTheme)
   const checkForUpdates = useAppStore((s) => s.checkForUpdates)
 
   const activeQueue = activeTab?.kind === 'queue' ? activeTab : null
@@ -74,6 +76,11 @@ export function MenuBar() {
           label: sidebarVisible ? 'Hide Sidebar' : 'Show Sidebar',
           icon: 'layout-sidebar-left',
           onClick: toggleSidebar
+        },
+        {
+          label: theme === 'dark' ? 'Light Theme' : 'Dark Theme',
+          icon: 'color-mode',
+          onClick: toggleTheme
         },
         { label: 'Reload', icon: 'refresh', onClick: () => location.reload() }
       ]
