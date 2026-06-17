@@ -203,7 +203,7 @@ export function MessagePeekPanel({ tab }: { tab: QueueTab }) {
       </div>
 
       <div className="peek__table-wrap" onKeyDown={onTableKeyDown}>
-        <table className="msg-table" role="grid">
+        <table className="msg-table">
           <thead>
             <tr>
               <th>Routing key</th>
@@ -216,7 +216,6 @@ export function MessagePeekPanel({ tab }: { tab: QueueTab }) {
             {peeks.map((m, i) => (
               <tr
                 key={m.id}
-                role="row"
                 className={selectedId === m.id ? 'is-selected' : ''}
                 data-msg-id={m.id}
                 aria-selected={selectedId === m.id}

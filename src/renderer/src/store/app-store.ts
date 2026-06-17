@@ -418,9 +418,31 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   openAllQueueTabs(connectionId) {
-    for (const q of get().queuesByConn[connectionId] ?? []) {
-      get().openQueueTab(connectionId, q.name)
+    // Add a tab for each not-already-open queue in ONE update — looping
+    // openQueueTab would re-activate (and clear unread on) every existing tab.
+    const queues = get().queuesByConn[connectionId] ?? []
+    const existing = new Set(get().tabs.map((t) => t.id))
+    const connName = get().connections.find((c) => c.id === connectionId)?.name ?? connectionId
+    const newTabs: EditorTab[] = []
+    const toPeek: string[] = []
+    for (const q of queues) {
+      const id = queueTabId(connectionId, q.name)
+      if (existing.has(id)) continue
+      newTabs.push({
+        id,
+        kind: 'queue',
+        connectionId,
+        queue: q.name,
+        title: `${connName} - ${q.name}`,
+        peeks: [],
+        selectedMessageId: null,
+        unread: 0
+      })
+      toPeek.push(q.name)
     }
+    if (newTabs.length === 0) return
+    set({ tabs: [...get().tabs, ...newTabs], activeTabId: newTabs[newTabs.length - 1].id })
+    for (const name of toPeek) void window.api.startPeek(connectionId, name)
   },
 
   closeAllQueueTabs(connectionId) {

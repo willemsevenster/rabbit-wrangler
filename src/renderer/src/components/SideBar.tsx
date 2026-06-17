@@ -41,6 +41,12 @@ const useTreeFocus = (): { focusedId: string | null; setFocusedId: (id: string) 
 export function SideBar() {
   const connections = useAppStore((s) => s.connections)
   const selectedConnectionId = useAppStore((s) => s.selectedConnectionId)
+  const connectionCollapsed = useAppStore((s) => s.connectionCollapsed)
+  const queuesCollapsed = useAppStore((s) => s.queuesCollapsed)
+  const exchangesCollapsed = useAppStore((s) => s.exchangesCollapsed)
+  const statuses = useAppStore((s) => s.statuses)
+  const queuesByConn = useAppStore((s) => s.queuesByConn)
+  const exchangesByConn = useAppStore((s) => s.exchangesByConn)
   const openNew = useAppStore((s) => s.openNewConnection)
   const refresh = useAppStore((s) => s.refreshConnections)
   const collapseTree = useAppStore((s) => s.collapseTree)
@@ -54,13 +60,23 @@ export function SideBar() {
     setFocusedIdState(id)
   }
 
-  // One row is always tabbable (roving): the focused one, else the selected
-  // connection, else the first connection — so Tab/F6 can land on the tree.
-  const fallbackId =
-    (selectedConnectionId && connNodeId(selectedConnectionId)) ||
-    (connections[0] && connNodeId(connections[0].id)) ||
-    null
-  const effectiveFocusedId = focusedId ?? fallbackId
+  // One row is always tabbable (roving) so Tab/F6 can land on the tree. Validate
+  // the focused id against what's actually visible — collapsing a group or
+  // switching connections can leave `focusedId` pointing at a now-unrendered row.
+  const visible = flattenVisibleTree({
+    connections,
+    selectedConnectionId,
+    connectionCollapsed,
+    queuesCollapsed,
+    exchangesCollapsed,
+    statuses,
+    queuesByConn,
+    exchangesByConn
+  })
+  const isVisible = (id: string | null): boolean => id != null && visible.some((n) => n.id === id)
+  const selectedConnNode = selectedConnectionId ? connNodeId(selectedConnectionId) : null
+  const fallbackId = (isVisible(selectedConnNode) ? selectedConnNode : null) ?? visible[0]?.id ?? null
+  const effectiveFocusedId = isVisible(focusedId) ? focusedId : fallbackId
 
   function focusRow(id: string): void {
     setFocusedId(id)
