@@ -5,14 +5,20 @@ import { registerIpcHandlers } from './ipc'
 import { eventStreamServer } from './websocket-server'
 import { connectionManager } from './connections/connection-manager'
 import { initUpdater, disposeUpdater } from './updater'
-import { savedWindowOptions, savedWindowFlags, trackWindowState } from './store/window-state'
+import {
+  savedWindowOptions,
+  savedWindowFlags,
+  trackWindowState,
+  MIN_WIDTH,
+  MIN_HEIGHT
+} from './store/window-state'
 import { startupBackgroundColor } from './store/ui-prefs'
 
 function createWindow(): void {
   const mainWindow = new BrowserWindow({
     ...savedWindowOptions(),
-    minWidth: 900,
-    minHeight: 600,
+    minWidth: MIN_WIDTH,
+    minHeight: MIN_HEIGHT,
     show: false,
     // Paint the window in the theme's background up-front so a dark-mode user
     // doesn't get a white flash before the renderer's CSS loads (and vice-versa).

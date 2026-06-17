@@ -17,8 +17,15 @@ interface WindowState {
 }
 
 const DEFAULTS: WindowState = { width: 1280, height: 800 }
-const MIN_WIDTH = 900
-const MIN_HEIGHT = 600
+// Single source of truth for the window's minimum size (also used by index.ts).
+export const MIN_WIDTH = 900
+export const MIN_HEIGHT = 600
+
+/** Coerce a persisted value to a finite number, else the fallback (the JSON could
+ * be hand-edited or corrupted). */
+function num(v: number | undefined, fallback: number): number {
+  return typeof v === 'number' && Number.isFinite(v) ? v : fallback
+}
 
 const store = new Store<{ window: WindowState }>({
   name: 'window-state',
@@ -38,10 +45,12 @@ function isOnScreen(x: number, y: number, width: number, height: number): boolea
  * omitted (so the window centers) when it would be off-screen. */
 export function savedWindowOptions(): { width: number; height: number; x?: number; y?: number } {
   const s = { ...DEFAULTS, ...store.get('window') }
-  const width = Math.max(MIN_WIDTH, Math.round(s.width))
-  const height = Math.max(MIN_HEIGHT, Math.round(s.height))
-  if (s.x != null && s.y != null && isOnScreen(s.x, s.y, width, height)) {
-    return { width, height, x: Math.round(s.x), y: Math.round(s.y) }
+  const width = Math.max(MIN_WIDTH, Math.round(num(s.width, DEFAULTS.width)))
+  const height = Math.max(MIN_HEIGHT, Math.round(num(s.height, DEFAULTS.height)))
+  const x = num(s.x, NaN)
+  const y = num(s.y, NaN)
+  if (Number.isFinite(x) && Number.isFinite(y) && isOnScreen(x, y, width, height)) {
+    return { width, height, x: Math.round(x), y: Math.round(y) }
   }
   return { width, height }
 }
