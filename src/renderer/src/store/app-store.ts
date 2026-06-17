@@ -635,6 +635,11 @@ export const useAppStore = create<AppState>((set, get) => ({
     await window.api.saveConnection(config)
     set({ dialogOpen: false, editing: null })
     await get().refreshConnections()
+    // Attempt the connection right away instead of waiting for the user to click
+    // it. connectConnection force-reconnects (disconnect+reconnect in main), so an
+    // edit applies its new settings immediately; on success, focus its overview.
+    await get().connectConnection(config.id)
+    if (get().statuses[config.id]?.state === 'connected') get().openOverviewTab(config.id)
   },
 
   async deleteConnection(id) {
