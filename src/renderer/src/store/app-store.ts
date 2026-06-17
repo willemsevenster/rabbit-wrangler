@@ -122,6 +122,8 @@ interface AppState {
   searchPaneHeight: number
   /** Persisted width of the properties column in the message-detail pane. */
   detailMetaWidth: number
+  /** Persisted properties-column width in the search popup's detail pane. */
+  searchDetailMetaWidth: number
   /** Active color theme (persisted; first run follows the OS). */
   theme: Theme
 
@@ -203,6 +205,7 @@ interface AppState {
   setPeekPaneHeight(height: number): void
   setSearchPaneHeight(height: number): void
   setDetailMetaWidth(width: number): void
+  setSearchDetailMetaWidth(width: number): void
   setTheme(theme: Theme): void
   toggleTheme(): void
 
@@ -274,6 +277,9 @@ const DETAIL_META_MAX = 640
 const clampMetaWidth = (w: number): number =>
   Math.min(DETAIL_META_MAX, Math.max(DETAIL_META_MIN, Math.round(w)))
 const initialDetailMetaWidth = clampMetaWidth(Number(localStorage.getItem('rw.detailMetaWidth')) || 320)
+const initialSearchDetailMetaWidth = clampMetaWidth(
+  Number(localStorage.getItem('rw.searchDetailMetaWidth')) || 320
+)
 
 const MAX_MESSAGES_KEY = 'rw.maxMessages'
 const clampMaxMessages = (n: number): number =>
@@ -349,6 +355,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   peekPaneHeight: initialPeekPaneHeight,
   searchPaneHeight: initialSearchPaneHeight,
   detailMetaWidth: initialDetailMetaWidth,
+  searchDetailMetaWidth: initialSearchDetailMetaWidth,
   theme: initialTheme,
   settingsOpen: false,
   searchOpen: false,
@@ -839,6 +846,12 @@ export const useAppStore = create<AppState>((set, get) => ({
     const w = clampMetaWidth(width)
     localStorage.setItem('rw.detailMetaWidth', String(w))
     set({ detailMetaWidth: w })
+  },
+
+  setSearchDetailMetaWidth(width) {
+    const w = clampMetaWidth(width)
+    localStorage.setItem('rw.searchDetailMetaWidth', String(w))
+    set({ searchDetailMetaWidth: w })
   },
 
   setTheme(theme) {

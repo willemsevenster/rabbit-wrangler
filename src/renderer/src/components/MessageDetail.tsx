@@ -1,5 +1,4 @@
 import { useRef, type MouseEvent } from 'react'
-import { useAppStore } from '../store/app-store'
 import { MonacoViewer } from './MonacoViewer'
 import { byteSize, deathRecords, detectLanguage, formatBytes, propertyRows } from '../lib/message-format'
 import type { PeekedMessage } from '@shared/types'
@@ -7,30 +6,33 @@ import type { PeekedMessage } from '@shared/types'
 /**
  * The message detail/payload pane: properties, x-death history, headers and the
  * read-only Monaco payload, with Move/Delete actions. Shared by the queue peek
- * view ({@link MessagePeekPanel}) and the cross-tab search popup. Self-contained
- * except for the resizable meta-column width, which is a shared store pref.
+ * view ({@link MessagePeekPanel}) and the cross-tab search popup. The resizable
+ * meta-column width is supplied by the caller (`metaWidth`/`onMetaWidthChange`),
+ * so each context persists its own.
  */
 export function MessageDetail({
   message: m,
   onMove,
-  onDelete
+  onDelete,
+  metaWidth,
+  onMetaWidthChange
 }: {
   message: PeekedMessage
   onMove: () => void
   onDelete: () => void
+  metaWidth: number
+  onMetaWidthChange: (width: number) => void
 }) {
   const props = propertyRows(m.properties)
   const deaths = deathRecords(m.headers)
   const otherHeaders = Object.entries(m.headers).filter(([k]) => k !== 'x-death')
-  const metaWidth = useAppStore((s) => s.detailMetaWidth)
-  const setMetaWidth = useAppStore((s) => s.setDetailMetaWidth)
   const detailRef = useRef<HTMLDivElement>(null)
 
   function onMetaResize(e: MouseEvent) {
     e.preventDefault()
     const onMove = (ev: globalThis.MouseEvent) => {
       const rect = detailRef.current?.getBoundingClientRect()
-      if (rect) setMetaWidth(ev.clientX - rect.left)
+      if (rect) onMetaWidthChange(ev.clientX - rect.left)
     }
     const onUp = () => {
       window.removeEventListener('mousemove', onMove)

@@ -51,6 +51,8 @@ export function MessagePeekPanel({ tab }: { tab: QueueTab }) {
   const deleteMessage = useAppStore((s) => s.deleteMessage)
   const maybeConfirm = useAppStore((s) => s.maybeConfirm)
   const addToast = useAppStore((s) => s.addToast)
+  const metaWidth = useAppStore((s) => s.detailMetaWidth)
+  const setMetaWidth = useAppStore((s) => s.setDetailMetaWidth)
 
   const setSelectedId = (id: string): void => selectMessage(tab.id, id)
   const selected = peeks.find((m) => m.id === selectedId) ?? null
@@ -181,6 +183,8 @@ export function MessagePeekPanel({ tab }: { tab: QueueTab }) {
             message={selected}
             onMove={() => moveMessage(selected)}
             onDelete={() => void removeMessage(selected)}
+            metaWidth={metaWidth}
+            onMetaWidthChange={setMetaWidth}
           />
         ) : (
           <div className="placeholder">Select a message to view its details and payload.</div>

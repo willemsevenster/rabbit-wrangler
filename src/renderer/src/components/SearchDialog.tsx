@@ -27,9 +27,11 @@ function SearchModal() {
   const deleteMessage = useAppStore((s) => s.deleteMessage)
   const maybeConfirm = useAppStore((s) => s.maybeConfirm)
   const addToast = useAppStore((s) => s.addToast)
-  // Own persisted detail-pane height (independent of the message-tab pane).
+  // Own persisted detail-pane height + meta-column width (independent of the message tabs).
   const paneHeight = useAppStore((s) => s.searchPaneHeight)
   const setPaneHeight = useAppStore((s) => s.setSearchPaneHeight)
+  const metaWidth = useAppStore((s) => s.searchDetailMetaWidth)
+  const setMetaWidth = useAppStore((s) => s.setSearchDetailMetaWidth)
   const detailRef = useRef<HTMLDivElement>(null)
 
   const [query, setQuery] = useState('')
@@ -248,6 +250,8 @@ function SearchModal() {
               message={selected}
               onMove={() => doMove(selected)}
               onDelete={() => void doDelete(selected)}
+              metaWidth={metaWidth}
+              onMetaWidthChange={setMetaWidth}
             />
           ) : (
             <div className="placeholder">Select a result to view its details and payload.</div>
