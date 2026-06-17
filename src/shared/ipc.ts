@@ -15,6 +15,8 @@ import type {
   ConnectionConfig,
   DeleteMessageRequest,
   ExchangeInfo,
+  ExportResult,
+  ImportResult,
   MoveMessageRequest,
   MoveMessagesRequest,
   OperationResult,
@@ -31,6 +33,8 @@ export const IPC = {
   deleteConnection: 'connections:delete',
   connect: 'connections:connect',
   disconnect: 'connections:disconnect',
+  exportConnections: 'connections:export',
+  importConnections: 'connections:import',
 
   // queue inspection / management (RabbitMQ management HTTP API)
   listQueues: 'queues:list',
@@ -67,6 +71,10 @@ export interface RabbitApi {
   deleteConnection(id: string): Promise<void>
   connect(id: string): Promise<void>
   disconnect(id: string): Promise<void>
+  /** Write all saved connections (passwords excluded) to a user-chosen JSON file. */
+  exportConnections(): Promise<ExportResult>
+  /** Read a connections JSON file (passwords excluded) for the import dialog. */
+  importConnections(): Promise<ImportResult>
 
   listQueues(connectionId: string): Promise<QueueInfo[]>
   purgeQueue(connectionId: string, queue: string): Promise<OperationResult>
