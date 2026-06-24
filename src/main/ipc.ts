@@ -14,7 +14,9 @@ import { connectionManager } from './connections/connection-manager'
 import { eventStreamServer } from './websocket-server'
 import type {
   ConnectionConfig,
+  CreateQueueRequest,
   DeleteMessageRequest,
+  DeleteQueueRequest,
   MoveMessageRequest,
   MoveMessagesRequest,
   PublishMessageRequest
@@ -50,6 +52,14 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle(IPC.purgeQueue, (_e, connectionId: string, queue: string) =>
     connectionManager.require(connectionId).purgeQueue(queue)
+  )
+
+  ipcMain.handle(IPC.createQueue, (_e, req: CreateQueueRequest) =>
+    connectionManager.require(req.connectionId).createQueue(req)
+  )
+
+  ipcMain.handle(IPC.deleteQueue, (_e, req: DeleteQueueRequest) =>
+    connectionManager.require(req.connectionId).deleteQueue(req)
   )
 
   ipcMain.handle(IPC.startPeek, (_e, connectionId: string, queue: string) =>

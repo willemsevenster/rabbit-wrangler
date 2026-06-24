@@ -7,7 +7,9 @@ import type {
   BindingInfo,
   ConnectionConfig,
   ConnectionState,
+  CreateQueueRequest,
   DeleteMessageRequest,
+  DeleteQueueRequest,
   ExchangeInfo,
   MoveMessageRequest,
   MoveMessagesRequest,
@@ -130,6 +132,17 @@ export class ClusterConnection {
     // peeker first so closing its channel requeues them to ready, then purge.
     await this.stopPeek(queue)
     return this.api.purgeQueue(queue)
+  }
+
+  async createQueue(req: CreateQueueRequest): Promise<OperationResult> {
+    return this.api.createQueue(req)
+  }
+
+  async deleteQueue(req: DeleteQueueRequest): Promise<OperationResult> {
+    // Release our own peeker first: it holds a consumer, which would trip an
+    // if-unused guard, and the queue is about to vanish anyway.
+    await this.stopPeek(req.name)
+    return this.api.deleteQueue(req)
   }
 
   async startPeek(queue: string): Promise<void> {

@@ -3,7 +3,9 @@ import { electronAPI } from '@electron-toolkit/preload'
 import { IPC, type RabbitApi } from '@shared/ipc'
 import type {
   ConnectionConfig,
+  CreateQueueRequest,
   DeleteMessageRequest,
+  DeleteQueueRequest,
   MoveMessageRequest,
   MoveMessagesRequest,
   PublishMessageRequest
@@ -27,6 +29,8 @@ const api: RabbitApi = {
   listQueues: (connectionId: string) => ipcRenderer.invoke(IPC.listQueues, connectionId),
   purgeQueue: (connectionId: string, queue: string) =>
     ipcRenderer.invoke(IPC.purgeQueue, connectionId, queue),
+  createQueue: (request: CreateQueueRequest) => ipcRenderer.invoke(IPC.createQueue, request),
+  deleteQueue: (request: DeleteQueueRequest) => ipcRenderer.invoke(IPC.deleteQueue, request),
 
   startPeek: (connectionId: string, queue: string) =>
     ipcRenderer.invoke(IPC.startPeek, connectionId, queue),
