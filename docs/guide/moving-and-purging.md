@@ -56,4 +56,6 @@ To empty a queue but keep it, use **Purge** instead.
 
 ## The confirmation setting
 
-The **Confirm before destructive actions** setting controls whether purge and delete ask you to confirm first. Leave it on for safety; turn it off if you do these operations often and don't want the extra step. See [Settings](./settings).
+The **Confirm before destructive actions** setting controls whether **purge** and **single-message delete** ask you to confirm first. Leave it on for safety; turn it off if you do these operations often and don't want the extra step.
+
+**Deleting a whole queue is always confirmed** through its own dialog — which also carries the *only if empty / only if unused* safety guards — regardless of this setting. See [Settings](./settings).

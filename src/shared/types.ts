@@ -110,7 +110,7 @@ export interface CreateQueueRequest {
   name: string
   durable: boolean
   autoDelete: boolean
-  /** Optional x-arguments (e.g. x-dead-letter-exchange, x-message-ttl). */
+  /** Queue x-arguments (e.g. x-dead-letter-exchange, x-message-ttl); empty object = none. */
   arguments: Record<string, unknown>
 }
 
