@@ -182,11 +182,25 @@ when the management API already exposes it (e.g. purge is an HTTP `DELETE`).
   the guard options), so it bypasses `maybeConfirm`/`confirmDestructive`.
 - **Exchanges** (`management-api.ts` + `components/ExchangeDetail`/`ExchangeDiagram`):
   listed in the sidebar tree under an "Exchanges" group (queues are under a
-  "Queues" group). The detail view shows **read-only** bindings (management API
+  "Queues" group). The detail view shows bindings (management API
   `/bindings/source`) + an SVG binding diagram (exchange → destinations), a
   **Publish** dialog (management API publish; reports routed vs. unrouted), and
   **Delete** (disabled for the default exchange and `amq.*` built-ins). The
   default exchange is addressed as `amq.default` in API paths.
+- **Editable bindings + declare-exchange** (`management-api.ts`
+  `createExchange`/`createBinding`/`deleteBinding`, UI in `ExchangeDetail` +
+  `CreateExchangeDialog`/`AddBindingDialog`, Exchanges-group menu): all
+  management-plane. **Create Exchange** (`PUT /exchanges/{vhost}/{name}`, idempotent
+  like `createQueue`) takes type/durable/auto_delete/internal/arguments; opens the
+  new exchange's tab on success. **Add Binding** (`POST /bindings/{vhost}/e/{src}/{q|e}/{dst}`)
+  binds the source exchange to a queue **or** another exchange (e2e), with an
+  optional arguments section for headers-exchange matches; **remove binding** is the
+  per-row trash → `DELETE /bindings/.../{propertiesKey}` (so `BindingInfo` now
+  carries `propertiesKey`, mapped from the `/bindings/source` payload). Binding
+  add/delete re-fetch only the affected exchange tab's bindings via
+  `refreshExchangeBindings`, so the table **and** diagram update live. The default
+  exchange can't be bound (its Add Binding is disabled). Binding-remove uses
+  `maybeConfirm` (no data loss — just routing), unlike queue/exchange delete.
 - **Connection registry**: `connection-manager.ts` is a singleton mapping
   connection id → live `ClusterConnection`. All IPC handlers route through
   `connectionManager.require(id)`. Saved configs live separately in

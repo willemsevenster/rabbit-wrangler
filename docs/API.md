@@ -206,10 +206,11 @@ recovery as the marquee workflow.
    Queue: durable / auto-delete / x-arguments) and `DELETE /queues/{vhost}/{name}`
    (Delete Queue, with optional `if-empty` / `if-unused` guards). Surfaced via the
    Queues-group menu / overview "New Queue" button and the queue context menu.
-2. **Editable bindings** — `POST`/`DELETE /bindings/...` and
-   `PUT /exchanges/...`. The bindings view is read-only "for now"; making it
-   read-write (plus declare-exchange) is the obvious next step, and the diagram
-   already visualizes the result.
+2. ✅ **Editable bindings** *(done)* — the exchange view is now read-write:
+   **Add Binding** (`POST /bindings/{vhost}/e/{src}/{q|e}/{dst}`) to a queue or
+   exchange and remove bindings (`DELETE /bindings/...` by properties key), plus
+   **Create Exchange** (`PUT /exchanges/{vhost}/{name}`). The binding table and
+   diagram update on every change.
 3. ✅ **Richer queue detail** *(done)* — `QueueInfo` now carries memory, message /
    publish / deliver / ack rates and idle-since, surfaced in a queue-tab stats
    strip and extra overview-table columns.

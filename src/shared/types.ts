@@ -179,6 +179,42 @@ export interface BindingInfo {
   destinationType: 'queue' | 'exchange'
   routingKey: string
   arguments: Record<string, unknown>
+  /** RabbitMQ's per-binding key — required to address this binding for deletion. */
+  propertiesKey?: string
+}
+
+/** Declare (create or idempotently re-assert) an exchange via the management API. */
+export interface CreateExchangeRequest {
+  connectionId: string
+  /** Exchange name. Reserved `amq.*` names are rejected by the broker. */
+  name: string
+  /** direct | fanout | topic | headers */
+  type: string
+  durable: boolean
+  autoDelete: boolean
+  internal: boolean
+  /** Optional exchange arguments (e.g. alternate-exchange). */
+  arguments: Record<string, unknown>
+}
+
+/** Create a binding from a source exchange to a queue or another exchange. */
+export interface CreateBindingRequest {
+  connectionId: string
+  source: string
+  destination: string
+  destinationType: 'queue' | 'exchange'
+  routingKey: string
+  /** Optional binding arguments (headers-exchange matches: x-match + header values). */
+  arguments: Record<string, unknown>
+}
+
+/** Delete a specific binding (addressed by its {@link BindingInfo.propertiesKey}). */
+export interface DeleteBindingRequest {
+  connectionId: string
+  source: string
+  destination: string
+  destinationType: 'queue' | 'exchange'
+  propertiesKey: string
 }
 
 export interface PublishMessageRequest {

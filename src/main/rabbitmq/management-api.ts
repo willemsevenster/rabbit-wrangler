@@ -1,7 +1,10 @@
 import type {
   BindingInfo,
   ConnectionConfig,
+  CreateBindingRequest,
+  CreateExchangeRequest,
   CreateQueueRequest,
+  DeleteBindingRequest,
   DeleteQueueRequest,
   ExchangeInfo,
   OperationResult,
@@ -188,8 +191,64 @@ export class ManagementApi {
       destination: b.destination,
       destinationType: b.destination_type === 'exchange' ? 'exchange' : 'queue',
       routingKey: b.routing_key,
-      arguments: b.arguments ?? {}
+      arguments: b.arguments ?? {},
+      propertiesKey: b.properties_key
     }))
+  }
+
+  /** Declare an exchange. PUT is idempotent for identical settings; a clash with
+   * different settings fails (precondition) and is surfaced. */
+  async createExchange(req: CreateExchangeRequest): Promise<OperationResult> {
+    try {
+      await this.request<void>(
+        `/exchanges/${this.vhostSegment()}/${this.exchangeSegment(req.name)}`,
+        {
+          method: 'PUT',
+          body: JSON.stringify({
+            type: req.type,
+            durable: req.durable,
+            auto_delete: req.autoDelete,
+            internal: req.internal,
+            arguments: req.arguments ?? {}
+          })
+        }
+      )
+      return { ok: true, affected: 1 }
+    } catch (err) {
+      return { ok: false, affected: 0, error: err instanceof Error ? err.message : String(err) }
+    }
+  }
+
+  /** Path segment for a binding destination — `q` for queues, `e` for exchanges. */
+  private bindingDestSegment(type: 'queue' | 'exchange', destination: string): string {
+    return `${type === 'exchange' ? 'e' : 'q'}/${encodeURIComponent(destination)}`
+  }
+
+  async createBinding(req: CreateBindingRequest): Promise<OperationResult> {
+    try {
+      await this.request<void>(
+        `/bindings/${this.vhostSegment()}/e/${encodeURIComponent(req.source)}/${this.bindingDestSegment(req.destinationType, req.destination)}`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ routing_key: req.routingKey, arguments: req.arguments ?? {} })
+        }
+      )
+      return { ok: true, affected: 1 }
+    } catch (err) {
+      return { ok: false, affected: 0, error: err instanceof Error ? err.message : String(err) }
+    }
+  }
+
+  async deleteBinding(req: DeleteBindingRequest): Promise<OperationResult> {
+    try {
+      await this.request<void>(
+        `/bindings/${this.vhostSegment()}/e/${encodeURIComponent(req.source)}/${this.bindingDestSegment(req.destinationType, req.destination)}/${encodeURIComponent(req.propertiesKey)}`,
+        { method: 'DELETE' }
+      )
+      return { ok: true, affected: 1 }
+    } catch (err) {
+      return { ok: false, affected: 0, error: err instanceof Error ? err.message : String(err) }
+    }
   }
 
   async deleteExchange(exchange: string): Promise<OperationResult> {
@@ -339,4 +398,5 @@ interface RawBinding {
   destination_type?: string
   routing_key: string
   arguments?: Record<string, unknown>
+  properties_key?: string
 }

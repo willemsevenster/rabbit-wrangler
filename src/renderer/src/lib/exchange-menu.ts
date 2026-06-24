@@ -15,7 +15,7 @@ function exchangeSnapshot(x: ExchangeInfo) {
 
 /** Context menu for an exchange, shared by the tree and the detail view. */
 export function buildExchangeMenu(connectionId: string, x: ExchangeInfo): MenuItem[] {
-  const { openExchangeTab, openPublishDialog, deleteExchange, confirm, addToast } =
+  const { openExchangeTab, openPublishDialog, openBindingDialog, deleteExchange, confirm, addToast } =
     useAppStore.getState()
   const isDefault = x.name === ''
   // Built-in exchanges (default + amq.*) can't be deleted.
@@ -26,6 +26,12 @@ export function buildExchangeMenu(connectionId: string, x: ExchangeInfo): MenuIt
       label: 'View Bindings',
       icon: 'references',
       onClick: () => void openExchangeTab(connectionId, x.name)
+    },
+    {
+      label: 'Add Binding…',
+      icon: 'add',
+      disabled: isDefault,
+      onClick: () => openBindingDialog(x.name, connectionId)
     },
     {
       label: 'Publish Message…',
