@@ -31,6 +31,7 @@ const api: RabbitApi = {
 
   getOverview: (connectionId: string) => ipcRenderer.invoke(IPC.getOverview, connectionId),
   getNodes: (connectionId: string) => ipcRenderer.invoke(IPC.getNodes, connectionId),
+  checkHealth: (connectionId: string) => ipcRenderer.invoke(IPC.checkHealth, connectionId),
 
   listQueues: (connectionId: string) => ipcRenderer.invoke(IPC.listQueues, connectionId),
   purgeQueue: (connectionId: string, queue: string) =>

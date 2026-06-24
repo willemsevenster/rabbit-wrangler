@@ -8,6 +8,7 @@ import type {
   DeleteBindingRequest,
   DeleteQueueRequest,
   ExchangeInfo,
+  HealthResult,
   NodeInfo,
   OperationResult,
   PublishMessageRequest,
@@ -109,6 +110,23 @@ export class ManagementApi {
         deliver: o.message_stats?.deliver_get_details?.rate,
         ack: o.message_stats?.ack_details?.rate
       }
+    }
+  }
+
+  /** Deep liveness probe for the configured vhost: the broker declares a temporary
+   * queue, publishes and consumes a message, then deletes it. Unlike `/whoami`
+   * (auth only) this proves the broker can actually move a message on the vhost.
+   * Needs configure/write/read perms on the vhost (which any operating user has);
+   * returns the broker's failure reason when it can't. */
+  async checkAliveness(): Promise<HealthResult> {
+    try {
+      const res = await this.request<{ status?: string; reason?: string }>(
+        `/aliveness-test/${this.vhostSegment()}`
+      )
+      if (res?.status === 'ok') return { ok: true }
+      return { ok: false, error: res?.reason ?? 'Broker reported the vhost is not alive.' }
+    } catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : String(err) }
     }
   }
 

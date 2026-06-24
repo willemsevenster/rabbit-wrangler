@@ -556,6 +556,9 @@ body.resizing {
 .status-dot--connected {
   background: var(--success);
 }
+.status-dot--degraded {
+  background: var(--warning);
+}
 .status-dot--connecting {
   background: var(--warning);
 }

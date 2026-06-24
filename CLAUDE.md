@@ -154,6 +154,15 @@ when the management API already exposes it (e.g. purge is an HTTP `DELETE`).
   `flow`-state queues). `refreshCluster` does a one-off fetch on overview-tab open /
   Refresh so the panel isn't blank before the first poll. `ManagementApi.getOverview`/
   `getNodes` map the raw payloads (incl. `mem_alarm`/`disk_free_alarm`).
+- **Deeper health check** (`ManagementApi.checkAliveness` → `GET /aliveness-test/{vhost}`):
+  the connection context menu's **Check Health** runs a real publish+consume
+  round-trip on the vhost (beyond `/whoami`'s auth-only probe) and toasts the result
+  (`store.checkHealth`). It needs vhost perms, **not** the monitoring tag, so it works
+  on locked-down users. The connection indicator also reflects live health: the tree
+  + status-bar dots derive a **`degraded`** (amber) state via
+  `lib/connection-health.ts` `effectiveConnectionState(state, cluster)` — connected
+  but a node resource alarm is active (from the cluster-stats data). `degraded` is a
+  renderer-only derived state, **not** a `ConnectionState` contract value.
 - **Move = drain + republish with confirms** (`rabbitmq/operations.ts`, UI via
   the queue context menu → "Move Messages…"): pulls messages one at a time,
   republishes to the target exchange/routing-key on a **confirm channel**, and

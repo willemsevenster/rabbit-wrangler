@@ -13,6 +13,7 @@ import { buildQueueMenu } from '../lib/queue-menu'
 import { buildExchangeMenu } from '../lib/exchange-menu'
 import { buildGroupMenu } from '../lib/group-menu'
 import { isDeadLetterQueue } from '../lib/dlq'
+import { effectiveConnectionState } from '../lib/connection-health'
 import {
   connNodeId,
   groupNodeId,
@@ -230,9 +231,11 @@ function ConnectionNode({
   const activeTabId = useAppStore((s) => s.activeTabId)
   const collapsed = useAppStore((s) => s.connectionCollapsed)
   const state = useAppStore((s) => s.statuses[connection.id]?.state ?? 'disconnected')
+  const cluster = useAppStore((s) => s.clusterByConn[connection.id])
   const select = useAppStore((s) => s.selectConnection)
   const connect = useAppStore((s) => s.connectConnection)
   const disconnect = useAppStore((s) => s.disconnectConnection)
+  const checkHealth = useAppStore((s) => s.checkHealth)
   const toggleCollapsed = useAppStore((s) => s.toggleConnectionCollapsed)
   const expandConnection = useAppStore((s) => s.expandConnection)
   const collapseConnection = useAppStore((s) => s.collapseConnection)
@@ -268,6 +271,11 @@ function ConnectionNode({
           void refreshQueues()
           void refreshExchanges()
         }
+      })
+      items.push({
+        label: 'Check Health',
+        icon: 'pulse',
+        onClick: () => void checkHealth(connection.id)
       })
       items.push({
         label: 'Disconnect',
@@ -317,7 +325,15 @@ function ConnectionNode({
           <span className="codicon codicon-server-environment" />
         </span>
         <span className="tree-row__label">{connection.name}</span>
-        <span className={`status-dot status-dot--${state}`} style={{ marginLeft: 6 }} />
+        <span
+          className={`status-dot status-dot--${effectiveConnectionState(state, cluster)}`}
+          style={{ marginLeft: 6 }}
+          title={
+            effectiveConnectionState(state, cluster) === 'degraded'
+              ? 'Reachable, but a broker resource alarm is active (publishers blocked)'
+              : state
+          }
+        />
         <span className="tree-row__actions" style={{ marginLeft: 4 }}>
           <button
             className="icon-button"

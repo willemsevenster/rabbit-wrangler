@@ -228,9 +228,11 @@ recovery as the marquee workflow.
 6. **Connections & consumers, with kill** — `GET /connections` + `/consumers`
    and `DELETE /connections/{name}` to see who's draining a queue and force-close
    a misbehaving client (a common reason a DLQ won't move).
-7. **Deeper health check** — replace/augment the `/whoami` ping with
-   `/aliveness-test/{vhost}` or `/health/checks/alarms` for a connection
-   indicator that reflects real broker health.
+7. ✅ **Deeper health check** *(done)* — a **Check Health** connection action runs
+   `/aliveness-test/{vhost}` (a real publish+consume round-trip on the vhost,
+   beyond `/whoami`'s auth-only check) and reports the result; the connection
+   indicator also reflects live health, showing a **degraded** (amber) state when
+   reachable but a node resource alarm is active.
 
 ### Tier 3 — power features
 

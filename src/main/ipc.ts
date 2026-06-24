@@ -57,6 +57,10 @@ export function registerIpcHandlers(): void {
     connectionManager.require(connectionId).getNodes()
   )
 
+  ipcMain.handle(IPC.checkHealth, (_e, connectionId: string) =>
+    connectionManager.require(connectionId).checkHealth()
+  )
+
   ipcMain.handle(IPC.listQueues, (_e, connectionId: string) =>
     connectionManager.require(connectionId).listQueues()
   )
