@@ -70,7 +70,12 @@ export class ClusterConnection {
    * cluster, not just the selected one. Scoped to the connection's lifetime. */
   private startStatsPolling(): void {
     if (this.statsTimer) return
+    let inFlight = false
     const poll = async (): Promise<void> => {
+      // Skip if the previous poll is still running (slow broker/network), so polls
+      // never pile up or emit out of order.
+      if (inFlight) return
+      inFlight = true
       try {
         const queues = await this.listQueues()
         eventBus.emitStream({
@@ -79,8 +84,11 @@ export class ClusterConnection {
         })
       } catch {
         // Transient management-API hiccup; connection-status reports real failures.
+      } finally {
+        inFlight = false
       }
     }
+    void poll() // push once immediately so the UI updates without waiting an interval
     this.statsTimer = setInterval(() => void poll(), STATS_POLL_INTERVAL_MS)
   }
 
