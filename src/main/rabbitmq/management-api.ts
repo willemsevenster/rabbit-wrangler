@@ -139,7 +139,12 @@ export class ManagementApi {
       name: c.name,
       user: c.user ?? '',
       vhost: c.vhost ?? '',
-      peer: c.peer_host != null ? `${c.peer_host}:${c.peer_port ?? ''}` : '',
+      peer:
+        c.peer_host != null
+          ? c.peer_port != null
+            ? `${c.peer_host}:${c.peer_port}`
+            : c.peer_host
+          : '',
       protocol: c.protocol ?? '',
       channels: c.channels ?? 0,
       state: c.state ?? 'unknown',

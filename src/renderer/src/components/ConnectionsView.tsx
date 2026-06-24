@@ -9,7 +9,6 @@ export function ConnectionsView({ tab }: { tab: ConnectionsTab }) {
   const refreshTab = useAppStore((s) => s.refreshTab)
   const closeClientConnection = useAppStore((s) => s.closeClientConnection)
   const confirm = useAppStore((s) => s.confirm)
-  const addToast = useAppStore((s) => s.addToast)
 
   const { clientConnections, consumers } = tab
 
@@ -21,8 +20,8 @@ export function ConnectionsView({ tab }: { tab: ConnectionsTab }) {
       danger: true
     })
     if (!ok) return
-    const result = await closeClientConnection(tab.connectionId, c.name)
-    if (!result.ok) addToast('error', `Close failed: ${result.error ?? 'unknown error'}`)
+    // store.closeClientConnection emits the success / error toast.
+    await closeClientConnection(tab.connectionId, c.name)
   }
 
   return (
@@ -112,7 +111,7 @@ export function ConnectionsView({ tab }: { tab: ConnectionsTab }) {
                   </td>
                   <td title={c.connectionName}>{c.connectionName ?? '—'}</td>
                   <td>{c.ackRequired ? 'manual' : 'auto'}</td>
-                  <td className="num">{c.prefetchCount || '—'}</td>
+                  <td className="num">{c.prefetchCount === 0 ? 'unlimited' : c.prefetchCount}</td>
                   <td>
                     {c.active ? (
                       'yes'
