@@ -50,4 +50,8 @@ These update on their own every few seconds — for every connected cluster, not
 
 ### Resource alarms
 
-If a node trips its **memory** or **disk** high-watermark, RabbitMQ **blocks publishers** and queues can sit in a `flow` state. Rabbit Wrangler surfaces this loudly: the node card shows a red **memory alarm** / **disk alarm** badge, the Overview tab shows a banner, and the **status bar** shows a high-contrast alarm chip — so a stuck cluster is obvious at a glance.
+If a node trips its **memory** or **disk** high-watermark, RabbitMQ **blocks publishers** and queues can sit in a `flow` state. Rabbit Wrangler surfaces this loudly: the node card shows a red **memory alarm** / **disk alarm** badge, the Overview tab shows a banner, and the **status bar** shows a high-contrast alarm chip — so a stuck cluster is obvious at a glance. When a connection is reachable but in alarm, its dot in the tree and status bar turns **amber (degraded)**.
+
+### Checking health on demand
+
+Right-click a connected broker and choose **Check Health** to run a deep liveness probe (`/aliveness-test`): the broker declares a temporary queue, publishes and consumes a message, then removes it. Unlike the connection check (which only verifies your credentials), this proves the broker can actually **move a message** on your virtual host — and reports the broker's own reason if it can't.

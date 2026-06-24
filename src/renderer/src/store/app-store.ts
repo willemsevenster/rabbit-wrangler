@@ -205,6 +205,8 @@ interface AppState {
   /** One-off fetch of cluster overview + nodes (e.g. on overview-tab open), so the
    * panel is populated before the first cluster-stats poll arrives. */
   refreshCluster(connectionId: string): Promise<void>
+  /** Run a deep health probe (aliveness round-trip) and report via a toast. */
+  checkHealth(connectionId: string): Promise<void>
   purgeQueue(queue: string, connectionId?: string): Promise<OperationResult>
   openCreateQueueDialog(connectionId?: string): void
   closeCreateQueueDialog(): void
@@ -752,6 +754,28 @@ export const useAppStore = create<AppState>((set, get) => ({
       set({ clusterByConn: { ...get().clusterByConn, [connectionId]: { overview, nodes } } })
     } catch {
       // Transient; the cluster-stats poll will refill once the broker responds.
+    }
+  },
+
+  async checkHealth(connectionId) {
+    const name = get().connections.find((c) => c.id === connectionId)?.name ?? 'broker'
+    get().addToast('info', `Checking health of "${name}"…`)
+    try {
+      const result = await window.api.checkHealth(connectionId)
+      if (result.ok) {
+        get().addToast(
+          'success',
+          `"${name}" is healthy — round-tripped a test message on its vhost.`
+        )
+      } else {
+        get().addToast('error', `"${name}" health check failed: ${result.error ?? 'unknown error'}`)
+      }
+    } catch (err) {
+      // e.g. the connection dropped between opening the menu and clicking.
+      get().addToast(
+        'error',
+        `"${name}" health check failed: ${err instanceof Error ? err.message : String(err)}`
+      )
     }
   },
 

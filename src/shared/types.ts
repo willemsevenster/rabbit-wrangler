@@ -160,6 +160,12 @@ export interface OperationResult {
   error?: string
 }
 
+/** Result of a deep broker health probe (aliveness round-trip on the vhost). */
+export interface HealthResult {
+  ok: boolean
+  error?: string
+}
+
 /** Subset of the management API exchange payload the UI renders. */
 export interface ExchangeInfo {
   /** Empty string for the AMQP default exchange. */

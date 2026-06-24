@@ -556,6 +556,9 @@ body.resizing {
 .status-dot--connected {
   background: var(--success);
 }
+.status-dot--degraded {
+  background: var(--warning);
+}
 .status-dot--connecting {
   background: var(--warning);
 }
@@ -1290,6 +1293,9 @@ body.resizing .msg-detail__resizer {
   color: var(--success);
 }
 .statusbar__dot--connecting {
+  color: var(--warning);
+}
+.statusbar__dot--degraded {
   color: var(--warning);
 }
 .statusbar__dot--error {

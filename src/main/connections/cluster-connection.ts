@@ -15,6 +15,7 @@ import type {
   DeleteMessageRequest,
   DeleteQueueRequest,
   ExchangeInfo,
+  HealthResult,
   MoveMessageRequest,
   MoveMessagesRequest,
   NodeInfo,
@@ -126,6 +127,10 @@ export class ClusterConnection {
 
   async getNodes(): Promise<NodeInfo[]> {
     return this.api.getNodes()
+  }
+
+  async checkHealth(): Promise<HealthResult> {
+    return this.api.checkAliveness()
   }
 
   async listQueues(): Promise<QueueInfo[]> {

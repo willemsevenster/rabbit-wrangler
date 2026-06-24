@@ -1,9 +1,11 @@
 import { useAppStore } from '../store/app-store'
+import { effectiveConnectionState, type EffectiveConnectionState } from '../lib/connection-health'
 import type { ConnectionState } from '@shared/types'
 
 /** codicon used as the connection-state indicator (coloured via .statusbar__dot--*). */
-const STATE_ICON: Record<ConnectionState, string> = {
+const STATE_ICON: Record<EffectiveConnectionState, string> = {
   connected: 'codicon-circle-filled',
+  degraded: 'codicon-warning',
   connecting: 'codicon-loading codicon-modifier-spin',
   error: 'codicon-error',
   disconnected: 'codicon-circle-outline'
@@ -19,9 +21,10 @@ export function StatusBar() {
   const cluster = useAppStore((s) => (selectedId ? s.clusterByConn[selectedId] : undefined))
 
   const conn = connections.find((c) => c.id === selectedId)
-  const state: ConnectionState = selectedId
+  const rawState: ConnectionState = selectedId
     ? (statuses[selectedId]?.state ?? 'connecting')
     : 'disconnected'
+  const state = effectiveConnectionState(rawState, cluster)
   const totalMessages = queues.reduce((acc, q) => acc + q.messages, 0)
   const memAlarm = cluster?.nodes.some((n) => n.memAlarm) ?? false
   const diskAlarm = cluster?.nodes.some((n) => n.diskFreeAlarm) ?? false
