@@ -1295,6 +1295,9 @@ body.resizing .msg-detail__resizer {
 .statusbar__dot--connecting {
   color: var(--warning);
 }
+.statusbar__dot--degraded {
+  color: var(--warning);
+}
 .statusbar__dot--error {
   color: var(--error);
 }

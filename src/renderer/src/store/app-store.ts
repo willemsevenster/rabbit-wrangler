@@ -760,11 +760,22 @@ export const useAppStore = create<AppState>((set, get) => ({
   async checkHealth(connectionId) {
     const name = get().connections.find((c) => c.id === connectionId)?.name ?? 'broker'
     get().addToast('info', `Checking health of "${name}"…`)
-    const result = await window.api.checkHealth(connectionId)
-    if (result.ok) {
-      get().addToast('success', `"${name}" is healthy — round-tripped a test message on its vhost.`)
-    } else {
-      get().addToast('error', `"${name}" health check failed: ${result.error ?? 'unknown error'}`)
+    try {
+      const result = await window.api.checkHealth(connectionId)
+      if (result.ok) {
+        get().addToast(
+          'success',
+          `"${name}" is healthy — round-tripped a test message on its vhost.`
+        )
+      } else {
+        get().addToast('error', `"${name}" health check failed: ${result.error ?? 'unknown error'}`)
+      }
+    } catch (err) {
+      // e.g. the connection dropped between opening the menu and clicking.
+      get().addToast(
+        'error',
+        `"${name}" health check failed: ${err instanceof Error ? err.message : String(err)}`
+      )
     }
   },
 
