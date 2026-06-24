@@ -55,3 +55,16 @@ If a node trips its **memory** or **disk** high-watermark, RabbitMQ **blocks pub
 ### Checking health on demand
 
 Right-click a connected broker and choose **Check Health** to run a deep liveness probe (`/aliveness-test`): the broker declares a temporary queue, publishes and consumes a message, then removes it. Unlike the connection check (which only verifies your credentials), this proves the broker can actually **move a message** on your virtual host — and reports the broker's own reason if it can't.
+
+## Client connections & consumers
+
+Right-click a connected broker and choose **View Connections** to open a tab listing:
+
+- **Connections** — every live client connected to the broker: name, user, virtual host, protocol, channel count and state. Each row has a **Force Close** button that drops that connection (and its channels and consumers).
+- **Consumers** — every consumer on your virtual host: which **queue** it's on, its consumer tag, the **connection** it belongs to, ack mode, prefetch, and whether it's currently active.
+
+This is the fastest way to answer "**why won't this queue drain / why can't I move these messages?**" — a live consumer is competing for the queue's messages. Find it in the Consumers list, note its connection, and **Force Close** that connection to release the queue.
+
+::: warning
+Force-closing a connection is immediate and affects a real client — it will have to reconnect. You'll always be asked to confirm first.
+:::

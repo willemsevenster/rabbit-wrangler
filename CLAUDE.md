@@ -154,6 +154,19 @@ when the management API already exposes it (e.g. purge is an HTTP `DELETE`).
   `flow`-state queues). `refreshCluster` does a one-off fetch on overview-tab open /
   Refresh so the panel isn't blank before the first poll. `ManagementApi.getOverview`/
   `getNodes` map the raw payloads (incl. `mem_alarm`/`disk_free_alarm`).
+- **Client connections & consumers** (`ManagementApi.listConnections`/`listConsumers`/
+  `closeConnection`, UI: `components/ConnectionsView` in a `connections` editor tab):
+  a per-cluster tab (opened from the connection context menu → **View Connections**,
+  keyed `connectionsTabId` = `c:${connId}`) lists live client connections
+  (`GET /connections`, cluster-wide) and consumers (`GET /consumers/{vhost}`), fetched
+  on open + **Refresh** (on-demand, **not** live-polled — held on the tab like exchange
+  `bindings`). **Force Close** (`DELETE /connections/{name}` + `X-Reason`) drops a
+  client; it's **always** confirmed via `store.confirm` (bypasses
+  `confirmDestructive`, like connection-delete) since it's an outward-facing action on
+  a real client. The contract names are deliberately `listClientConnections` /
+  `broker:connections` etc. to avoid clashing with the saved-cluster `connections:*`
+  channels. Surfaces the DLQ-won't-drain culprit: find the queue's consumer, note its
+  connection, force-close it.
 - **Deeper health check** (`ManagementApi.checkAliveness` → `GET /aliveness-test/{vhost}`):
   the connection context menu's **Check Health** runs a real publish+consume
   round-trip on the vhost (beyond `/whoami`'s auth-only probe) and toasts the result

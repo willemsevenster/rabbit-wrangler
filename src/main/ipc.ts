@@ -61,6 +61,22 @@ export function registerIpcHandlers(): void {
     connectionManager.require(connectionId).checkHealth()
   )
 
+  ipcMain.handle(IPC.listClientConnections, (_e, connectionId: string) =>
+    connectionManager.require(connectionId).listClientConnections()
+  )
+
+  ipcMain.handle(IPC.listConsumers, (_e, connectionId: string) =>
+    connectionManager.require(connectionId).listConsumers()
+  )
+
+  ipcMain.handle(
+    IPC.closeClientConnection,
+    (_e, connectionId: string, name: string, reason?: string) =>
+      connectionManager
+        .require(connectionId)
+        .closeClientConnection(name, reason ?? 'Closed from Rabbit Wrangler')
+  )
+
   ipcMain.handle(IPC.listQueues, (_e, connectionId: string) =>
     connectionManager.require(connectionId).listQueues()
   )

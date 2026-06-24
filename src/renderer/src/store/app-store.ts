@@ -4,9 +4,11 @@ import { DEFAULT_DLQ_SUFFIXES } from '../lib/dlq'
 import type { StreamEvent, UpdateStatusPayload } from '@shared/ipc'
 import type {
   BindingInfo,
+  ClientConnectionInfo,
   ClusterOverview,
   ConnectionConfig,
   ConnectionStatus,
+  ConsumerInfo,
   CreateBindingRequest,
   CreateExchangeRequest,
   CreateQueueRequest,
@@ -65,10 +67,19 @@ export type EditorTab =
       title: string
       bindings: BindingInfo[]
     }
+  | {
+      id: string
+      kind: 'connections'
+      connectionId: string
+      title: string
+      clientConnections: ClientConnectionInfo[]
+      consumers: ConsumerInfo[]
+    }
 
 export const overviewTabId = (c: string): string => `o:${c}`
 export const queueTabId = (c: string, q: string): string => `q:${c}:${q}`
 export const exchangeTabId = (c: string, x: string): string => `x:${c}:${x}`
+export const connectionsTabId = (c: string): string => `c:${c}`
 
 /** A transient toast notification (auto-dismisses). */
 export interface Toast {
@@ -188,6 +199,10 @@ interface AppState {
   openOverviewTab(connectionId: string): void
   openQueueTab(connectionId: string, queue: string): void
   openExchangeTab(connectionId: string, exchange: string): Promise<void>
+  /** Open (or focus) the cluster's client-connections & consumers tab. */
+  openConnectionsTab(connectionId: string): Promise<void>
+  /** Force-close a client connection, then refresh the connections tab. */
+  closeClientConnection(connectionId: string, name: string): Promise<OperationResult>
   /** Open a tab for every queue on a connection. */
   openAllQueueTabs(connectionId: string): void
   /** Close every open queue tab belonging to a connection. */
@@ -632,6 +647,35 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   },
 
+  async openConnectionsTab(connectionId) {
+    const id = connectionsTabId(connectionId)
+    if (get().tabs.some((t) => t.id === id)) {
+      set({ activeTabId: id })
+      await get().refreshTab(id)
+      return
+    }
+    const connName = get().connections.find((c) => c.id === connectionId)?.name ?? connectionId
+    set({
+      tabs: [
+        ...get().tabs,
+        { id, kind: 'connections', connectionId, title: `${connName} - Connections`, clientConnections: [], consumers: [] }
+      ],
+      activeTabId: id
+    })
+    await get().refreshTab(id)
+  },
+
+  async closeClientConnection(connectionId, name) {
+    const result = await window.api.closeClientConnection(connectionId, name)
+    if (result.ok) {
+      get().addToast('success', `Closed connection "${name}".`)
+      await get().refreshTab(connectionsTabId(connectionId))
+    } else {
+      get().addToast('error', `Close failed: ${result.error ?? 'unknown error'}`)
+    }
+    return result
+  },
+
   setActiveTab(id) {
     set({
       activeTabId: id,
@@ -718,6 +762,20 @@ export const useAppStore = create<AppState>((set, get) => ({
         })
       } catch {
         // leave bindings as-is
+      }
+    } else if (tab.kind === 'connections') {
+      try {
+        const [clientConnections, consumers] = await Promise.all([
+          window.api.listClientConnections(tab.connectionId),
+          window.api.listConsumers(tab.connectionId)
+        ])
+        set({
+          tabs: get().tabs.map((t) =>
+            t.id === id && t.kind === 'connections' ? { ...t, clientConnections, consumers } : t
+          )
+        })
+      } catch {
+        // leave lists as-is
       }
     } else {
       await Promise.all([

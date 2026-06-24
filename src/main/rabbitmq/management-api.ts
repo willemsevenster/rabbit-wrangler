@@ -1,7 +1,9 @@
 import type {
   BindingInfo,
+  ClientConnectionInfo,
   ClusterOverview,
   ConnectionConfig,
+  ConsumerInfo,
   CreateBindingRequest,
   CreateExchangeRequest,
   CreateQueueRequest,
@@ -127,6 +129,52 @@ export class ManagementApi {
       return { ok: false, error: res?.reason ?? 'Broker reported the vhost is not alive.' }
     } catch (err) {
       return { ok: false, error: err instanceof Error ? err.message : String(err) }
+    }
+  }
+
+  /** Live client connections to the broker (cluster-wide). */
+  async listConnections(): Promise<ClientConnectionInfo[]> {
+    const raw = await this.request<RawConnection[]>('/connections')
+    return raw.map((c) => ({
+      name: c.name,
+      user: c.user ?? '',
+      vhost: c.vhost ?? '',
+      peer: c.peer_host != null ? `${c.peer_host}:${c.peer_port ?? ''}` : '',
+      protocol: c.protocol ?? '',
+      channels: c.channels ?? 0,
+      state: c.state ?? 'unknown',
+      tls: c.ssl ?? false,
+      connectedAt: c.connected_at,
+      clientName:
+        (c.client_properties?.connection_name as string | undefined) ??
+        (c.client_properties?.product as string | undefined)
+    }))
+  }
+
+  /** Consumers subscribed on the configured vhost. */
+  async listConsumers(): Promise<ConsumerInfo[]> {
+    const raw = await this.request<RawConsumer[]>(`/consumers/${this.vhostSegment()}`)
+    return raw.map((c) => ({
+      queue: c.queue?.name ?? '',
+      consumerTag: c.consumer_tag ?? '',
+      connectionName: c.channel_details?.connection_name,
+      ackRequired: c.ack_required ?? false,
+      prefetchCount: c.prefetch_count ?? 0,
+      active: c.active ?? true,
+      exclusive: c.exclusive ?? false
+    }))
+  }
+
+  /** Force-close a client connection. The reason is surfaced to the client. */
+  async closeConnection(name: string, reason: string): Promise<OperationResult> {
+    try {
+      await this.request<void>(`/connections/${encodeURIComponent(name)}`, {
+        method: 'DELETE',
+        headers: { 'X-Reason': reason }
+      })
+      return { ok: true, affected: 1 }
+    } catch (err) {
+      return { ok: false, affected: 0, error: err instanceof Error ? err.message : String(err) }
     }
   }
 
@@ -496,4 +544,28 @@ interface RawBinding {
   routing_key: string
   arguments?: Record<string, unknown>
   properties_key?: string
+}
+
+interface RawConnection {
+  name: string
+  user?: string
+  vhost?: string
+  peer_host?: string
+  peer_port?: number
+  protocol?: string
+  channels?: number
+  state?: string
+  ssl?: boolean
+  connected_at?: number
+  client_properties?: Record<string, unknown>
+}
+
+interface RawConsumer {
+  queue?: { name?: string; vhost?: string }
+  consumer_tag?: string
+  channel_details?: { connection_name?: string; number?: number }
+  ack_required?: boolean
+  prefetch_count?: number
+  active?: boolean
+  exclusive?: boolean
 }

@@ -236,6 +236,7 @@ function ConnectionNode({
   const connect = useAppStore((s) => s.connectConnection)
   const disconnect = useAppStore((s) => s.disconnectConnection)
   const checkHealth = useAppStore((s) => s.checkHealth)
+  const openConnectionsTab = useAppStore((s) => s.openConnectionsTab)
   const toggleCollapsed = useAppStore((s) => s.toggleConnectionCollapsed)
   const expandConnection = useAppStore((s) => s.expandConnection)
   const collapseConnection = useAppStore((s) => s.collapseConnection)
@@ -276,6 +277,11 @@ function ConnectionNode({
         label: 'Check Health',
         icon: 'pulse',
         onClick: () => void checkHealth(connection.id)
+      })
+      items.push({
+        label: 'View Connections',
+        icon: 'plug',
+        onClick: () => void openConnectionsTab(connection.id)
       })
       items.push({
         label: 'Disconnect',
