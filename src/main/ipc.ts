@@ -49,6 +49,14 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(IPC.exportConnections, () => exportConnections(new Date().toISOString()))
   ipcMain.handle(IPC.importConnections, () => readImportFile())
 
+  ipcMain.handle(IPC.getOverview, (_e, connectionId: string) =>
+    connectionManager.require(connectionId).getOverview()
+  )
+
+  ipcMain.handle(IPC.getNodes, (_e, connectionId: string) =>
+    connectionManager.require(connectionId).getNodes()
+  )
+
   ipcMain.handle(IPC.listQueues, (_e, connectionId: string) =>
     connectionManager.require(connectionId).listQueues()
   )

@@ -37,3 +37,17 @@ Export and import make it easy to share a set of brokers across machines or with
 ## The sidebar tree
 
 The tree shows **one connection's contents at a time** to keep things tidy. Use the **Collapse All** button in the toolbar to fold the tree back to the connection level, and each connection row has its own **expand/collapse** toggle for its queues and exchanges.
+
+## Cluster health
+
+A connection's **Overview tab** opens with a cluster summary above the queue list:
+
+- **Version**, cluster name, and live totals (queues, connections, channels, consumers).
+- Cluster-wide **publish / deliver / ack rates**.
+- A card per **broker node** showing memory used vs. limit, free disk, file-descriptor usage and uptime.
+
+These update on their own every few seconds — for every connected cluster, not just the one you're looking at.
+
+### Resource alarms
+
+If a node trips its **memory** or **disk** high-watermark, RabbitMQ **blocks publishers** and queues can sit in a `flow` state. Rabbit Wrangler surfaces this loudly: the node card shows a red **memory alarm** / **disk alarm** badge, the Overview tab shows a banner, and the **status bar** shows a high-contrast alarm chip — so a stuck cluster is obvious at a glance.

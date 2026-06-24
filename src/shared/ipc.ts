@@ -12,6 +12,7 @@
  */
 import type {
   BindingInfo,
+  ClusterOverview,
   ConnectionConfig,
   CreateBindingRequest,
   CreateExchangeRequest,
@@ -24,6 +25,7 @@ import type {
   ImportResult,
   MoveMessageRequest,
   MoveMessagesRequest,
+  NodeInfo,
   OperationResult,
   PeekedMessage,
   PublishMessageRequest,
@@ -40,6 +42,10 @@ export const IPC = {
   disconnect: 'connections:disconnect',
   exportConnections: 'connections:export',
   importConnections: 'connections:import',
+
+  // cluster health (RabbitMQ management HTTP API)
+  getOverview: 'cluster:overview',
+  getNodes: 'cluster:nodes',
 
   // queue inspection / management (RabbitMQ management HTTP API)
   listQueues: 'queues:list',
@@ -90,6 +96,11 @@ export interface RabbitApi {
   exportConnections(): Promise<ExportResult>
   /** Read a connections JSON file (passwords excluded) for the import dialog. */
   importConnections(): Promise<ImportResult>
+
+  /** Cluster-wide summary (version, totals, rates). */
+  getOverview(connectionId: string): Promise<ClusterOverview>
+  /** Per-node health (memory/disk alarms, fd usage, uptime). */
+  getNodes(connectionId: string): Promise<NodeInfo[]>
 
   listQueues(connectionId: string): Promise<QueueInfo[]>
   purgeQueue(connectionId: string, queue: string): Promise<OperationResult>
@@ -176,4 +187,8 @@ export type StreamEvent =
   | { type: 'connection-status'; payload: import('./types').ConnectionStatus }
   | { type: 'peek'; payload: PeekedMessage }
   | { type: 'queue-stats'; payload: { connectionId: string; queues: QueueInfo[] } }
+  | {
+      type: 'cluster-stats'
+      payload: { connectionId: string; overview: ClusterOverview; nodes: NodeInfo[] }
+    }
   | { type: 'update-status'; payload: UpdateStatusPayload }

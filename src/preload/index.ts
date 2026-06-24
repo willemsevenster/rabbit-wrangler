@@ -29,6 +29,9 @@ const api: RabbitApi = {
   exportConnections: () => ipcRenderer.invoke(IPC.exportConnections),
   importConnections: () => ipcRenderer.invoke(IPC.importConnections),
 
+  getOverview: (connectionId: string) => ipcRenderer.invoke(IPC.getOverview, connectionId),
+  getNodes: (connectionId: string) => ipcRenderer.invoke(IPC.getNodes, connectionId),
+
   listQueues: (connectionId: string) => ipcRenderer.invoke(IPC.listQueues, connectionId),
   purgeQueue: (connectionId: string, queue: string) =>
     ipcRenderer.invoke(IPC.purgeQueue, connectionId, queue),
