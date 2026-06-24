@@ -103,6 +103,27 @@ export interface PeekedMessage {
   observedAt: number
 }
 
+/** Declare (create or idempotently re-assert) a queue via the management API. */
+export interface CreateQueueRequest {
+  connectionId: string
+  /** Queue name. Reserved `amq.*` names are rejected by the broker. */
+  name: string
+  durable: boolean
+  autoDelete: boolean
+  /** Optional x-arguments (e.g. x-dead-letter-exchange, x-message-ttl). */
+  arguments: Record<string, unknown>
+}
+
+/** Delete a whole queue (and its messages), optionally only under guards. */
+export interface DeleteQueueRequest {
+  connectionId: string
+  name: string
+  /** Only delete if the queue has no messages (broker rejects otherwise). */
+  ifEmpty?: boolean
+  /** Only delete if the queue has no consumers (broker rejects otherwise). */
+  ifUnused?: boolean
+}
+
 export interface MoveMessagesRequest {
   connectionId: string
   sourceQueue: string

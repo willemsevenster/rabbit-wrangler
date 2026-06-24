@@ -13,7 +13,9 @@
 import type {
   BindingInfo,
   ConnectionConfig,
+  CreateQueueRequest,
   DeleteMessageRequest,
+  DeleteQueueRequest,
   ExchangeInfo,
   ExportResult,
   ImportResult,
@@ -39,6 +41,8 @@ export const IPC = {
   // queue inspection / management (RabbitMQ management HTTP API)
   listQueues: 'queues:list',
   purgeQueue: 'queues:purge',
+  createQueue: 'queues:create',
+  deleteQueue: 'queues:delete',
 
   // exchange inspection / management (RabbitMQ management HTTP API)
   listExchanges: 'exchanges:list',
@@ -83,6 +87,10 @@ export interface RabbitApi {
 
   listQueues(connectionId: string): Promise<QueueInfo[]>
   purgeQueue(connectionId: string, queue: string): Promise<OperationResult>
+  /** Declare a queue (create, or idempotently re-assert an identical one). */
+  createQueue(request: CreateQueueRequest): Promise<OperationResult>
+  /** Delete a whole queue and its messages, optionally guarded by if-empty/if-unused. */
+  deleteQueue(request: DeleteQueueRequest): Promise<OperationResult>
 
   listExchanges(connectionId: string): Promise<ExchangeInfo[]>
   listExchangeBindings(connectionId: string, exchange: string): Promise<BindingInfo[]>

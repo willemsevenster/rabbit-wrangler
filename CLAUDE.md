@@ -163,6 +163,23 @@ when the management API already exposes it (e.g. purge is an HTTP `DELETE`).
   fingerprint, so the first match is acted on. The Move dialog (`moveDialog`,
   shared with bulk move) defaults to the **last destination used for that source
   queue** (`lastMoveTargets`, persisted in localStorage).
+- **Create / delete queues** (`management-api.ts` `createQueue`/`deleteQueue`, UI via
+  the Queues-group context menu + overview **New Queue** button, and the queue context
+  menu → "Delete Queue…"): both are **management-plane** (HTTP `PUT`/`DELETE` on
+  `/queues/{vhost}/{name}`), not AMQP. **Create** (`CreateQueueDialog`) sends
+  `durable`/`auto_delete`/`arguments` — the arguments section reuses the Publish
+  dialog's key/value/**type** rows so x-args like `x-dead-letter-exchange` (string) or
+  `x-message-ttl` (number) get the right JSON type; `PUT` is idempotent (re-asserting
+  identical settings is a no-op, a clash with different settings is a broker
+  precondition error, surfaced). A new queue auto-binds to the default exchange by its
+  name, so it's immediately a valid move/redrive target. **Delete**
+  (`DeleteQueueDialog`) shows the live message/consumer counts and exposes the broker's
+  **`if-empty` / `if-unused`** guards as checkboxes (a guard rejection shows inline so
+  the user can adjust and retry); it removes the whole queue (unlike Purge). Like
+  purge, `ClusterConnection.deleteQueue` **stops the peeker first** (our consumer would
+  trip `if-unused`, and the queue is vanishing), and the store closes the queue's tab +
+  refreshes on success. Delete is **always** confirmed via its own dialog (it carries
+  the guard options), so it bypasses `maybeConfirm`/`confirmDestructive`.
 - **Exchanges** (`management-api.ts` + `components/ExchangeDetail`/`ExchangeDiagram`):
   listed in the sidebar tree under an "Exchanges" group (queues are under a
   "Queues" group). The detail view shows **read-only** bindings (management API

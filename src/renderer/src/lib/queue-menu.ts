@@ -24,8 +24,16 @@ function queueSnapshot(q: QueueInfo, isDeadLetter: boolean) {
  * open-time.
  */
 export function buildQueueMenu(connectionId: string, q: QueueInfo): MenuItem[] {
-  const { openQueueTab, refreshQueues, purgeQueue, openMoveDialog, maybeConfirm, addToast, dlqSuffixes } =
-    useAppStore.getState()
+  const {
+    openQueueTab,
+    refreshQueues,
+    purgeQueue,
+    openMoveDialog,
+    openDeleteQueueDialog,
+    maybeConfirm,
+    addToast,
+    dlqSuffixes
+  } = useAppStore.getState()
   const isDeadLetter = isDeadLetterQueue(q.name, dlqSuffixes)
   return [
     { label: 'Peek Messages', icon: 'eye', onClick: () => openQueueTab(connectionId, q.name) },
@@ -58,6 +66,12 @@ export function buildQueueMenu(connectionId: string, q: QueueInfo): MenuItem[] {
         const result = await purgeQueue(q.name, connectionId)
         if (!result.ok) addToast('error', `Purge failed: ${result.error ?? 'unknown error'}`)
       }
+    },
+    {
+      label: 'Delete Queue…',
+      icon: 'trash',
+      danger: true,
+      onClick: () => openDeleteQueueDialog(q.name, connectionId)
     }
   ]
 }

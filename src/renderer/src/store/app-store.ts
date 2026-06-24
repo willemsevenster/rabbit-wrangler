@@ -6,7 +6,9 @@ import type {
   BindingInfo,
   ConnectionConfig,
   ConnectionStatus,
+  CreateQueueRequest,
   DeleteMessageRequest,
+  DeleteQueueRequest,
   ExchangeInfo,
   MoveMessageRequest,
   MoveMessagesRequest,
@@ -110,6 +112,10 @@ interface AppState {
   moveDialog: { connectionId: string; queue: string; fingerprint?: string } | null
   /** Target of the open Publish-message dialog (null = closed). */
   publishDialog: { connectionId: string; exchange: string } | null
+  /** Target of the open Create-queue dialog (null = closed). */
+  createQueueDialog: { connectionId: string } | null
+  /** Target of the open Delete-queue dialog (null = closed). */
+  deleteQueueDialog: { connectionId: string; queue: string } | null
   /** Last-used move destination per source queue (persisted), for default values. */
   lastMoveTargets: Record<string, MoveTarget>
 
@@ -186,6 +192,12 @@ interface AppState {
 
   refreshQueues(connectionId?: string): Promise<void>
   purgeQueue(queue: string, connectionId?: string): Promise<OperationResult>
+  openCreateQueueDialog(connectionId?: string): void
+  closeCreateQueueDialog(): void
+  createQueue(req: CreateQueueRequest): Promise<OperationResult>
+  openDeleteQueueDialog(queue: string, connectionId?: string): void
+  closeDeleteQueueDialog(): void
+  deleteQueue(req: DeleteQueueRequest): Promise<OperationResult>
   openMoveDialog(queue: string, connectionId?: string, fingerprint?: string): void
   closeMoveDialog(): void
   moveMessages(req: MoveMessagesRequest): Promise<OperationResult>
@@ -365,6 +377,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   importDialog: null,
   moveDialog: null,
   publishDialog: null,
+  createQueueDialog: null,
+  deleteQueueDialog: null,
   lastMoveTargets: loadMoveTargets(),
   sidebarWidth: initialSidebarWidth,
   sidebarVisible: true,
@@ -727,6 +741,46 @@ export const useAppStore = create<AppState>((set, get) => ({
     // Resume the live peek of the now-empty queue if its tab is open.
     if (get().tabs.some((t) => t.id === queueTabId(cid, queue))) {
       void window.api.startPeek(cid, queue)
+    }
+    return result
+  },
+
+  openCreateQueueDialog(connectionId) {
+    const cid = connectionId ?? get().selectedConnectionId
+    if (!cid) return
+    set({ createQueueDialog: { connectionId: cid } })
+  },
+
+  closeCreateQueueDialog() {
+    set({ createQueueDialog: null })
+  },
+
+  async createQueue(req) {
+    const result = await window.api.createQueue(req)
+    if (result.ok) {
+      set({ createQueueDialog: null })
+      await get().refreshQueues(req.connectionId)
+    }
+    return result
+  },
+
+  openDeleteQueueDialog(queue, connectionId) {
+    const cid = connectionId ?? get().selectedConnectionId
+    if (!cid) return
+    set({ deleteQueueDialog: { connectionId: cid, queue } })
+  },
+
+  closeDeleteQueueDialog() {
+    set({ deleteQueueDialog: null })
+  },
+
+  async deleteQueue(req) {
+    // main releases the peeker before deleting (see ClusterConnection).
+    const result = await window.api.deleteQueue(req)
+    if (result.ok) {
+      set({ deleteQueueDialog: null })
+      get().closeTab(queueTabId(req.connectionId, req.name))
+      await get().refreshQueues(req.connectionId)
     }
     return result
   },

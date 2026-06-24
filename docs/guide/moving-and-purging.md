@@ -1,6 +1,15 @@
 # Moving & Purging
 
-Rabbit Wrangler can move messages between queues and clear queues out entirely — with safety rails so you don't lose data by accident.
+Rabbit Wrangler can create and delete queues, move messages between queues, and clear queues out entirely — with safety rails so you don't lose data by accident.
+
+## Create a queue
+
+1. Right-click the **Queues** group in the tree (or click **New Queue** on a connection's overview tab) and choose **Create Queue…**.
+2. Enter a **name**, choose **Durable** (recommended — survives a broker restart) and optionally **Auto-delete**.
+3. Add any **Arguments** (x-args) you need — for example `x-dead-letter-exchange` (String) or `x-message-ttl` (Number). Pick the right value **type** so numbers are sent as numbers.
+4. Click **Create queue**.
+
+A new queue is automatically bound to the default exchange by its name, so you can immediately use it as a **move/redrive target** (see below). Re-creating a queue with the exact same settings is harmless; trying to re-create it with *different* settings is rejected by the broker.
 
 ## Move a whole queue
 
@@ -28,6 +37,21 @@ Purging **clears all messages** in a queue. Right-click the queue to purge it.
 
 ::: warning
 Purging is **irreversible** — purged messages cannot be recovered.
+:::
+
+## Delete a queue
+
+Deleting removes the **whole queue** (and any messages it still holds), not just its contents. Right-click a queue and choose **Delete Queue…**.
+
+The dialog shows the queue's current **message and consumer counts**, and offers two safety guards:
+
+- **Only delete if empty** — the broker refuses the delete if the queue still has messages.
+- **Only delete if unused** — the broker refuses if the queue still has consumers.
+
+If a guard blocks the delete, the reason is shown right in the dialog so you can adjust and retry. Deleting a queue **always** asks for explicit confirmation through this dialog, regardless of the [confirm-before-destructive setting](./settings).
+
+::: tip
+To empty a queue but keep it, use **Purge** instead.
 :::
 
 ## The confirmation setting

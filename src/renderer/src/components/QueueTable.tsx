@@ -14,11 +14,18 @@ function depthRate(n: number | undefined): string {
 export function QueueTable({ connectionId }: { connectionId: string }) {
   const queues = useAppStore((s) => s.queuesByConn[connectionId]) ?? []
   const openQueueTab = useAppStore((s) => s.openQueueTab)
+  const openCreateQueueDialog = useAppStore((s) => s.openCreateQueueDialog)
   const dlqSuffixes = useAppStore((s) => s.dlqSuffixes)
   const { menu, openMenu, close } = useContextMenu()
 
   return (
     <>
+      <div className="queue-table__toolbar">
+        <button className="btn btn--sm" onClick={() => openCreateQueueDialog(connectionId)}>
+          <span className="codicon codicon-add" />
+          New Queue
+        </button>
+      </div>
       <table className="queue-table">
         <thead>
           <tr>

@@ -1,6 +1,8 @@
 import type {
   BindingInfo,
   ConnectionConfig,
+  CreateQueueRequest,
+  DeleteQueueRequest,
   ExchangeInfo,
   OperationResult,
   PublishMessageRequest,
@@ -112,6 +114,46 @@ export class ManagementApi {
       )
       await this.request<void>(
         `/queues/${this.vhostSegment()}/${encodeURIComponent(queue)}/contents`,
+        { method: 'DELETE' }
+      )
+      return { ok: true, affected: before.messages ?? 0 }
+    } catch (err) {
+      return { ok: false, affected: 0, error: err instanceof Error ? err.message : String(err) }
+    }
+  }
+
+  /** Declare a queue. PUT is idempotent: re-asserting identical settings succeeds;
+   * a name clash with different settings fails (precondition) and is surfaced. */
+  async createQueue(req: CreateQueueRequest): Promise<OperationResult> {
+    try {
+      await this.request<void>(`/queues/${this.vhostSegment()}/${encodeURIComponent(req.name)}`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          durable: req.durable,
+          auto_delete: req.autoDelete,
+          arguments: req.arguments ?? {}
+        })
+      })
+      return { ok: true, affected: 1 }
+    } catch (err) {
+      return { ok: false, affected: 0, error: err instanceof Error ? err.message : String(err) }
+    }
+  }
+
+  /** Delete a whole queue. With if-empty / if-unused the broker rejects (and we
+   * surface) the delete when the queue still has messages / consumers. */
+  async deleteQueue(req: DeleteQueueRequest): Promise<OperationResult> {
+    try {
+      // Capture the message count first so we can report what was discarded.
+      const before = await this.request<RawQueue>(
+        `/queues/${this.vhostSegment()}/${encodeURIComponent(req.name)}`
+      )
+      const params = new URLSearchParams()
+      if (req.ifEmpty) params.set('if-empty', 'true')
+      if (req.ifUnused) params.set('if-unused', 'true')
+      const query = params.toString()
+      await this.request<void>(
+        `/queues/${this.vhostSegment()}/${encodeURIComponent(req.name)}${query ? `?${query}` : ''}`,
         { method: 'DELETE' }
       )
       return { ok: true, affected: before.messages ?? 0 }

@@ -7,11 +7,18 @@ import type { MenuItem } from '../components/ContextMenu'
  * at open-time, like the queue/exchange menu builders.
  */
 export function buildGroupMenu(connectionId: string, group: 'queues'): MenuItem[] {
-  const { openAllQueueTabs, closeAllQueueTabs, queuesByConn, tabs } = useAppStore.getState()
+  const { openAllQueueTabs, closeAllQueueTabs, openCreateQueueDialog, queuesByConn, tabs } =
+    useAppStore.getState()
   if (group !== 'queues') return []
   const queueCount = (queuesByConn[connectionId] ?? []).length
   const openCount = tabs.filter((t) => t.kind === 'queue' && t.connectionId === connectionId).length
   return [
+    {
+      label: 'Create Queue…',
+      icon: 'add',
+      onClick: () => openCreateQueueDialog(connectionId)
+    },
+    { separator: true },
     {
       label: 'Open All Queue Tabs',
       icon: 'multiple-windows',

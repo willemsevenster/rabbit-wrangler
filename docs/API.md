@@ -202,9 +202,10 @@ recovery as the marquee workflow.
 
 ### Tier 1 — directly extend the core mission
 
-1. **Delete & create queues** — `DELETE /queues/{vhost}/{name}` (with
-   `if-empty`/`if-unused`) and `PUT /queues/{vhost}/{name}`. Today we can purge
-   but not delete, and can't create a move/redrive target from inside the app.
+1. ✅ **Delete & create queues** *(done)* — `PUT /queues/{vhost}/{name}` (Create
+   Queue: durable / auto-delete / x-arguments) and `DELETE /queues/{vhost}/{name}`
+   (Delete Queue, with optional `if-empty` / `if-unused` guards). Surfaced via the
+   Queues-group menu / overview "New Queue" button and the queue context menu.
 2. **Editable bindings** — `POST`/`DELETE /bindings/...` and
    `PUT /exchanges/...`. The bindings view is read-only "for now"; making it
    read-write (plus declare-exchange) is the obvious next step, and the diagram
