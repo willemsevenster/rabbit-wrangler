@@ -14,7 +14,10 @@ import { connectionManager } from './connections/connection-manager'
 import { eventStreamServer } from './websocket-server'
 import type {
   ConnectionConfig,
+  CreateBindingRequest,
+  CreateExchangeRequest,
   CreateQueueRequest,
+  DeleteBindingRequest,
   DeleteMessageRequest,
   DeleteQueueRequest,
   MoveMessageRequest,
@@ -90,12 +93,24 @@ export function registerIpcHandlers(): void {
     connectionManager.require(connectionId).listExchangeBindings(exchange)
   )
 
+  ipcMain.handle(IPC.createExchange, (_e, req: CreateExchangeRequest) =>
+    connectionManager.require(req.connectionId).createExchange(req)
+  )
+
   ipcMain.handle(IPC.deleteExchange, (_e, connectionId: string, exchange: string) =>
     connectionManager.require(connectionId).deleteExchange(exchange)
   )
 
   ipcMain.handle(IPC.publishMessage, (_e, req: PublishMessageRequest) =>
     connectionManager.require(req.connectionId).publishMessage(req)
+  )
+
+  ipcMain.handle(IPC.createBinding, (_e, req: CreateBindingRequest) =>
+    connectionManager.require(req.connectionId).createBinding(req)
+  )
+
+  ipcMain.handle(IPC.deleteBinding, (_e, req: DeleteBindingRequest) =>
+    connectionManager.require(req.connectionId).deleteBinding(req)
   )
 
   ipcMain.handle(IPC.persistTheme, (_e, theme: 'light' | 'dark') => {

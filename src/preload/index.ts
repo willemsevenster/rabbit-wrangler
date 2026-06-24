@@ -3,7 +3,10 @@ import { electronAPI } from '@electron-toolkit/preload'
 import { IPC, type RabbitApi } from '@shared/ipc'
 import type {
   ConnectionConfig,
+  CreateBindingRequest,
+  CreateExchangeRequest,
   CreateQueueRequest,
+  DeleteBindingRequest,
   DeleteMessageRequest,
   DeleteQueueRequest,
   MoveMessageRequest,
@@ -43,10 +46,14 @@ const api: RabbitApi = {
   listExchanges: (connectionId: string) => ipcRenderer.invoke(IPC.listExchanges, connectionId),
   listExchangeBindings: (connectionId: string, exchange: string) =>
     ipcRenderer.invoke(IPC.listExchangeBindings, connectionId, exchange),
+  createExchange: (request: CreateExchangeRequest) =>
+    ipcRenderer.invoke(IPC.createExchange, request),
   deleteExchange: (connectionId: string, exchange: string) =>
     ipcRenderer.invoke(IPC.deleteExchange, connectionId, exchange),
   publishMessage: (request: PublishMessageRequest) =>
     ipcRenderer.invoke(IPC.publishMessage, request),
+  createBinding: (request: CreateBindingRequest) => ipcRenderer.invoke(IPC.createBinding, request),
+  deleteBinding: (request: DeleteBindingRequest) => ipcRenderer.invoke(IPC.deleteBinding, request),
 
   persistTheme: (theme: 'light' | 'dark') => ipcRenderer.invoke(IPC.persistTheme, theme),
 

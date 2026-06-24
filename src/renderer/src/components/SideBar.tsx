@@ -465,9 +465,7 @@ function TreeGroup({
         tabIndex={rowFocus.tabIndex}
         onFocus={rowFocus.onFocus}
         onClick={onToggle}
-        onContextMenu={
-          group === 'queues' ? (e) => openMenu(e, buildGroupMenu(connectionId, 'queues')) : undefined
-        }
+        onContextMenu={(e) => openMenu(e, buildGroupMenu(connectionId, group))}
       >
         <span className={`tree-row__twisty ${collapsed ? '' : 'is-open'}`}>
           <span className="codicon codicon-chevron-right" />

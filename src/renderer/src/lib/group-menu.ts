@@ -2,14 +2,30 @@ import { useAppStore } from '../store/app-store'
 import type { MenuItem } from '../components/ContextMenu'
 
 /**
- * Context menu for a tree group header (currently the "Queues" group): bulk
- * open/close of that connection's queue tabs. Reads live actions from the store
- * at open-time, like the queue/exchange menu builders.
+ * Context menu for a tree group header (the "Queues" / "Exchanges" groups):
+ * create within the group, plus bulk open/close of queue tabs. Reads live
+ * actions from the store at open-time, like the queue/exchange menu builders.
  */
-export function buildGroupMenu(connectionId: string, group: 'queues'): MenuItem[] {
-  const { openAllQueueTabs, closeAllQueueTabs, openCreateQueueDialog, queuesByConn, tabs } =
-    useAppStore.getState()
-  if (group !== 'queues') return []
+export function buildGroupMenu(connectionId: string, group: 'queues' | 'exchanges'): MenuItem[] {
+  const {
+    openAllQueueTabs,
+    closeAllQueueTabs,
+    openCreateQueueDialog,
+    openCreateExchangeDialog,
+    queuesByConn,
+    tabs
+  } = useAppStore.getState()
+
+  if (group === 'exchanges') {
+    return [
+      {
+        label: 'Create Exchange…',
+        icon: 'add',
+        onClick: () => openCreateExchangeDialog(connectionId)
+      }
+    ]
+  }
+
   const queueCount = (queuesByConn[connectionId] ?? []).length
   const openCount = tabs.filter((t) => t.kind === 'queue' && t.connectionId === connectionId).length
   return [

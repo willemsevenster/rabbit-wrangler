@@ -6,9 +6,19 @@ Exchanges are the routers of RabbitMQ: messages are published to an exchange, wh
 
 Exchanges appear under their own **Exchanges** group in the sidebar tree, separate from queues. Click an exchange to open it.
 
+## Creating an exchange
+
+Right-click the **Exchanges** group and choose **Create Exchange…**. Enter a **name**, pick a **type** (direct / fanout / topic / headers), choose **Durable** (recommended), **Auto-delete**, and **Internal** as needed, and optionally add **Arguments** (for example `alternate-exchange`). The new exchange opens in its own tab, ready to bind.
+
 ## Bindings and the routing diagram
 
-Opening an exchange shows its **bindings**, which are **read-only** here — Rabbit Wrangler displays them for inspection but doesn't edit them. Alongside the binding list is a **diagram** showing where the exchange routes: from the exchange to its destination queues and exchanges. It's a quick way to understand the flow without reading binding tables line by line.
+Opening an exchange shows its **bindings**. Alongside the binding list is a **diagram** showing where the exchange routes: from the exchange to its destination queues and exchanges — a quick way to understand the flow without reading binding tables line by line.
+
+### Adding and removing bindings
+
+Click **Add Binding** above the binding list to route the exchange to a **queue** or **another exchange**: pick the destination type, choose the destination, and set a **routing key** (optional for fanout / headers exchanges). For a **headers** exchange, add the match criteria under **Arguments** (`x-match` = `all` or `any`, plus the header names/values). Remove a binding with the trash button on its row. The list and diagram update immediately.
+
+The **default exchange** can't have bindings added or removed — it binds every queue implicitly by name.
 
 ## Publishing a test message
 

@@ -6,7 +6,10 @@ import type {
   BindingInfo,
   ConnectionConfig,
   ConnectionStatus,
+  CreateBindingRequest,
+  CreateExchangeRequest,
   CreateQueueRequest,
+  DeleteBindingRequest,
   DeleteMessageRequest,
   DeleteQueueRequest,
   ExchangeInfo,
@@ -116,6 +119,10 @@ interface AppState {
   createQueueDialog: { connectionId: string } | null
   /** Target of the open Delete-queue dialog (null = closed). */
   deleteQueueDialog: { connectionId: string; queue: string } | null
+  /** Target of the open Create-exchange dialog (null = closed). */
+  createExchangeDialog: { connectionId: string } | null
+  /** Target of the open Add-binding dialog (null = closed); `source` is the exchange. */
+  bindingDialog: { connectionId: string; source: string } | null
   /** Last-used move destination per source queue (persisted), for default values. */
   lastMoveTargets: Record<string, MoveTarget>
 
@@ -206,6 +213,15 @@ interface AppState {
 
   refreshExchanges(connectionId?: string): Promise<void>
   deleteExchange(name: string, connectionId?: string): Promise<OperationResult>
+  openCreateExchangeDialog(connectionId?: string): void
+  closeCreateExchangeDialog(): void
+  createExchange(req: CreateExchangeRequest): Promise<OperationResult>
+  /** Re-fetch the bindings of an open exchange tab (after add/delete binding). */
+  refreshExchangeBindings(connectionId: string, exchange: string): Promise<void>
+  openBindingDialog(source: string, connectionId?: string): void
+  closeBindingDialog(): void
+  createBinding(req: CreateBindingRequest): Promise<OperationResult>
+  deleteBinding(req: DeleteBindingRequest): Promise<OperationResult>
   toggleQueuesCollapsed(): void
   toggleExchangesCollapsed(): void
   openPublishDialog(exchange: string, connectionId?: string): void
@@ -379,6 +395,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   publishDialog: null,
   createQueueDialog: null,
   deleteQueueDialog: null,
+  createExchangeDialog: null,
+  bindingDialog: null,
   lastMoveTargets: loadMoveTargets(),
   sidebarWidth: initialSidebarWidth,
   sidebarVisible: true,
@@ -845,6 +863,65 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (result.ok) {
       get().closeTab(exchangeTabId(cid, name))
       await get().refreshExchanges(cid)
+    }
+    return result
+  },
+
+  openCreateExchangeDialog(connectionId) {
+    const cid = connectionId ?? get().selectedConnectionId
+    if (!cid) return
+    set({ createExchangeDialog: { connectionId: cid } })
+  },
+
+  closeCreateExchangeDialog() {
+    set({ createExchangeDialog: null })
+  },
+
+  async createExchange(req) {
+    const result = await window.api.createExchange(req)
+    if (result.ok) {
+      set({ createExchangeDialog: null })
+      await get().refreshExchanges(req.connectionId)
+    }
+    return result
+  },
+
+  async refreshExchangeBindings(connectionId, exchange) {
+    const id = exchangeTabId(connectionId, exchange)
+    if (!get().tabs.some((t) => t.id === id)) return
+    try {
+      const bindings = await window.api.listExchangeBindings(connectionId, exchange)
+      set({
+        tabs: get().tabs.map((t) => (t.id === id && t.kind === 'exchange' ? { ...t, bindings } : t))
+      })
+    } catch {
+      // leave bindings as-is
+    }
+  },
+
+  openBindingDialog(source, connectionId) {
+    const cid = connectionId ?? get().selectedConnectionId
+    if (!cid) return
+    set({ bindingDialog: { connectionId: cid, source } })
+  },
+
+  closeBindingDialog() {
+    set({ bindingDialog: null })
+  },
+
+  async createBinding(req) {
+    const result = await window.api.createBinding(req)
+    if (result.ok) {
+      set({ bindingDialog: null })
+      await get().refreshExchangeBindings(req.connectionId, req.source)
+    }
+    return result
+  },
+
+  async deleteBinding(req) {
+    const result = await window.api.deleteBinding(req)
+    if (result.ok) {
+      await get().refreshExchangeBindings(req.connectionId, req.source)
     }
     return result
   },

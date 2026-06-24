@@ -13,7 +13,10 @@
 import type {
   BindingInfo,
   ConnectionConfig,
+  CreateBindingRequest,
+  CreateExchangeRequest,
   CreateQueueRequest,
+  DeleteBindingRequest,
   DeleteMessageRequest,
   DeleteQueueRequest,
   ExchangeInfo,
@@ -47,8 +50,11 @@ export const IPC = {
   // exchange inspection / management (RabbitMQ management HTTP API)
   listExchanges: 'exchanges:list',
   listExchangeBindings: 'exchanges:bindings',
+  createExchange: 'exchanges:create',
   deleteExchange: 'exchanges:delete',
   publishMessage: 'exchanges:publish',
+  createBinding: 'bindings:create',
+  deleteBinding: 'bindings:delete',
 
   // message-level operations (AMQP)
   startPeek: 'peek:start',
@@ -94,8 +100,14 @@ export interface RabbitApi {
 
   listExchanges(connectionId: string): Promise<ExchangeInfo[]>
   listExchangeBindings(connectionId: string, exchange: string): Promise<BindingInfo[]>
+  /** Declare an exchange (create, or idempotently re-assert an identical one). */
+  createExchange(request: CreateExchangeRequest): Promise<OperationResult>
   deleteExchange(connectionId: string, exchange: string): Promise<OperationResult>
   publishMessage(request: PublishMessageRequest): Promise<OperationResult>
+  /** Bind a source exchange to a queue or another exchange. */
+  createBinding(request: CreateBindingRequest): Promise<OperationResult>
+  /** Remove a specific binding (by its properties key). */
+  deleteBinding(request: DeleteBindingRequest): Promise<OperationResult>
 
   /** Begin streaming live (NACK-and-requeue) peeks of `queue` over the event socket. */
   startPeek(connectionId: string, queue: string): Promise<void>

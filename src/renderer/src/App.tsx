@@ -10,6 +10,8 @@ import { MoveMessagesDialog } from './components/MoveMessagesDialog'
 import { PublishMessageDialog } from './components/PublishMessageDialog'
 import { CreateQueueDialog } from './components/CreateQueueDialog'
 import { DeleteQueueDialog } from './components/DeleteQueueDialog'
+import { CreateExchangeDialog } from './components/CreateExchangeDialog'
+import { AddBindingDialog } from './components/AddBindingDialog'
 import { MenuBar } from './components/MenuBar'
 import { Resizer } from './components/Resizer'
 import { UpdateButton } from './components/UpdateButton'
@@ -29,6 +31,8 @@ function App() {
   const publishDialog = useAppStore((s) => s.publishDialog)
   const createQueueDialog = useAppStore((s) => s.createQueueDialog)
   const deleteQueueDialog = useAppStore((s) => s.deleteQueueDialog)
+  const createExchangeDialog = useAppStore((s) => s.createExchangeDialog)
+  const bindingDialog = useAppStore((s) => s.bindingDialog)
   const importDialog = useAppStore((s) => s.importDialog)
   const sidebarWidth = useAppStore((s) => s.sidebarWidth)
   const sidebarVisible = useAppStore((s) => s.sidebarVisible)
@@ -68,6 +72,8 @@ function App() {
       {publishDialog && <PublishMessageDialog />}
       {createQueueDialog && <CreateQueueDialog />}
       {deleteQueueDialog && <DeleteQueueDialog />}
+      {createExchangeDialog && <CreateExchangeDialog />}
+      {bindingDialog && <AddBindingDialog />}
       <ConfirmDialog />
       <AboutDialog />
       <SettingsDialog />

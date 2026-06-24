@@ -7,7 +7,10 @@ import type {
   BindingInfo,
   ConnectionConfig,
   ConnectionState,
+  CreateBindingRequest,
+  CreateExchangeRequest,
   CreateQueueRequest,
+  DeleteBindingRequest,
   DeleteMessageRequest,
   DeleteQueueRequest,
   ExchangeInfo,
@@ -118,8 +121,20 @@ export class ClusterConnection {
     return this.api.listExchangeBindings(exchange)
   }
 
+  async createExchange(req: CreateExchangeRequest): Promise<OperationResult> {
+    return this.api.createExchange(req)
+  }
+
   async deleteExchange(exchange: string): Promise<OperationResult> {
     return this.api.deleteExchange(exchange)
+  }
+
+  async createBinding(req: CreateBindingRequest): Promise<OperationResult> {
+    return this.api.createBinding(req)
+  }
+
+  async deleteBinding(req: DeleteBindingRequest): Promise<OperationResult> {
+    return this.api.deleteBinding(req)
   }
 
   async publishMessage(req: PublishMessageRequest): Promise<OperationResult> {

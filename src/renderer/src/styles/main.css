@@ -1790,6 +1790,20 @@ body.resizing .msg-detail__resizer {
   margin: 0 0 8px;
 }
 
+/* Section header with a trailing action button (e.g. Bindings + Add Binding). */
+.section-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+/* Inline radio group (e.g. binding destination type). */
+.radio-row {
+  display: flex;
+  gap: 20px;
+}
+
 .field textarea {
   width: 100%;
   padding: 6px 8px;
