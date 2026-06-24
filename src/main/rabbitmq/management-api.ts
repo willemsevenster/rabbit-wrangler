@@ -1,5 +1,6 @@
 import type {
   BindingInfo,
+  ClusterOverview,
   ConnectionConfig,
   CreateBindingRequest,
   CreateExchangeRequest,
@@ -7,6 +8,7 @@ import type {
   DeleteBindingRequest,
   DeleteQueueRequest,
   ExchangeInfo,
+  NodeInfo,
   OperationResult,
   PublishMessageRequest,
   QueueInfo
@@ -86,6 +88,46 @@ export class ManagementApi {
   /** Cheap reachability + auth probe used on connect. */
   async ping(): Promise<void> {
     await this.request('/whoami')
+  }
+
+  /** Cluster-wide summary: version, object totals, message rates. */
+  async getOverview(): Promise<ClusterOverview> {
+    const o = await this.request<RawOverview>('/overview')
+    return {
+      rabbitmqVersion: o.rabbitmq_version ?? o.product_version ?? 'unknown',
+      erlangVersion: o.erlang_version,
+      clusterName: o.cluster_name ?? '',
+      totals: {
+        queues: o.object_totals?.queues ?? 0,
+        connections: o.object_totals?.connections ?? 0,
+        channels: o.object_totals?.channels ?? 0,
+        consumers: o.object_totals?.consumers ?? 0,
+        exchanges: o.object_totals?.exchanges ?? 0
+      },
+      rates: {
+        publish: o.message_stats?.publish_details?.rate,
+        deliver: o.message_stats?.deliver_get_details?.rate,
+        ack: o.message_stats?.ack_details?.rate
+      }
+    }
+  }
+
+  /** Per-node health, including memory / disk alarms. */
+  async getNodes(): Promise<NodeInfo[]> {
+    const raw = await this.request<RawNode[]>('/nodes')
+    return raw.map((n) => ({
+      name: n.name,
+      running: n.running ?? false,
+      memUsed: n.mem_used,
+      memLimit: n.mem_limit,
+      memAlarm: n.mem_alarm ?? false,
+      diskFree: n.disk_free,
+      diskFreeLimit: n.disk_free_limit,
+      diskFreeAlarm: n.disk_free_alarm ?? false,
+      fdUsed: n.fd_used,
+      fdTotal: n.fd_total,
+      uptime: n.uptime
+    }))
   }
 
   async listQueues(): Promise<QueueInfo[]> {
@@ -366,6 +408,39 @@ async function describeHttpError(res: Response, method: string, path: string): P
 
 interface RawRate {
   rate?: number
+}
+
+interface RawOverview {
+  rabbitmq_version?: string
+  product_version?: string
+  erlang_version?: string
+  cluster_name?: string
+  object_totals?: {
+    queues?: number
+    connections?: number
+    channels?: number
+    consumers?: number
+    exchanges?: number
+  }
+  message_stats?: {
+    publish_details?: RawRate
+    deliver_get_details?: RawRate
+    ack_details?: RawRate
+  }
+}
+
+interface RawNode {
+  name: string
+  running?: boolean
+  mem_used?: number
+  mem_limit?: number
+  mem_alarm?: boolean
+  disk_free?: number
+  disk_free_limit?: number
+  disk_free_alarm?: boolean
+  fd_used?: number
+  fd_total?: number
+  uptime?: number
 }
 
 interface RawQueue {

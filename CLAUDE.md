@@ -144,6 +144,16 @@ when the management API already exposes it (e.g. purge is an HTTP `DELETE`).
   optional fields (`memory`, `publishRate`/`deliverRate`/`ackRate`/`messageRate`,
   `idleSince`) mapped from the `/queues` payload at **zero extra cost**; DLQ-ness is
   still computed renderer-side (`lib/dlq.ts`).
+- **Cluster overview & node health are main-pushed too** (same poller): each `poll()`
+  also fetches `/overview` + `/nodes` and emits a `cluster-stats` `StreamEvent`
+  (`{ connectionId, overview, nodes }`), folded into `clusterByConn` by the reducer.
+  The connection's **Overview tab** renders a `ClusterOverviewPanel` (version, totals,
+  cluster publish/deliver/ack rates, and per-node memory/disk/fd/uptime with red
+  **alarm badges**); the **status bar** shows the broker version and a high-contrast
+  alarm chip when any node trips a memory/disk alarm (which blocks publishers →
+  `flow`-state queues). `refreshCluster` does a one-off fetch on overview-tab open /
+  Refresh so the panel isn't blank before the first poll. `ManagementApi.getOverview`/
+  `getNodes` map the raw payloads (incl. `mem_alarm`/`disk_free_alarm`).
 - **Move = drain + republish with confirms** (`rabbitmq/operations.ts`, UI via
   the queue context menu → "Move Messages…"): pulls messages one at a time,
   republishes to the target exchange/routing-key on a **confirm channel**, and

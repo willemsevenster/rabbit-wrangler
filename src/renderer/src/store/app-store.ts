@@ -4,6 +4,7 @@ import { DEFAULT_DLQ_SUFFIXES } from '../lib/dlq'
 import type { StreamEvent, UpdateStatusPayload } from '@shared/ipc'
 import type {
   BindingInfo,
+  ClusterOverview,
   ConnectionConfig,
   ConnectionStatus,
   CreateBindingRequest,
@@ -15,6 +16,7 @@ import type {
   ExchangeInfo,
   MoveMessageRequest,
   MoveMessagesRequest,
+  NodeInfo,
   OperationResult,
   PeekedMessage,
   PublishMessageRequest,
@@ -94,6 +96,8 @@ interface AppState {
    * connection's; overview tabs read their own connection's. */
   queuesByConn: Record<string, QueueInfo[]>
   exchangesByConn: Record<string, ExchangeInfo[]>
+  /** Per-connection cluster summary + node health (pushed via cluster-stats). */
+  clusterByConn: Record<string, { overview: ClusterOverview; nodes: NodeInfo[] }>
   /** Tree group collapse state (under the active connection). */
   queuesCollapsed: boolean
   exchangesCollapsed: boolean
@@ -198,6 +202,9 @@ interface AppState {
   selectTabMessage(tabId: string, messageId: string | null): void
 
   refreshQueues(connectionId?: string): Promise<void>
+  /** One-off fetch of cluster overview + nodes (e.g. on overview-tab open), so the
+   * panel is populated before the first cluster-stats poll arrives. */
+  refreshCluster(connectionId: string): Promise<void>
   purgeQueue(queue: string, connectionId?: string): Promise<OperationResult>
   openCreateQueueDialog(connectionId?: string): void
   closeCreateQueueDialog(): void
@@ -384,6 +391,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   connectionCollapsed: false,
   queuesByConn: {},
   exchangesByConn: {},
+  clusterByConn: {},
   queuesCollapsed: false,
   exchangesCollapsed: false,
   tabs: [],
@@ -710,7 +718,10 @@ export const useAppStore = create<AppState>((set, get) => ({
         // leave bindings as-is
       }
     } else {
-      await get().refreshQueues(tab.connectionId)
+      await Promise.all([
+        get().refreshQueues(tab.connectionId),
+        get().refreshCluster(tab.connectionId)
+      ])
     }
   },
 
@@ -730,6 +741,17 @@ export const useAppStore = create<AppState>((set, get) => ({
       set({ queuesByConn: { ...get().queuesByConn, [cid]: applyPurgeGrace(cid, fresh) } })
     } catch {
       set({ queuesByConn: { ...get().queuesByConn, [cid]: [] } })
+    }
+  },
+
+  async refreshCluster(connectionId) {
+    try {
+      const overview = await window.api.getOverview(connectionId)
+      // /nodes needs the monitoring tag — best-effort so the overview still shows.
+      const nodes = await window.api.getNodes(connectionId).catch(() => [])
+      set({ clusterByConn: { ...get().clusterByConn, [connectionId]: { overview, nodes } } })
+    } catch {
+      // Transient; the cluster-stats poll will refill once the broker responds.
     }
   },
 
@@ -1269,6 +1291,17 @@ function applyStreamEvent(
             event.payload.connectionId,
             event.payload.queues
           )
+        }
+      })
+      break
+    case 'cluster-stats':
+      set({
+        clusterByConn: {
+          ...get().clusterByConn,
+          [event.payload.connectionId]: {
+            overview: event.payload.overview,
+            nodes: event.payload.nodes
+          }
         }
       })
       break

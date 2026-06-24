@@ -218,6 +218,48 @@ export interface DeleteBindingRequest {
   propertiesKey: string
 }
 
+/** Cluster-wide summary from the management API `/overview`. */
+export interface ClusterOverview {
+  rabbitmqVersion: string
+  erlangVersion?: string
+  clusterName: string
+  /** Object counts across the cluster. */
+  totals: {
+    queues: number
+    connections: number
+    channels: number
+    consumers: number
+    exchanges: number
+  }
+  /** Cluster-wide message rates, msgs/sec (absent when the broker reports none). */
+  rates: {
+    publish?: number
+    deliver?: number
+    ack?: number
+  }
+}
+
+/** Health of a single broker node, from the management API `/nodes`. */
+export interface NodeInfo {
+  name: string
+  running: boolean
+  /** Memory in bytes used / configured high-watermark (when reported). */
+  memUsed?: number
+  memLimit?: number
+  /** True when the node has tripped its memory high-watermark alarm. */
+  memAlarm: boolean
+  /** Free disk in bytes / the configured low-watermark (when reported). */
+  diskFree?: number
+  diskFreeLimit?: number
+  /** True when the node has tripped its free-disk alarm. */
+  diskFreeAlarm: boolean
+  /** File descriptors used / available (when reported). */
+  fdUsed?: number
+  fdTotal?: number
+  /** Node uptime in milliseconds (when reported). */
+  uptime?: number
+}
+
 export interface PublishMessageRequest {
   connectionId: string
   /** Exchange to publish to; "" is the default exchange. */

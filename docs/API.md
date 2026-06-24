@@ -220,9 +220,11 @@ recovery as the marquee workflow.
 
 ### Tier 2 — situational awareness for operators
 
-5. **Cluster overview & node health** — `GET /overview` + `GET /nodes` to drive a
-   dashboard / richer status bar: version, total rates, and **resource alarms**
-   (memory/disk) that explain a stuck `flow`-state queue.
+5. ✅ **Cluster overview & node health** *(done)* — `GET /overview` + `GET /nodes`,
+   pushed live via the `cluster-stats` event. A connection's Overview tab shows
+   version / totals / cluster rates and per-node memory, disk, fd and uptime, with
+   **resource-alarm** badges (memory/disk); the status bar shows the broker version
+   and a high-contrast alarm chip when a node is blocked.
 6. **Connections & consumers, with kill** — `GET /connections` + `/consumers`
    and `DELETE /connections/{name}` to see who's draining a queue and force-close
    a misbehaving client (a common reason a DLQ won't move).

@@ -5,6 +5,7 @@ import { deleteMessage, moveMessage, moveMessages } from '../rabbitmq/operations
 import { connectAmqp, type AmqpConnection } from '../rabbitmq/amqp'
 import type {
   BindingInfo,
+  ClusterOverview,
   ConnectionConfig,
   ConnectionState,
   CreateBindingRequest,
@@ -16,6 +17,7 @@ import type {
   ExchangeInfo,
   MoveMessageRequest,
   MoveMessagesRequest,
+  NodeInfo,
   OperationResult,
   PublishMessageRequest,
   QueueInfo
@@ -87,6 +89,15 @@ export class ClusterConnection {
           type: 'queue-stats',
           payload: { connectionId: this.config.id, queues }
         })
+        // Cluster summary + node health (incl. resource alarms) on the same cadence.
+        // /nodes needs the monitoring tag — fetch it best-effort so a permission-
+        // limited user still gets the overview (nodes degrade to empty).
+        const overview = await this.getOverview()
+        const nodes = await this.getNodes().catch(() => [])
+        eventBus.emitStream({
+          type: 'cluster-stats',
+          payload: { connectionId: this.config.id, overview, nodes }
+        })
       } catch {
         // Transient management-API hiccup; connection-status reports real failures.
       } finally {
@@ -107,6 +118,14 @@ export class ClusterConnection {
     conn.on('error', (err: Error) => this.setState('error', err.message))
     this.amqp = conn
     return conn
+  }
+
+  async getOverview(): Promise<ClusterOverview> {
+    return this.api.getOverview()
+  }
+
+  async getNodes(): Promise<NodeInfo[]> {
+    return this.api.getNodes()
   }
 
   async listQueues(): Promise<QueueInfo[]> {

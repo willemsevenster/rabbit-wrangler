@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react'
 import { useAppStore, type EditorTab } from '../store/app-store'
 import { QueueTable } from './QueueTable'
+import { ClusterOverviewPanel } from './ClusterOverviewPanel'
 import { MessagePeekPanel } from './MessagePeekPanel'
 import { ExchangeDetail } from './ExchangeDetail'
 import { ContextMenu, useContextMenu, type MenuItem } from './ContextMenu'
@@ -255,12 +256,18 @@ function TabBar() {
 
 function OverviewTab({ tab }: { tab: Extract<EditorTab, { kind: 'overview' }> }) {
   const refreshTab = useAppStore((s) => s.refreshTab)
+  const refreshCluster = useAppStore((s) => s.refreshCluster)
+  // Populate the cluster panel immediately on open; the cluster-stats poll keeps
+  // it live thereafter.
+  useEffect(() => {
+    void refreshCluster(tab.connectionId)
+  }, [refreshCluster, tab.connectionId])
   return (
     <div className="editor">
       <div className="editor__header">
         <h2>
           <span className="codicon codicon-database" />
-          {tab.title} · Queues
+          {tab.title} · Overview
         </h2>
         <span className="spacer" />
         <button className="btn btn--sm btn--secondary" onClick={() => void refreshTab(tab.id)}>
@@ -268,7 +275,8 @@ function OverviewTab({ tab }: { tab: Extract<EditorTab, { kind: 'overview' }> })
           Refresh
         </button>
       </div>
-      <div className="editor__body">
+      <div className="editor__body" style={{ overflow: 'auto' }}>
+        <ClusterOverviewPanel connectionId={tab.connectionId} />
         <QueueTable connectionId={tab.connectionId} />
       </div>
     </div>
