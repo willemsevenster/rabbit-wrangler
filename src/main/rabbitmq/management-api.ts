@@ -93,7 +93,15 @@ export class ManagementApi {
       messages: q.messages ?? 0,
       messagesReady: q.messages_ready ?? 0,
       messagesUnacknowledged: q.messages_unacknowledged ?? 0,
-      consumers: q.consumers ?? 0
+      consumers: q.consumers ?? 0,
+      // Richer signal (present on the standard /queues payload; absent on very old
+      // brokers or queues with no recent activity — left undefined then).
+      memory: q.memory,
+      idleSince: q.idle_since,
+      messageRate: q.messages_details?.rate,
+      publishRate: q.message_stats?.publish_details?.rate,
+      deliverRate: q.message_stats?.deliver_get_details?.rate,
+      ackRate: q.message_stats?.ack_details?.rate
     }))
   }
 
@@ -251,6 +259,10 @@ async function describeHttpError(res: Response, method: string, path: string): P
   return reason ? `${base} (${reason.trim()})` : base
 }
 
+interface RawRate {
+  rate?: number
+}
+
 interface RawQueue {
   name: string
   vhost: string
@@ -260,6 +272,14 @@ interface RawQueue {
   messages_ready?: number
   messages_unacknowledged?: number
   consumers?: number
+  memory?: number
+  idle_since?: string
+  messages_details?: RawRate
+  message_stats?: {
+    publish_details?: RawRate
+    deliver_get_details?: RawRate
+    ack_details?: RawRate
+  }
 }
 
 interface RawExchange {

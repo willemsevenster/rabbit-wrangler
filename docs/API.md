@@ -209,12 +209,12 @@ recovery as the marquee workflow.
    `PUT /exchanges/...`. The bindings view is read-only "for now"; making it
    read-write (plus declare-exchange) is the obvious next step, and the diagram
    already visualizes the result.
-3. **Richer queue detail** — surface the full `GET /queues/{vhost}/{name}`
-   payload already fetched during purge: message rates, memory, consumer list,
-   `message_stats`, and consumer utilisation. Cheap win, high signal.
-4. **Live queue stats** — wire the already-defined `queue-stats` StreamEvent to a
-   periodic `listQueues` poll (or `/overview` deltas) so the tree depths update
-   without a manual refresh.
+3. ✅ **Richer queue detail** *(done)* — `QueueInfo` now carries memory, message /
+   publish / deliver / ack rates and idle-since, surfaced in a queue-tab stats
+   strip and extra overview-table columns.
+4. ✅ **Live queue stats** *(done)* — each connected cluster polls `listQueues` in
+   the main process and pushes the `queue-stats` StreamEvent, so the tree, overview
+   and queue tabs update for **every** connection without a manual refresh.
 
 ### Tier 2 — situational awareness for operators
 

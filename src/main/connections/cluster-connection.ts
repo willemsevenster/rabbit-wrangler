@@ -22,11 +22,15 @@ import type {
  * opened AMQP connection (only needed for peek/move). Tracks and broadcasts its
  * own connection state.
  */
+/** How often connected clusters re-poll queue stats and push them to the UI. */
+const STATS_POLL_INTERVAL_MS = 4000
+
 export class ClusterConnection {
   readonly api: ManagementApi
   private amqp: AmqpConnection | null = null
   private state: ConnectionState = 'disconnected'
   private readonly peekers = new Map<string, MessagePeeker>()
+  private statsTimer: ReturnType<typeof setInterval> | null = null
 
   constructor(private readonly config: ConnectionConfig) {
     this.api = new ManagementApi(config)
@@ -54,10 +58,38 @@ export class ClusterConnection {
     try {
       await this.api.ping()
       this.setState('connected')
+      this.startStatsPolling()
     } catch (err) {
       this.setState('error', err instanceof Error ? err.message : String(err))
       throw err
     }
+  }
+
+  /** Periodically push fresh queue stats for THIS cluster to the renderer, so the
+   * tree/overview/queue-tab update without a manual refresh — for every connected
+   * cluster, not just the selected one. Scoped to the connection's lifetime. */
+  private startStatsPolling(): void {
+    if (this.statsTimer) return
+    let inFlight = false
+    const poll = async (): Promise<void> => {
+      // Skip if the previous poll is still running (slow broker/network), so polls
+      // never pile up or emit out of order.
+      if (inFlight) return
+      inFlight = true
+      try {
+        const queues = await this.listQueues()
+        eventBus.emitStream({
+          type: 'queue-stats',
+          payload: { connectionId: this.config.id, queues }
+        })
+      } catch {
+        // Transient management-API hiccup; connection-status reports real failures.
+      } finally {
+        inFlight = false
+      }
+    }
+    void poll() // push once immediately so the UI updates without waiting an interval
+    this.statsTimer = setInterval(() => void poll(), STATS_POLL_INTERVAL_MS)
   }
 
   /** Opens (or reuses) the AMQP connection used for message operations. */
@@ -133,6 +165,10 @@ export class ClusterConnection {
   }
 
   async dispose(): Promise<void> {
+    if (this.statsTimer) {
+      clearInterval(this.statsTimer)
+      this.statsTimer = null
+    }
     await Promise.all([...this.peekers.values()].map((p) => p.stop()))
     this.peekers.clear()
     if (this.amqp) {

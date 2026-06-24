@@ -5,6 +5,7 @@ import { MessagePeekPanel } from './MessagePeekPanel'
 import { ExchangeDetail } from './ExchangeDetail'
 import { ContextMenu, useContextMenu, type MenuItem } from './ContextMenu'
 import { openManual } from '../lib/help'
+import { formatBytes, formatRate } from '../lib/message-format'
 
 const TAB_ICON: Record<EditorTab['kind'], string> = {
   overview: 'codicon-database',
@@ -280,6 +281,10 @@ function QueueTab({ tab }: { tab: Extract<EditorTab, { kind: 'queue' }> }) {
   const openMoveDialog = useAppStore((s) => s.openMoveDialog)
   const maybeConfirm = useAppStore((s) => s.maybeConfirm)
   const addToast = useAppStore((s) => s.addToast)
+  // Live broker stats for this queue (pushed via queue-stats; updates on its own).
+  const info = useAppStore((s) =>
+    s.queuesByConn[tab.connectionId]?.find((q) => q.name === tab.queue)
+  )
 
   async function purge() {
     const ok = await maybeConfirm({
@@ -329,6 +334,31 @@ function QueueTab({ tab }: { tab: Extract<EditorTab, { kind: 'queue' }> }) {
           <span className="codicon codicon-question" />
         </button>
       </div>
+      {info && (
+        <div className="queue-stats">
+          <span>
+            <b>{info.messagesReady}</b> ready
+          </span>
+          <span>
+            <b>{info.messagesUnacknowledged}</b> unacked
+          </span>
+          <span>
+            <b>{info.messages}</b> total
+          </span>
+          <span>
+            <b>{info.consumers}</b> consumer{info.consumers === 1 ? '' : 's'}
+          </span>
+          {info.publishRate != null && <span>pub {formatRate(info.publishRate)}</span>}
+          {info.deliverRate != null && <span>deliver {formatRate(info.deliverRate)}</span>}
+          {info.ackRate != null && <span>ack {formatRate(info.ackRate)}</span>}
+          {info.memory != null && <span>{formatBytes(info.memory)} mem</span>}
+          {info.idleSince && (
+            <span className="queue-stats__idle">
+              idle since {new Date(info.idleSince).toLocaleTimeString()}
+            </span>
+          )}
+        </div>
+      )}
       <div className="editor__body" style={{ display: 'flex', flexDirection: 'column' }}>
         <MessagePeekPanel tab={tab} />
       </div>
