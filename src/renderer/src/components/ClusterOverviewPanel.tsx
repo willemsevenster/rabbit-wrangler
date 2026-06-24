@@ -129,8 +129,8 @@ export function ClusterOverviewPanel({ connectionId }: { connectionId: string })
         </div>
       ) : (
         <div className="cluster-panel__note">
-          Node health (memory / disk alarms) needs a broker user with the{' '}
-          <strong>monitoring</strong> tag.
+          Node health (memory / disk alarms) is unavailable — most often the broker user lacks the{' '}
+          <strong>monitoring</strong> tag, or the broker didn’t return node data.
         </div>
       )}
     </div>
