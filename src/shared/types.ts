@@ -67,6 +67,18 @@ export interface QueueInfo {
   messagesReady: number
   messagesUnacknowledged: number
   consumers: number
+  /** Queue memory footprint on the broker, in bytes (when reported). */
+  memory?: number
+  /** Net rate of queue-depth change, msgs/sec (message_stats sampling window). */
+  messageRate?: number
+  /** Messages published into the queue, msgs/sec. */
+  publishRate?: number
+  /** Messages delivered to consumers (deliver + get), msgs/sec. */
+  deliverRate?: number
+  /** Messages acknowledged, msgs/sec. */
+  ackRate?: number
+  /** ISO timestamp of the queue's last activity, when idle. */
+  idleSince?: string
 }
 
 /** A single message captured while peeking a queue. */

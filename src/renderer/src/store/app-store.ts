@@ -257,6 +257,22 @@ let confirmResolver: ((ok: boolean) => void) | null = null
 const purgedAt = new Map<string, number>()
 const PURGE_GRACE_MS = 6000
 
+/** Zero a just-purged queue's counts until the broker's ~5s-lagged stats catch up,
+ * so a refresh or pushed `queue-stats` event doesn't briefly re-show the pre-purge
+ * count. Shared by `refreshQueues` and the `queue-stats` reducer. */
+function applyPurgeGrace(cid: string, queues: QueueInfo[]): QueueInfo[] {
+  const now = Date.now()
+  return queues.map((q) => {
+    const key = `${cid}:${q.name}`
+    const t = purgedAt.get(key)
+    if (t && now - t < PURGE_GRACE_MS) {
+      return { ...q, messages: 0, messagesReady: 0, messagesUnacknowledged: 0 }
+    }
+    if (t) purgedAt.delete(key)
+    return q
+  })
+}
+
 const SIDEBAR_MIN = 180
 const SIDEBAR_MAX = 600
 const clampWidth = (w: number): number =>
@@ -389,11 +405,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (get().autoConnectOnLaunch) {
       for (const c of get().connections) void get().connectConnection(c.id)
     }
-    // Keep queue counts fresh: RabbitMQ stats sample ~5s, and peeking shifts
-    // messages between ready/unacked, so a one-time snapshot goes stale fast.
-    setInterval(() => {
-      if (get().selectedConnectionId) void get().refreshQueues()
-    }, 4000)
+    // Live queue stats are pushed by the main process for every connected cluster
+    // (the `queue-stats` event, folded in by applyStreamEvent) — no renderer poll.
   },
 
   async refreshConnections() {
@@ -682,17 +695,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (!cid) return
     try {
       const fresh = await window.api.listQueues(cid)
-      const now = Date.now()
-      const adjusted = fresh.map((q) => {
-        const key = `${cid}:${q.name}`
-        const t = purgedAt.get(key)
-        if (t && now - t < PURGE_GRACE_MS) {
-          return { ...q, messages: 0, messagesReady: 0, messagesUnacknowledged: 0 }
-        }
-        if (t) purgedAt.delete(key)
-        return q
-      })
-      set({ queuesByConn: { ...get().queuesByConn, [cid]: adjusted } })
+      set({ queuesByConn: { ...get().queuesByConn, [cid]: applyPurgeGrace(cid, fresh) } })
     } catch {
       set({ queuesByConn: { ...get().queuesByConn, [cid]: [] } })
     }
@@ -1129,7 +1132,13 @@ function applyStreamEvent(
     }
     case 'queue-stats':
       set({
-        queuesByConn: { ...get().queuesByConn, [event.payload.connectionId]: event.payload.queues }
+        queuesByConn: {
+          ...get().queuesByConn,
+          [event.payload.connectionId]: applyPurgeGrace(
+            event.payload.connectionId,
+            event.payload.queues
+          )
+        }
       })
       break
     case 'update-status': {

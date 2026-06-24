@@ -133,6 +133,17 @@ when the management API already exposes it (e.g. purge is an HTTP `DELETE`).
   formatting helpers in `lib/message-format.ts`) with working Move/Delete. Mounted
   before the move/confirm dialogs in `App.tsx` so those stack on top when launched
   from a search result.
+- **Live queue stats are main-pushed** (`ClusterConnection.startStatsPolling`): each
+  connected cluster polls `listQueues` every ~4s in the **main** process and emits
+  the `queue-stats` `StreamEvent` (started on `connect()`, cleared in `dispose()`).
+  The renderer **no longer polls on a timer** — `applyStreamEvent` folds each event
+  into `queuesByConn`, so the tree, overview table and queue-tab stats strip update
+  for **every** connected connection (not just the selected one). The purge-grace
+  (`applyPurgeGrace`, shared with `refreshQueues`) is applied in the reducer so a
+  just-purged queue isn't re-shown at its old count. `QueueInfo` carries richer
+  optional fields (`memory`, `publishRate`/`deliverRate`/`ackRate`/`messageRate`,
+  `idleSince`) mapped from the `/queues` payload at **zero extra cost**; DLQ-ness is
+  still computed renderer-side (`lib/dlq.ts`).
 - **Move = drain + republish with confirms** (`rabbitmq/operations.ts`, UI via
   the queue context menu → "Move Messages…"): pulls messages one at a time,
   republishes to the target exchange/routing-key on a **confirm channel**, and

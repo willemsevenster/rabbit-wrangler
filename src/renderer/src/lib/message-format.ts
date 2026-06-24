@@ -23,6 +23,12 @@ export function formatBytes(n: number): string {
   return `${(n / (1024 * 1024)).toFixed(1)} MB`
 }
 
+/** Format a msgs/sec rate compactly: `12/s`, `12.3/s`, `—` when absent. */
+export function formatRate(n: number | undefined | null): string {
+  if (n == null) return '—'
+  return `${Math.round(n * 10) / 10}/s`
+}
+
 export function byteSize(m: PeekedMessage): number {
   if (m.isBinary) {
     try {

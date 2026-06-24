@@ -2,6 +2,13 @@ import { useAppStore } from '../store/app-store'
 import { ContextMenu, useContextMenu } from './ContextMenu'
 import { buildQueueMenu } from '../lib/queue-menu'
 import { isDeadLetterQueue } from '../lib/dlq'
+import { formatBytes, formatRate } from '../lib/message-format'
+
+/** Net queue-depth rate, signed (`+12/s` incoming, `-3/s` draining). */
+function depthRate(n: number | undefined): string {
+  if (n == null) return '—'
+  return (n > 0 ? '+' : '') + formatRate(n)
+}
 
 /** Queue overview for a connection, shown inside its overview tab. */
 export function QueueTable({ connectionId }: { connectionId: string }) {
@@ -19,6 +26,8 @@ export function QueueTable({ connectionId }: { connectionId: string }) {
             <th className="num">Ready</th>
             <th className="num">Unacked</th>
             <th className="num">Consumers</th>
+            <th className="num">Rate</th>
+            <th className="num">Memory</th>
             <th>State</th>
           </tr>
         </thead>
@@ -47,13 +56,15 @@ export function QueueTable({ connectionId }: { connectionId: string }) {
               <td className="num">{q.messagesReady}</td>
               <td className="num">{q.messagesUnacknowledged}</td>
               <td className="num">{q.consumers}</td>
+              <td className="num">{depthRate(q.messageRate)}</td>
+              <td className="num">{q.memory != null ? formatBytes(q.memory) : '—'}</td>
               <td>{q.state}</td>
             </tr>
             )
           })}
           {queues.length === 0 && (
             <tr>
-              <td colSpan={5} style={{ color: 'var(--text-muted)', padding: 12 }}>
+              <td colSpan={7} style={{ color: 'var(--text-muted)', padding: 12 }}>
                 No queues on this virtual host.
               </td>
             </tr>
