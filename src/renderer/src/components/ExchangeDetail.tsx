@@ -34,6 +34,9 @@ export function ExchangeDetail({ tab }: { tab: ExchangeTab }) {
   }
 
   async function onDeleteBinding(b: (typeof bindings)[number]): Promise<void> {
+    // A binding is addressed by its properties key, not its routing key — without
+    // it we can't form a valid (or safe) DELETE, so the row's button is disabled.
+    if (!b.propertiesKey) return
     const ok = await maybeConfirm({
       title: 'Remove binding',
       message: `Remove the binding to ${b.destinationType} "${b.destination}"${
@@ -48,7 +51,7 @@ export function ExchangeDetail({ tab }: { tab: ExchangeTab }) {
       source: exchangeName,
       destination: b.destination,
       destinationType: b.destinationType,
-      propertiesKey: b.propertiesKey ?? b.routingKey
+      propertiesKey: b.propertiesKey
     })
     if (!result.ok) addToast('error', `Remove failed: ${result.error ?? 'unknown error'}`)
   }
@@ -127,7 +130,12 @@ export function ExchangeDetail({ tab }: { tab: ExchangeTab }) {
                   <td>
                     <button
                       className="icon-button"
-                      title="Remove binding"
+                      title={
+                        b.propertiesKey
+                          ? 'Remove binding'
+                          : 'This binding cannot be removed (no properties key reported)'
+                      }
+                      disabled={!b.propertiesKey}
                       onClick={() => void onDeleteBinding(b)}
                     >
                       <span className="codicon codicon-trash" />

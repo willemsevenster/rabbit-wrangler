@@ -179,7 +179,8 @@ export interface BindingInfo {
   destinationType: 'queue' | 'exchange'
   routingKey: string
   arguments: Record<string, unknown>
-  /** RabbitMQ's per-binding key — required to address this binding for deletion. */
+  /** RabbitMQ's per-binding key from the bindings listing; needed to delete this
+   * binding. Absent only when the broker omits it (then deletion isn't offered). */
   propertiesKey?: string
 }
 

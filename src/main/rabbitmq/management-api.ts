@@ -219,15 +219,19 @@ export class ManagementApi {
     }
   }
 
-  /** Path segment for a binding destination — `q` for queues, `e` for exchanges. */
+  /** Path segment for a binding destination — `q` for queues, `e` for exchanges.
+   * Exchange destinations go through exchangeSegment so the default exchange ("")
+   * is addressed as amq.default, consistent with the other exchange endpoints. */
   private bindingDestSegment(type: 'queue' | 'exchange', destination: string): string {
-    return `${type === 'exchange' ? 'e' : 'q'}/${encodeURIComponent(destination)}`
+    return type === 'exchange'
+      ? `e/${this.exchangeSegment(destination)}`
+      : `q/${encodeURIComponent(destination)}`
   }
 
   async createBinding(req: CreateBindingRequest): Promise<OperationResult> {
     try {
       await this.request<void>(
-        `/bindings/${this.vhostSegment()}/e/${encodeURIComponent(req.source)}/${this.bindingDestSegment(req.destinationType, req.destination)}`,
+        `/bindings/${this.vhostSegment()}/e/${this.exchangeSegment(req.source)}/${this.bindingDestSegment(req.destinationType, req.destination)}`,
         {
           method: 'POST',
           body: JSON.stringify({ routing_key: req.routingKey, arguments: req.arguments ?? {} })
@@ -242,7 +246,7 @@ export class ManagementApi {
   async deleteBinding(req: DeleteBindingRequest): Promise<OperationResult> {
     try {
       await this.request<void>(
-        `/bindings/${this.vhostSegment()}/e/${encodeURIComponent(req.source)}/${this.bindingDestSegment(req.destinationType, req.destination)}/${encodeURIComponent(req.propertiesKey)}`,
+        `/bindings/${this.vhostSegment()}/e/${this.exchangeSegment(req.source)}/${this.bindingDestSegment(req.destinationType, req.destination)}/${encodeURIComponent(req.propertiesKey)}`,
         { method: 'DELETE' }
       )
       return { ok: true, affected: 1 }
