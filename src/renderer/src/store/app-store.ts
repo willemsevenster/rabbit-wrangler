@@ -955,23 +955,22 @@ export const useAppStore = create<AppState>((set, get) => ({
   async exportMessages(queue, connectionId) {
     const cid = connectionId ?? get().selectedConnectionId
     if (!cid) return
-    // Export stops the peeker (main side) to read held messages; resume after if
-    // the queue's tab is still open, so the live feed continues.
-    const tabOpen = get().tabs.some((t) => t.id === queueTabId(cid, queue))
+    // Export stops the peeker (main side) to read held messages.
     const result = await window.api.exportMessages({ connectionId: cid, queue })
-    if (result.canceled) {
-      if (tabOpen) void window.api.startPeek(cid, queue)
-      return
-    }
     if (result.ok) {
       get().addToast(
         'success',
         `Exported ${result.count ?? 0} message${result.count === 1 ? '' : 's'} from "${queue}" to ${result.path}`
       )
-    } else {
+    } else if (!result.canceled) {
       get().addToast('error', `Export failed: ${result.error ?? 'unknown error'}`)
     }
-    if (tabOpen) void window.api.startPeek(cid, queue)
+    // Resume the live peek only if the queue's tab is still open *now* — it may
+    // have been closed during the export (its peeker shutdown is driven by tab
+    // close), so a stale "was open" flag would orphan a peeker with no tab.
+    if (get().tabs.some((t) => t.id === queueTabId(cid, queue))) {
+      void window.api.startPeek(cid, queue)
+    }
   },
 
   async refreshExchanges(connectionId) {

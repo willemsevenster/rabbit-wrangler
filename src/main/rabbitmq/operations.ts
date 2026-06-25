@@ -199,7 +199,8 @@ export async function exportMessages(
   const channel = await conn.createChannel()
   const held: GetMsg[] = []
   const out: ExportedMessage[] = []
-  const limit = req.limit && req.limit > 0 ? req.limit : Infinity
+  // undefined = export all; 0 = export none; negatives clamp to 0.
+  const limit = req.limit === undefined ? Infinity : Math.max(0, req.limit)
   try {
     while (out.length < limit) {
       const msg = await channel.get(req.queue, { noAck: false })

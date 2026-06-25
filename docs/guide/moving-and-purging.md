@@ -40,7 +40,7 @@ Before a destructive move or purge, you can snapshot a queue's messages to disk.
 
 Each record carries the exchange, routing key, redelivered flag, properties, headers, and the payload (UTF-8, or base64 with `payloadEncoding: "base64"` for binary).
 
-The export is **non-destructive**: messages are read with the same hold-and-requeue technique as peeking, so the queue is left exactly as it was. As with peek and move, only the queue's **ready** messages are captured (in-flight/unacked messages held by other consumers are not).
+The export is **non-destructive**: messages are read and **requeued** (the same hold-and-requeue technique as peeking) rather than consumed, so none are removed. Note that — like peeking — requeueing marks the messages **redelivered** and can change their order; nothing is lost, but the broker state isn't byte-for-byte preserved. As with peek and move, only the queue's **ready** messages are captured (in-flight/unacked messages held by other consumers are not).
 
 ::: tip
 Use this as an audit trail or a safety net — export a dead-letter queue right before you redrive or purge it.
