@@ -166,6 +166,41 @@ export interface HealthResult {
   error?: string
 }
 
+/** A live client connection to the broker (management API `/connections`). */
+export interface ClientConnectionInfo {
+  /** Unique connection name, e.g. "10.0.0.4:51234 -> 10.0.0.1:5672". Used to close it. */
+  name: string
+  user: string
+  vhost: string
+  /** Remote peer host:port. */
+  peer: string
+  /** amqp 0-9-1 | amqp 1.0 | ... */
+  protocol: string
+  /** Open channel count on this connection. */
+  channels: number
+  /** "running" | "blocked" | "blocking" | ... */
+  state: string
+  tls: boolean
+  /** Epoch millis the connection was established (when reported). */
+  connectedAt?: number
+  /** Client-reported name/product, when advertised (connection_name / product). */
+  clientName?: string
+}
+
+/** A consumer subscribed to a queue (management API `/consumers`). */
+export interface ConsumerInfo {
+  queue: string
+  consumerTag: string
+  /** Connection the consuming channel belongs to (for cross-referencing / closing). */
+  connectionName?: string
+  /** True when the consumer requires acks (manual ack mode). */
+  ackRequired: boolean
+  prefetchCount: number
+  /** False when the broker has paused delivery to this consumer (e.g. SAC standby). */
+  active: boolean
+  exclusive: boolean
+}
+
 /** Subset of the management API exchange payload the UI renders. */
 export interface ExchangeInfo {
   /** Empty string for the AMQP default exchange. */

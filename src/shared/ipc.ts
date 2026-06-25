@@ -12,8 +12,10 @@
  */
 import type {
   BindingInfo,
+  ClientConnectionInfo,
   ClusterOverview,
   ConnectionConfig,
+  ConsumerInfo,
   CreateBindingRequest,
   CreateExchangeRequest,
   CreateQueueRequest,
@@ -48,6 +50,11 @@ export const IPC = {
   getOverview: 'cluster:overview',
   getNodes: 'cluster:nodes',
   checkHealth: 'cluster:health',
+
+  // client connections & consumers (RabbitMQ management HTTP API)
+  listClientConnections: 'broker:connections',
+  listConsumers: 'broker:consumers',
+  closeClientConnection: 'broker:close-connection',
 
   // queue inspection / management (RabbitMQ management HTTP API)
   listQueues: 'queues:list',
@@ -105,6 +112,17 @@ export interface RabbitApi {
   getNodes(connectionId: string): Promise<NodeInfo[]>
   /** Deep health probe: round-trips a test message on the vhost (/aliveness-test). */
   checkHealth(connectionId: string): Promise<HealthResult>
+
+  /** Live client connections to the broker. */
+  listClientConnections(connectionId: string): Promise<ClientConnectionInfo[]>
+  /** Consumers on the configured vhost. */
+  listConsumers(connectionId: string): Promise<ConsumerInfo[]>
+  /** Force-close a client connection by name (DELETE /connections/{name}). */
+  closeClientConnection(
+    connectionId: string,
+    name: string,
+    reason?: string
+  ): Promise<OperationResult>
 
   listQueues(connectionId: string): Promise<QueueInfo[]>
   purgeQueue(connectionId: string, queue: string): Promise<OperationResult>

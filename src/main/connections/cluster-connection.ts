@@ -5,9 +5,11 @@ import { deleteMessage, moveMessage, moveMessages } from '../rabbitmq/operations
 import { connectAmqp, type AmqpConnection } from '../rabbitmq/amqp'
 import type {
   BindingInfo,
+  ClientConnectionInfo,
   ClusterOverview,
   ConnectionConfig,
   ConnectionState,
+  ConsumerInfo,
   CreateBindingRequest,
   CreateExchangeRequest,
   CreateQueueRequest,
@@ -131,6 +133,18 @@ export class ClusterConnection {
 
   async checkHealth(): Promise<HealthResult> {
     return this.api.checkAliveness()
+  }
+
+  async listClientConnections(): Promise<ClientConnectionInfo[]> {
+    return this.api.listConnections()
+  }
+
+  async listConsumers(): Promise<ConsumerInfo[]> {
+    return this.api.listConsumers()
+  }
+
+  async closeClientConnection(name: string, reason: string): Promise<OperationResult> {
+    return this.api.closeConnection(name, reason)
   }
 
   async listQueues(): Promise<QueueInfo[]> {

@@ -225,9 +225,11 @@ recovery as the marquee workflow.
    version / totals / cluster rates and per-node memory, disk, fd and uptime, with
    **resource-alarm** badges (memory/disk); the status bar shows the broker version
    and a high-contrast alarm chip when a node is blocked.
-6. **Connections & consumers, with kill** — `GET /connections` + `/consumers`
-   and `DELETE /connections/{name}` to see who's draining a queue and force-close
-   a misbehaving client (a common reason a DLQ won't move).
+6. ✅ **Connections & consumers, with kill** *(done)* — a per-cluster **Connections**
+   tab lists live client connections (`GET /connections`) and consumers
+   (`GET /consumers/{vhost}`), with **Force Close** (`DELETE /connections/{name}`) to
+   drop a misbehaving client — so you can see who's draining a queue and why a DLQ
+   won't move.
 7. ✅ **Deeper health check** *(done)* — a **Check Health** connection action runs
    `/aliveness-test/{vhost}` (a real publish+consume round-trip on the vhost,
    beyond `/whoami`'s auth-only check) and reports the result; the connection
