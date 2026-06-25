@@ -153,6 +153,14 @@ export interface DeleteMessageRequest {
   fingerprint: string
 }
 
+/** Export a queue's ready messages to a file (non-destructive snapshot). */
+export interface ExportMessagesRequest {
+  connectionId: string
+  queue: string
+  /** Max messages to export; undefined exports all currently-ready messages. */
+  limit?: number
+}
+
 export interface OperationResult {
   ok: boolean
   /** Number of messages affected (purged, moved, ...). For publish: 1 if routed. */

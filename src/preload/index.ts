@@ -9,6 +9,7 @@ import type {
   DeleteBindingRequest,
   DeleteMessageRequest,
   DeleteQueueRequest,
+  ExportMessagesRequest,
   MoveMessageRequest,
   MoveMessagesRequest,
   PublishMessageRequest
@@ -51,6 +52,8 @@ const api: RabbitApi = {
   moveMessages: (request: MoveMessagesRequest) => ipcRenderer.invoke(IPC.moveMessages, request),
   moveMessage: (request: MoveMessageRequest) => ipcRenderer.invoke(IPC.moveMessage, request),
   deleteMessage: (request: DeleteMessageRequest) => ipcRenderer.invoke(IPC.deleteMessage, request),
+  exportMessages: (request: ExportMessagesRequest) =>
+    ipcRenderer.invoke(IPC.exportMessages, request),
 
   listExchanges: (connectionId: string) => ipcRenderer.invoke(IPC.listExchanges, connectionId),
   listExchangeBindings: (connectionId: string, exchange: string) =>

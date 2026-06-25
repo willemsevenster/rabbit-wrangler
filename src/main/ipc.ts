@@ -9,6 +9,7 @@ import {
 } from './updater'
 import { configStore } from './store/config-store'
 import { exportConnections, readImportFile } from './store/connection-io'
+import { exportMessagesToFile } from './store/message-io'
 import { setStoredTheme, titleBarOverlay } from './store/ui-prefs'
 import { connectionManager } from './connections/connection-manager'
 import { eventStreamServer } from './websocket-server'
@@ -20,6 +21,7 @@ import type {
   DeleteBindingRequest,
   DeleteMessageRequest,
   DeleteQueueRequest,
+  ExportMessagesRequest,
   MoveMessageRequest,
   MoveMessagesRequest,
   PublishMessageRequest
@@ -111,6 +113,10 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle(IPC.deleteMessage, (_e, req: DeleteMessageRequest) =>
     connectionManager.require(req.connectionId).deleteMessage(req)
+  )
+
+  ipcMain.handle(IPC.exportMessages, (_e, req: ExportMessagesRequest) =>
+    exportMessagesToFile(req.queue, () => connectionManager.require(req.connectionId).exportMessages(req))
   )
 
   ipcMain.handle(IPC.listExchanges, (_e, connectionId: string) =>

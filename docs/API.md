@@ -243,9 +243,10 @@ recovery as the marquee workflow.
 9. **Policy management** — `GET`/`PUT`/`DELETE /policies/{vhost}` to set a DLX,
    message TTL, or max-length without leaving the app — the configuration side of
    the DLQ story the move feature handles operationally.
-10. **Message export to file** — an AMQP `get`-loop (or `POST .../get`) that
-    saves a queue's messages to JSON/NDJSON before a destructive move or purge —
-    a safety net and an audit trail.
+10. ✅ **Message export to file** *(done)* — the queue context menu's **Export
+    Messages…** drains a queue's ready messages **non-destructively** (AMQP
+    `get`-loop holding unacked, requeued on close) and saves them to **NDJSON or
+    JSON** — a safety net + audit trail before a move or purge.
 11. **HTTP browse fallback** — `POST /queues/{vhost}/{name}/get` as a peek path
     when the AMQP port (`5672`) is firewalled but `15672` is reachable.
 12. **Server-side shovel for large moves** — for very large DLQs, a dynamic

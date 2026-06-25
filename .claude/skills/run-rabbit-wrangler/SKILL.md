@@ -91,6 +91,7 @@ avoids the blocking prompt.
 | `ss [name]` | screenshot → `shots/<name>.png` |
 | `text [css-sel]` | print `innerText` of selector (or whole body) |
 | `eval <js>` | evaluate an expression in the renderer, print JSON |
+| `stub-save-dialog <path>` | stub the native Save dialog (main process) to return `<path>` (or `cancel`) — for driving file-export flows |
 | `fill <css-sel> <value>` | set a React-controlled input's value |
 | `click <css-sel>` / `click-text <text>` | click via DOM (not coordinates) |
 | `type <text>` / `press <key>` | keyboard input |

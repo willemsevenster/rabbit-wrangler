@@ -1,5 +1,6 @@
 import type {
   DeleteMessageRequest,
+  ExportMessagesRequest,
   MoveMessageRequest,
   MoveMessagesRequest,
   OperationResult
@@ -169,4 +170,69 @@ export async function deleteMessage(
     channel.ack(msg)
     return { ok: true, affected: 1 }
   })
+}
+
+/** A queue message serialized for file export (mirrors PeekedMessage's payload
+ * handling; `payloadEncoding` matches the publish contract for round-tripping). */
+export interface ExportedMessage {
+  exchange: string
+  routingKey: string
+  redelivered: boolean
+  properties: Record<string, unknown>
+  headers: Record<string, unknown>
+  payload: string
+  payloadEncoding: 'string' | 'base64'
+  fingerprint: string
+}
+
+/**
+ * Read all currently-ready messages from a queue WITHOUT consuming them: each is
+ * fetched with manual ack and held unacked; closing the channel requeues every
+ * one (the broker requeues unacked on channel close), so the queue is unchanged.
+ * Same non-destructive contract as peek/move — only ready messages are visible,
+ * so callers stop the peeker first.
+ */
+export async function exportMessages(
+  conn: AmqpConnection,
+  req: ExportMessagesRequest
+): Promise<ExportedMessage[]> {
+  const channel = await conn.createChannel()
+  const held: GetMsg[] = []
+  const out: ExportedMessage[] = []
+  const limit = req.limit && req.limit > 0 ? req.limit : Infinity
+  try {
+    while (out.length < limit) {
+      const msg = await channel.get(req.queue, { noAck: false })
+      if (msg === false) break // queue drained of ready messages
+      held.push(msg)
+      const binary = !isUtf8(msg.content)
+      const { headers, ...properties } = msg.properties
+      out.push({
+        exchange: msg.fields.exchange,
+        routingKey: msg.fields.routingKey,
+        redelivered: msg.fields.redelivered,
+        properties: properties as Record<string, unknown>,
+        headers: (headers as Record<string, unknown>) ?? {},
+        payload: binary ? msg.content.toString('base64') : msg.content.toString('utf8'),
+        payloadEncoding: binary ? 'base64' : 'string',
+        fingerprint: fingerprintOf(msg)
+      })
+    }
+    return out
+  } finally {
+    // Requeue everything we held, then close (close also requeues any stragglers).
+    for (const h of held) {
+      try {
+        channel.nack(h, false, true)
+      } catch {
+        // channel closing — broker requeues unacked anyway
+      }
+    }
+    await channel.close().catch(() => undefined)
+  }
+}
+
+/** Best-effort check that a buffer is valid UTF-8 (so we don't mangle binaries). */
+function isUtf8(buf: Buffer): boolean {
+  return Buffer.compare(Buffer.from(buf.toString('utf8'), 'utf8'), buf) === 0
 }

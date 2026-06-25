@@ -195,6 +195,16 @@ when the management API already exposes it (e.g. purge is an HTTP `DELETE`).
   fingerprint, so the first match is acted on. The Move dialog (`moveDialog`,
   shared with bulk move) defaults to the **last destination used for that source
   queue** (`lastMoveTargets`, persisted in localStorage).
+- **Message export to file** (`operations.ts` `exportMessages`, `store/message-io.ts`,
+  UI via the queue context menu → "Export Messages…"): a **non-destructive** drain —
+  an AMQP `get`-loop holds each ready message unacked and requeues all on channel
+  close (same hold-and-requeue contract as peek/move; `ClusterConnection.exportMessages`
+  stops the peeker first). Records (`ExportedMessage`: exchange, routingKey,
+  redelivered, properties, headers, payload + `payloadEncoding`, fingerprint) are
+  written by `message-io.ts` via `dialog.showSaveDialog` as **NDJSON** (one per line)
+  or **JSON** array, chosen by file extension. Reuses the shared `ExportResult` type.
+  Only **ready** messages are captured (like purge). Drives via the new
+  `stub-save-dialog` driver command (native dialogs can't be clicked).
 - **Create / delete queues** (`management-api.ts` `createQueue`/`deleteQueue`, UI via
   the Queues-group context menu + overview **New Queue** button, and the queue context
   menu → "Delete Queue…"): both are **management-plane** (HTTP `PUT`/`DELETE` on

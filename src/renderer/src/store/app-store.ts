@@ -234,6 +234,8 @@ interface AppState {
   moveMessages(req: MoveMessagesRequest): Promise<OperationResult>
   moveMessage(req: MoveMessageRequest): Promise<OperationResult>
   deleteMessage(req: DeleteMessageRequest): Promise<OperationResult>
+  /** Export a queue's ready messages to a file (non-destructive); reports via toast. */
+  exportMessages(queue: string, connectionId?: string): Promise<void>
 
   refreshExchanges(connectionId?: string): Promise<void>
   deleteExchange(name: string, connectionId?: string): Promise<OperationResult>
@@ -948,6 +950,28 @@ export const useAppStore = create<AppState>((set, get) => ({
       await get().refreshQueues(req.connectionId)
     }
     return result
+  },
+
+  async exportMessages(queue, connectionId) {
+    const cid = connectionId ?? get().selectedConnectionId
+    if (!cid) return
+    // Export stops the peeker (main side) to read held messages; resume after if
+    // the queue's tab is still open, so the live feed continues.
+    const tabOpen = get().tabs.some((t) => t.id === queueTabId(cid, queue))
+    const result = await window.api.exportMessages({ connectionId: cid, queue })
+    if (result.canceled) {
+      if (tabOpen) void window.api.startPeek(cid, queue)
+      return
+    }
+    if (result.ok) {
+      get().addToast(
+        'success',
+        `Exported ${result.count ?? 0} message${result.count === 1 ? '' : 's'} from "${queue}" to ${result.path}`
+      )
+    } else {
+      get().addToast('error', `Export failed: ${result.error ?? 'unknown error'}`)
+    }
+    if (tabOpen) void window.api.startPeek(cid, queue)
   },
 
   async refreshExchanges(connectionId) {

@@ -30,6 +30,7 @@ export function buildQueueMenu(connectionId: string, q: QueueInfo): MenuItem[] {
     purgeQueue,
     openMoveDialog,
     openDeleteQueueDialog,
+    exportMessages,
     maybeConfirm,
     addToast,
     dlqSuffixes
@@ -51,6 +52,12 @@ export function buildQueueMenu(connectionId: string, q: QueueInfo): MenuItem[] {
       icon: 'arrow-right',
       onClick: () => openMoveDialog(q.name, connectionId)
     },
+    {
+      label: 'Export Messages…',
+      icon: 'save',
+      onClick: () => void exportMessages(q.name, connectionId)
+    },
+    { separator: true },
     {
       label: 'Purge…',
       icon: 'trash',

@@ -23,6 +23,7 @@ import type {
   DeleteMessageRequest,
   DeleteQueueRequest,
   ExchangeInfo,
+  ExportMessagesRequest,
   ExportResult,
   HealthResult,
   ImportResult,
@@ -77,6 +78,7 @@ export const IPC = {
   moveMessages: 'messages:move',
   moveMessage: 'messages:moveOne',
   deleteMessage: 'messages:deleteOne',
+  exportMessages: 'messages:export',
 
   // event stream bootstrap
   getEventStreamPort: 'events:port',
@@ -150,6 +152,8 @@ export interface RabbitApi {
   moveMessage(request: MoveMessageRequest): Promise<OperationResult>
   /** Delete one peeked message (by fingerprint) from its queue. */
   deleteMessage(request: DeleteMessageRequest): Promise<OperationResult>
+  /** Export a queue's ready messages to a user-chosen JSON/NDJSON file (non-destructive). */
+  exportMessages(request: ExportMessagesRequest): Promise<ExportResult>
 
   /** Remember the chosen theme so the next launch's window opens without a flash. */
   persistTheme(theme: 'light' | 'dark'): Promise<void>

@@ -31,6 +31,21 @@ The Move dialog remembers and defaults to the **last destination you used for th
 
 To replay dead-lettered messages back to where they came from, **leave the target exchange blank**. The default (nameless) exchange routes by routing key straight to the queue with that name — so a dead-letter whose routing key matches its original queue lands right back home. See [Dead-letter queues](./dead-letter-queues) for more.
 
+## Export messages to a file
+
+Before a destructive move or purge, you can snapshot a queue's messages to disk. Right-click a queue and choose **Export Messages…**, then pick a location and format:
+
+- **NDJSON** (default) — one JSON message per line; greppable and stream-friendly for large queues.
+- **JSON** — a single pretty-printed array.
+
+Each record carries the exchange, routing key, redelivered flag, properties, headers, and the payload (UTF-8, or base64 with `payloadEncoding: "base64"` for binary).
+
+The export is **non-destructive**: messages are read with the same hold-and-requeue technique as peeking, so the queue is left exactly as it was. As with peek and move, only the queue's **ready** messages are captured (in-flight/unacked messages held by other consumers are not).
+
+::: tip
+Use this as an audit trail or a safety net — export a dead-letter queue right before you redrive or purge it.
+:::
+
 ## Purge a queue
 
 Purging **clears all messages** in a queue. Right-click the queue to purge it.
