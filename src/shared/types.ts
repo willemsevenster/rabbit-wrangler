@@ -228,6 +228,38 @@ export interface CreatePolicyRequest {
   priority: number
 }
 
+/** RabbitMQ user tags that grant management capabilities. */
+export type UserTag = 'administrator' | 'monitoring' | 'policymaker' | 'management' | 'impersonator'
+
+/** The broker user this connection authenticates as (from `GET /whoami`). */
+export interface CurrentUser {
+  name: string
+  tags: string[]
+  /** True when `tags` includes `administrator` — gates the admin surface. */
+  isAdministrator: boolean
+}
+
+/** A broker user (cluster-wide), from `GET /users`. The password hash never
+ * crosses to the renderer — only whether one is set. */
+export interface UserInfo {
+  name: string
+  tags: string[]
+  /** True when the user has a password set (vs. passwordless x509/SASL). */
+  hasPassword: boolean
+}
+
+/** Create or update a user (`PUT /users/{name}`). */
+export interface CreateUserRequest {
+  connectionId: string
+  name: string
+  tags: string[]
+  /** New plaintext password. Ignored when `keepPassword` is true. */
+  password?: string
+  /** On edit with no new password: re-assert the existing password hash (read
+   * main-side) so a tag-only change doesn't wipe the password. */
+  keepPassword?: boolean
+}
+
 /** Whether dynamic shovels are usable on this broker (the `rabbitmq_shovel` +
  * `rabbitmq_shovel_management` plugins). Probed lazily before offering the feature. */
 export interface ShovelSupport {

@@ -46,6 +46,7 @@ export default defineConfig({
             { text: 'Moving & purging', link: '/guide/moving-and-purging' },
             { text: 'Dead-letter queues', link: '/guide/dead-letter-queues' },
             { text: 'Exchanges & publishing', link: '/guide/exchanges' },
+            { text: 'Administration', link: '/guide/administration' },
             { text: 'Searching messages', link: '/guide/search' },
             { text: 'Keyboard navigation', link: '/guide/keyboard' },
             { text: 'Settings', link: '/guide/settings' }

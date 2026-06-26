@@ -26,6 +26,7 @@ import type {
   CreatePolicyRequest,
   CreateQueueRequest,
   CreateShovelRequest,
+  CreateUserRequest,
   DeleteBindingRequest,
   DeleteMessageRequest,
   DeleteQueueRequest,
@@ -103,6 +104,22 @@ export function registerIpcHandlers(): void {
       return { ok: false, affected: 0, error: e instanceof Error ? e.message : String(e) }
     }
   })
+
+  ipcMain.handle(IPC.getCurrentUser, (_e, connectionId: string) =>
+    connectionManager.require(connectionId).whoami()
+  )
+
+  ipcMain.handle(IPC.listUsers, (_e, connectionId: string) =>
+    connectionManager.require(connectionId).listUsers()
+  )
+
+  ipcMain.handle(IPC.createUser, (_e, req: CreateUserRequest) =>
+    connectionManager.require(req.connectionId).createUser(req)
+  )
+
+  ipcMain.handle(IPC.deleteUser, (_e, connectionId: string, name: string) =>
+    connectionManager.require(connectionId).deleteUser(name)
+  )
 
   ipcMain.handle(IPC.getShovelSupport, (_e, connectionId: string) =>
     connectionManager.require(connectionId).getShovelSupport()

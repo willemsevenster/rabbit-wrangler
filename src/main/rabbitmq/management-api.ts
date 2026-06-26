@@ -9,6 +9,8 @@ import type {
   CreatePolicyRequest,
   CreateQueueRequest,
   CreateShovelRequest,
+  CreateUserRequest,
+  CurrentUser,
   DeleteBindingRequest,
   DeleteQueueRequest,
   ExchangeInfo,
@@ -19,7 +21,8 @@ import type {
   PublishMessageRequest,
   QueueInfo,
   ShovelInfo,
-  ShovelSupport
+  ShovelSupport,
+  UserInfo
 } from '@shared/types'
 
 /** The complete set of AMQP basic message properties RabbitMQ accepts on publish. */
@@ -96,6 +99,61 @@ export class ManagementApi {
   /** Cheap reachability + auth probe used on connect. */
   async ping(): Promise<void> {
     await this.request('/whoami')
+  }
+
+  /** The broker user this connection authenticates as (name + tags), from
+   * `/whoami`. Used to gate the admin surface and protect against self-lockout. */
+  async whoami(): Promise<CurrentUser> {
+    const raw = await this.request<{ name?: string; tags?: string[] | string }>('/whoami')
+    const tags = normalizeTags(raw.tags)
+    return { name: raw.name ?? '', tags, isAdministrator: tags.includes('administrator') }
+  }
+
+  /** List the broker's users (cluster-wide). Needs the administrator tag. The
+   * password hash is reduced to a boolean here — it never leaves the main process. */
+  async listUsers(): Promise<UserInfo[]> {
+    const raw = await this.request<RawUser[]>('/users')
+    return raw.map((u) => ({
+      name: u.name,
+      tags: normalizeTags(u.tags),
+      hasPassword: (u.password_hash ?? '') !== ''
+    }))
+  }
+
+  /** Create or update a user. PUT replaces the whole record, so a tag-only edit
+   * must re-send the existing `password_hash` to keep the password — read here,
+   * main-side, rather than round-tripping the hash through the renderer. A blank
+   * password with no `keepPassword` makes the user passwordless. */
+  async createUser(req: CreateUserRequest): Promise<OperationResult> {
+    try {
+      const body: Record<string, unknown> = { tags: req.tags }
+      if (req.password) {
+        body.password = req.password
+      } else if (req.keepPassword) {
+        const existing = await this.request<RawUser>(
+          `/users/${encodeURIComponent(req.name)}`
+        ).catch(() => undefined)
+        body.password_hash = existing?.password_hash ?? ''
+      } else {
+        body.password_hash = '' // explicit passwordless
+      }
+      await this.request<void>(`/users/${encodeURIComponent(req.name)}`, {
+        method: 'PUT',
+        body: JSON.stringify(body)
+      })
+      return { ok: true, affected: 1 }
+    } catch (err) {
+      return { ok: false, affected: 0, error: err instanceof Error ? err.message : String(err) }
+    }
+  }
+
+  async deleteUser(name: string): Promise<OperationResult> {
+    try {
+      await this.request<void>(`/users/${encodeURIComponent(name)}`, { method: 'DELETE' })
+      return { ok: true, affected: 1 }
+    } catch (err) {
+      return { ok: false, affected: 0, error: err instanceof Error ? err.message : String(err) }
+    }
   }
 
   /** Cluster-wide summary: version, object totals, message rates. */
@@ -585,6 +643,14 @@ export class ManagementApi {
   }
 }
 
+/** Normalize RabbitMQ user/whoami `tags`, which may be a comma-separated string
+ * (older brokers) or a string array (newer), into a clean string array. */
+function normalizeTags(tags: string[] | string | undefined): string[] {
+  if (Array.isArray(tags)) return tags.map((t) => String(t).trim()).filter(Boolean)
+  if (typeof tags === 'string') return tags.split(',').map((t) => t.trim()).filter(Boolean)
+  return []
+}
+
 /** Human hint for a Node/undici socket error code. */
 function hintForCode(code: string): string {
   switch (code) {
@@ -761,6 +827,12 @@ interface RawPolicy {
   'apply-to'?: string
   definition?: Record<string, unknown>
   priority?: number
+}
+
+interface RawUser {
+  name: string
+  tags?: string[] | string
+  password_hash?: string
 }
 
 interface RawShovel {

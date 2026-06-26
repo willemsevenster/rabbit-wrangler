@@ -233,6 +233,22 @@ Key behavior below.
   `broker:connections` etc. to avoid clashing with the saved-cluster `connections:*`
   channels. Surfaces the DLQ-won't-drain culprit: find the queue's consumer, note its
   connection, force-close it.
+- **Administration tab** (`ManagementApi.whoami`/`listUsers`/`createUser`/`deleteUser`,
+  UI: `AdministrationView` in an `admin` editor tab via connection menu →
+  **Administration**, keyed `adminTabId` = `adm:${connId}`, roadmap Tier 4 → v1.0.0):
+  the cluster-wide **identity/access** surface. One tab with a `section` switcher
+  (`users` now; `vhosts`/`permissions` land in later PRs); each section is a sub-view
+  (`UsersSection` + `UserDialog`). **Cluster-wide**, so it ignores the connection's
+  vhost. `whoami` (`GET /whoami`, was discarded by `ping()`) is captured into
+  `CurrentUser` (`{name, tags, isAdministrator}`) via `getCurrentUser`: it shows
+  "connected as X", **gates** the tab (a non-admin sees a banner, not a raw 403 — the
+  reducer skips `listUsers` when `!isAdministrator`), and powers **self-lockout guards**
+  (warn when deleting the connected user / stripping your own `administrator` tag — all
+  admin deletes use `store.confirm`, always-confirm). **Password handling**: `PUT
+  /users/{name}` replaces the whole record, so a tag-only edit sends `keepPassword`
+  and `ManagementApi.createUser` **re-reads the existing `password_hash` main-side** (the
+  hash never crosses to the renderer; `UserInfo` only carries `hasPassword`). Needs the
+  `administrator` tag.
 - **Deeper health check** (`ManagementApi.checkAliveness` → `GET /aliveness-test/{vhost}`):
   the connection context menu's **Check Health** runs a real publish+consume
   round-trip on the vhost (beyond `/whoami`'s auth-only probe) and toasts the result

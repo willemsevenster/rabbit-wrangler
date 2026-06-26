@@ -169,10 +169,10 @@ addressed as `amq.default`, the default vhost `/` as `%2F`).
 
 | Status | Method         | Path                                                     | Purpose                                    |
 | ------ | -------------- | -------------------------------------------------------- | ------------------------------------------ |
-| ✅     | GET            | `/whoami`                                                | Reachability + auth probe used on connect. |
-| ◻︎      | GET/PUT/DELETE | `/vhosts[/{name}]`                                       | Manage vhosts.                             |
-| ◻︎      | GET/PUT/DELETE | `/users[/{name}]`                                        | Manage users.                              |
-| ◻︎      | GET/PUT/DELETE | `/permissions/{vhost}/{user}` · `/topic-permissions/...` | Manage permissions.                        |
+| ✅     | GET            | `/whoami`                                                | Reachability + auth probe on connect; also surfaces the current user's name + tags (Administration tab gating). |
+| ✅     | GET/PUT/DELETE | `/users[/{name}]`                                        | **Manage users** (Administration → Users): tags + password.    |
+| ◻︎      | GET/PUT/DELETE | `/vhosts[/{name}]`                                       | Manage vhosts _(Administration → Vhosts, in progress)._        |
+| ◻︎      | GET/PUT/DELETE | `/permissions/{vhost}/{user}` · `/topic-permissions/...` | Manage permissions _(Administration → Permissions, in progress)._ |
 | ◻︎      | GET            | `/extensions`                                            | Installed management extensions.           |
 
 > Full reference: any running broker serves its own at
@@ -272,8 +272,17 @@ recovery as the marquee workflow.
     (`GET /shovels/{vhost}`, `DELETE /parameters/shovel/{vhost}/{name}`) monitors and
     removes shovels. Needs the `administrator` (or `policymaker` + `monitoring`) tag.
 
-### Probably out of scope (note, don't build unless asked)
+### Tier 4 — full administration (→ v1.0.0)
 
-Full user / vhost / permission administration (`/users`, `/vhosts`,
-`/permissions`) would turn Rabbit Wrangler into a general admin console and
-overlaps with the official Management UI. Keep the focus on the message plane.
+Originally noted as "probably out of scope", **user / vhost / permission
+administration** is now being built as the **Administration tab** — the milestone for
+the first **v1.0.0** release, making Rabbit Wrangler a complete RabbitMQ admin tool.
+Delivered in phases:
+
+13. ⏳ **Users** — `GET`/`PUT`/`DELETE /users` (tags + password) + `/whoami` for
+    current-user/admin gating. Administration → Users.
+14. ◻︎ **Virtual hosts** — `GET`/`PUT`/`DELETE /vhosts`. Administration → Vhosts.
+15. ◻︎ **Permissions** — `GET`/`PUT`/`DELETE /permissions/{vhost}/{user}` and
+    `/topic-permissions/{vhost}/{user}`. Administration → Permissions.
+
+All require the broker user's **administrator** tag.

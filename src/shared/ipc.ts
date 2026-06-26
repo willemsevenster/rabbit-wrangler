@@ -21,6 +21,8 @@ import type {
   CreateBindingRequest,
   CreatePolicyRequest,
   CreateShovelRequest,
+  CreateUserRequest,
+  CurrentUser,
   DefinitionsPreview,
   CreateExchangeRequest,
   CreateQueueRequest,
@@ -43,7 +45,8 @@ import type {
   SafeConnectionConfig,
   SaveMessagesRequest,
   ShovelInfo,
-  ShovelSupport
+  ShovelSupport,
+  UserInfo
 } from './types'
 
 export const IPC = {
@@ -57,6 +60,12 @@ export const IPC = {
   importConnections: 'connections:import',
   getConnectionRuntime: 'connections:runtime',
   setBrowseMode: 'connections:set-browse-mode',
+
+  // identity & access administration (RabbitMQ management HTTP API, cluster-wide)
+  getCurrentUser: 'admin:whoami',
+  listUsers: 'admin:users:list',
+  createUser: 'admin:users:create',
+  deleteUser: 'admin:users:delete',
 
   // policies (RabbitMQ management HTTP API, vhost-scoped)
   listPolicies: 'policies:list',
@@ -139,6 +148,15 @@ export interface RabbitApi {
   getConnectionRuntime(connectionId: string): Promise<ConnectionRuntime>
   /** Switch a live connection's browse mode (no reconnect); persists + returns the new runtime. */
   setBrowseMode(connectionId: string, mode: BrowseMode): Promise<ConnectionRuntime>
+
+  /** The broker user this connection authenticates as (name + tags). */
+  getCurrentUser(connectionId: string): Promise<CurrentUser>
+  /** List the broker's users (cluster-wide). Needs the administrator tag. */
+  listUsers(connectionId: string): Promise<UserInfo[]>
+  /** Create or update a user (tags + optional password). */
+  createUser(request: CreateUserRequest): Promise<OperationResult>
+  /** Delete a user by name. */
+  deleteUser(connectionId: string, name: string): Promise<OperationResult>
 
   /** List the vhost's policies. */
   listPolicies(connectionId: string): Promise<PolicyInfo[]>
