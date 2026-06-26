@@ -17,6 +17,7 @@ import type {
   ConnectionConfig,
   ConsumerInfo,
   CreateBindingRequest,
+  CreatePolicyRequest,
   DefinitionsPreview,
   CreateExchangeRequest,
   CreateQueueRequest,
@@ -33,6 +34,7 @@ import type {
   NodeInfo,
   OperationResult,
   PeekedMessage,
+  PolicyInfo,
   PublishMessageRequest,
   QueueInfo,
   SafeConnectionConfig,
@@ -48,6 +50,11 @@ export const IPC = {
   disconnect: 'connections:disconnect',
   exportConnections: 'connections:export',
   importConnections: 'connections:import',
+
+  // policies (RabbitMQ management HTTP API, vhost-scoped)
+  listPolicies: 'policies:list',
+  createPolicy: 'policies:create',
+  deletePolicy: 'policies:delete',
 
   // topology definitions (RabbitMQ management HTTP API, vhost-scoped)
   exportDefinitions: 'definitions:export',
@@ -115,6 +122,13 @@ export interface RabbitApi {
   exportConnections(): Promise<ExportResult>
   /** Read a connections JSON file (passwords excluded) for the import dialog. */
   importConnections(): Promise<ImportResult>
+
+  /** List the vhost's policies. */
+  listPolicies(connectionId: string): Promise<PolicyInfo[]>
+  /** Create or update a policy. */
+  createPolicy(request: CreatePolicyRequest): Promise<OperationResult>
+  /** Delete a policy by name. */
+  deletePolicy(connectionId: string, name: string): Promise<OperationResult>
 
   /** Export the connection's vhost topology (queues/exchanges/bindings/policies) to a JSON file. */
   exportDefinitions(connectionId: string): Promise<ExportResult>

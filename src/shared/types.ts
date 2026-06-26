@@ -181,6 +181,29 @@ export interface SaveMessagesRequest {
   messages: ExportedMessage[]
 }
 
+/** A RabbitMQ policy applied to queues/exchanges matching a name pattern. */
+export interface PolicyInfo {
+  name: string
+  vhost: string
+  /** Regex matched against queue/exchange names. */
+  pattern: string
+  /** "queues" | "exchanges" | "all" (sometimes "classic_queues"/"quorum_queues"). */
+  applyTo: string
+  /** Policy definition (e.g. message-ttl, max-length, dead-letter-exchange, ha-mode). */
+  definition: Record<string, unknown>
+  priority: number
+}
+
+/** Create or update a policy (PUT /policies/{vhost}/{name}). */
+export interface CreatePolicyRequest {
+  connectionId: string
+  name: string
+  pattern: string
+  applyTo: string
+  definition: Record<string, unknown>
+  priority: number
+}
+
 /** Counts of the objects in a vhost definitions document. */
 export interface DefinitionsSummary {
   queues: number

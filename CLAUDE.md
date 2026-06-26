@@ -154,6 +154,17 @@ when the management API already exposes it (e.g. purge is an HTTP `DELETE`).
   `flow`-state queues). `refreshCluster` does a one-off fetch on overview-tab open /
   Refresh so the panel isn't blank before the first poll. `ManagementApi.getOverview`/
   `getNodes` map the raw payloads (incl. `mem_alarm`/`disk_free_alarm`).
+- **Policy management** (`ManagementApi.listPolicies`/`createPolicy`/`deletePolicy`,
+  UI: `components/PoliciesView` in a `policies` editor tab + `PolicyDialog`): a
+  per-cluster tab (connection menu → **View Policies**, keyed `policiesTabId` =
+  `pol:${connId}`) lists vhost policies (`GET /policies/{vhost}`) with **Add Policy**
+  + per-row **Edit**/**Delete**, fetched on open + Refresh (held on the tab, like
+  connections). `PolicyDialog` (create + edit) takes name/pattern/apply-to/priority +
+  a typed **definition** editor (key/value/type rows, reused from `CreateQueueDialog`)
+  for `message-ttl`, `max-length`, `dead-letter-exchange`, etc. Create/edit both
+  `PUT /policies/{vhost}/{name}` (idempotent); the name is read-only when editing
+  (PUT to a new name creates a new policy). Delete uses `maybeConfirm` (config, not
+  data). Needs the `administrator`/`policymaker` tag — surfaced error otherwise.
 - **Definitions export/import** (`ManagementApi.getDefinitions`/`importDefinitions`,
   `store/definitions-io.ts`, UI via the connection context menu → "Export/Import
   Definitions…"): vhost-scoped topology backup/restore over `GET`/`POST

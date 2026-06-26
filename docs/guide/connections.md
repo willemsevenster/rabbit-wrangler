@@ -56,6 +56,19 @@ If a node trips its **memory** or **disk** high-watermark, RabbitMQ **blocks pub
 
 Right-click a connected broker and choose **Check Health** to run a deep liveness probe (`/aliveness-test`): the broker declares a temporary queue, publishes and consumes a message, then removes it. Unlike the connection check (which only verifies your credentials), this proves the broker can actually **move a message** on your virtual host — and reports the broker's own reason if it can't.
 
+## Policies
+
+Right-click a connected broker and choose **View Policies** to open a tab listing the virtual host's policies. Policies apply settings to every queue or exchange whose name matches a pattern — the standard way to configure **dead-lettering, TTLs, and length limits** in bulk.
+
+- **Add Policy** / **Edit** open a dialog where you set the **name**, a **pattern** (regex matched against names), **apply-to** (all / queues / exchanges), a **priority**, and the **definition** — typed key/value entries such as `message-ttl` (Number), `max-length` (Number), or `dead-letter-exchange` (String).
+- **Delete** removes a policy (matching objects lose their settings).
+
+This is the configuration counterpart to moving dead-letters: set a queue's DLX or TTL here, then use [Move](./moving-and-purging) to recover messages operationally.
+
+::: warning
+Managing policies requires a broker user with the **administrator** (or **policymaker**) tag.
+:::
+
 ## Backing up the topology (definitions)
 
 Right-click a connected broker for **Export Definitions…** and **Import Definitions…** — a backup/restore for the virtual host's **topology**: its queues, exchanges, bindings, and policies.

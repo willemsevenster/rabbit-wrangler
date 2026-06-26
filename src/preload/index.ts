@@ -5,6 +5,7 @@ import type {
   ConnectionConfig,
   CreateBindingRequest,
   CreateExchangeRequest,
+  CreatePolicyRequest,
   CreateQueueRequest,
   DeleteBindingRequest,
   DeleteMessageRequest,
@@ -30,6 +31,11 @@ const api: RabbitApi = {
   disconnect: (id: string) => ipcRenderer.invoke(IPC.disconnect, id),
   exportConnections: () => ipcRenderer.invoke(IPC.exportConnections),
   importConnections: () => ipcRenderer.invoke(IPC.importConnections),
+
+  listPolicies: (connectionId: string) => ipcRenderer.invoke(IPC.listPolicies, connectionId),
+  createPolicy: (request: CreatePolicyRequest) => ipcRenderer.invoke(IPC.createPolicy, request),
+  deletePolicy: (connectionId: string, name: string) =>
+    ipcRenderer.invoke(IPC.deletePolicy, connectionId, name),
 
   exportDefinitions: (connectionId: string) =>
     ipcRenderer.invoke(IPC.exportDefinitions, connectionId),

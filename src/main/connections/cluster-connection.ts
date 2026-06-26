@@ -12,6 +12,7 @@ import type {
   ConsumerInfo,
   CreateBindingRequest,
   CreateExchangeRequest,
+  CreatePolicyRequest,
   CreateQueueRequest,
   DeleteBindingRequest,
   DeleteMessageRequest,
@@ -24,6 +25,7 @@ import type {
   MoveMessagesRequest,
   NodeInfo,
   OperationResult,
+  PolicyInfo,
   PublishMessageRequest,
   QueueInfo
 } from '@shared/types'
@@ -131,6 +133,18 @@ export class ClusterConnection {
 
   async getNodes(): Promise<NodeInfo[]> {
     return this.api.getNodes()
+  }
+
+  async listPolicies(): Promise<PolicyInfo[]> {
+    return this.api.listPolicies()
+  }
+
+  async createPolicy(req: CreatePolicyRequest): Promise<OperationResult> {
+    return this.api.createPolicy(req)
+  }
+
+  async deletePolicy(name: string): Promise<OperationResult> {
+    return this.api.deletePolicy(name)
   }
 
   async getDefinitions(): Promise<Record<string, unknown>> {
