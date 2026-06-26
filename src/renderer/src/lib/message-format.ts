@@ -1,4 +1,18 @@
-import type { PeekedMessage } from '@shared/types'
+import type { ExportedMessage, PeekedMessage } from '@shared/types'
+
+/** Serialize a peeked message to the file/clipboard export record shape. */
+export function toExportRecord(m: PeekedMessage): ExportedMessage {
+  return {
+    exchange: m.exchange,
+    routingKey: m.routingKey,
+    redelivered: m.redelivered,
+    properties: m.properties,
+    headers: m.headers,
+    payload: m.payload,
+    payloadEncoding: m.isBinary ? 'base64' : 'string',
+    fingerprint: m.fingerprint
+  }
+}
 
 /** amqplib exposes properties camelCased; show the familiar RabbitMQ names, in order. */
 const PROP_ORDER: [string, string][] = [

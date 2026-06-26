@@ -86,6 +86,20 @@ const COMMANDS = {
     }
   },
 
+  // stub-save-dialog <path> — stub Electron's native Save dialog in the MAIN
+  // process to return <path> (native OS dialogs can't be driven via Playwright).
+  // Pass "cancel" to simulate the user cancelling. Useful for export features.
+  async 'stub-save-dialog'(p) {
+    if (!app) return console.log('ERROR: launch first')
+    await app.evaluate(({ dialog }, filePath) => {
+      dialog.showSaveDialog = async () =>
+        filePath === 'cancel'
+          ? { canceled: true, filePath: undefined }
+          : { canceled: false, filePath }
+    }, p)
+    console.log('stubbed save dialog ->', p)
+  },
+
   // fill <selector> <value> — sets a (React-controlled) input via Playwright.
   async fill(rest) {
     if (!page) return console.log('ERROR: launch first')

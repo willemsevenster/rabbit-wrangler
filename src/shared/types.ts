@@ -153,6 +153,34 @@ export interface DeleteMessageRequest {
   fingerprint: string
 }
 
+/** Export a queue's ready messages to a file (non-destructive snapshot). */
+export interface ExportMessagesRequest {
+  connectionId: string
+  queue: string
+  /** Max messages to export; undefined exports all currently-ready messages. */
+  limit?: number
+}
+
+/** A queue message serialized for file export / clipboard copy. `payloadEncoding`
+ * matches the publish contract so a record can round-trip back through publish. */
+export interface ExportedMessage {
+  exchange: string
+  routingKey: string
+  redelivered: boolean
+  properties: Record<string, unknown>
+  headers: Record<string, unknown>
+  payload: string
+  payloadEncoding: 'string' | 'base64'
+  fingerprint: string
+}
+
+/** Save already-serialized message records (e.g. one peeked message) to a file. */
+export interface SaveMessagesRequest {
+  /** Base name suggested in the save dialog (no extension). */
+  defaultName: string
+  messages: ExportedMessage[]
+}
+
 export interface OperationResult {
   ok: boolean
   /** Number of messages affected (purged, moved, ...). For publish: 1 if routed. */

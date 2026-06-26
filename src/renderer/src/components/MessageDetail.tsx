@@ -1,5 +1,6 @@
 import { useRef, type MouseEvent } from 'react'
 import { MonacoViewer } from './MonacoViewer'
+import { useAppStore } from '../store/app-store'
 import { byteSize, deathRecords, detectLanguage, formatBytes, propertyRows } from '../lib/message-format'
 import type { PeekedMessage } from '@shared/types'
 
@@ -27,6 +28,8 @@ export function MessageDetail({
   const deaths = deathRecords(m.headers)
   const otherHeaders = Object.entries(m.headers).filter(([k]) => k !== 'x-death')
   const detailRef = useRef<HTMLDivElement>(null)
+  const copyMessage = useAppStore((s) => s.copyMessage)
+  const exportMessage = useAppStore((s) => s.exportMessage)
 
   function onMetaResize(e: MouseEvent) {
     e.preventDefault()
@@ -51,6 +54,22 @@ export function MessageDetail({
           <button className="btn btn--sm btn--secondary" onClick={onMove}>
             <span className="codicon codicon-arrow-right" />
             Move
+          </button>
+          <button
+            className="btn btn--sm btn--secondary"
+            title="Copy this message as JSON to the clipboard"
+            onClick={() => copyMessage(m, 'json')}
+          >
+            <span className="codicon codicon-copy" />
+            Copy
+          </button>
+          <button
+            className="btn btn--sm btn--secondary"
+            title="Export this message to a file"
+            onClick={() => void exportMessage(m)}
+          >
+            <span className="codicon codicon-save" />
+            Export
           </button>
           <button className="btn btn--sm btn--danger" onClick={onDelete}>
             <span className="codicon codicon-trash" />

@@ -31,6 +31,30 @@ The Move dialog remembers and defaults to the **last destination you used for th
 
 To replay dead-lettered messages back to where they came from, **leave the target exchange blank**. The default (nameless) exchange routes by routing key straight to the queue with that name — so a dead-letter whose routing key matches its original queue lands right back home. See [Dead-letter queues](./dead-letter-queues) for more.
 
+## Export messages to a file
+
+Before a destructive move or purge, you can snapshot a queue's messages to disk. Right-click a queue and choose **Export Messages…**, then pick a location and format:
+
+- **NDJSON** (default) — one JSON message per line; greppable and stream-friendly for large queues.
+- **JSON** — a single pretty-printed array.
+
+Each record carries the exchange, routing key, redelivered flag, properties, headers, and the payload (UTF-8, or base64 with `payloadEncoding: "base64"` for binary).
+
+The export is **non-destructive**: messages are read and **requeued** (the same hold-and-requeue technique as peeking) rather than consumed, so none are removed. Note that — like peeking — requeueing marks the messages **redelivered** and can change their order; nothing is lost, but the broker state isn't byte-for-byte preserved. As with peek and move, only the queue's **ready** messages are captured (in-flight/unacked messages held by other consumers are not).
+
+::: tip
+Use this as an audit trail or a safety net — export a dead-letter queue right before you redrive or purge it.
+:::
+
+### A single message
+
+You don't have to export the whole queue. Select a message (or right-click a row), and from the **detail pane** or the **context menu** you can:
+
+- **Copy as JSON** / **Copy as NDJSON** — put the one message on the clipboard (full record: exchange, routing key, properties, headers, payload).
+- **Export Message…** — save just that message to a file.
+
+Handy for grabbing one offending message to share, replay, or inspect elsewhere.
+
 ## Purge a queue
 
 Purging **clears all messages** in a queue. Right-click the queue to purge it.

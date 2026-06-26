@@ -1,7 +1,7 @@
 import { eventBus } from '../event-bus'
 import { ManagementApi } from '../rabbitmq/management-api'
 import { MessagePeeker } from '../rabbitmq/message-peeker'
-import { deleteMessage, moveMessage, moveMessages } from '../rabbitmq/operations'
+import { deleteMessage, exportMessages, moveMessage, moveMessages } from '../rabbitmq/operations'
 import { connectAmqp, type AmqpConnection } from '../rabbitmq/amqp'
 import type {
   BindingInfo,
@@ -17,6 +17,8 @@ import type {
   DeleteMessageRequest,
   DeleteQueueRequest,
   ExchangeInfo,
+  ExportedMessage,
+  ExportMessagesRequest,
   HealthResult,
   MoveMessageRequest,
   MoveMessagesRequest,
@@ -228,6 +230,12 @@ export class ClusterConnection {
   async deleteMessage(req: DeleteMessageRequest): Promise<OperationResult> {
     await this.stopPeek(req.sourceQueue)
     return deleteMessage(await this.amqpConnection(), req)
+  }
+
+  async exportMessages(req: ExportMessagesRequest): Promise<ExportedMessage[]> {
+    // Release the peeker so its held messages are ready to be read (like move).
+    await this.stopPeek(req.queue)
+    return exportMessages(await this.amqpConnection(), req)
   }
 
   async dispose(): Promise<void> {

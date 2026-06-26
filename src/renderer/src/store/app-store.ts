@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { EventSocket } from '../lib/event-socket'
 import { DEFAULT_DLQ_SUFFIXES } from '../lib/dlq'
+import { toExportRecord } from '../lib/message-format'
 import type { StreamEvent, UpdateStatusPayload } from '@shared/ipc'
 import type {
   BindingInfo,
@@ -234,6 +235,12 @@ interface AppState {
   moveMessages(req: MoveMessagesRequest): Promise<OperationResult>
   moveMessage(req: MoveMessageRequest): Promise<OperationResult>
   deleteMessage(req: DeleteMessageRequest): Promise<OperationResult>
+  /** Export a queue's ready messages to a file (non-destructive); reports via toast. */
+  exportMessages(queue: string, connectionId?: string): Promise<void>
+  /** Copy one peeked message to the clipboard as pretty JSON or single-line NDJSON. */
+  copyMessage(message: PeekedMessage, format: 'json' | 'ndjson'): void
+  /** Export one peeked message to a file; reports via toast. */
+  exportMessage(message: PeekedMessage): Promise<void>
 
   refreshExchanges(connectionId?: string): Promise<void>
   deleteExchange(name: string, connectionId?: string): Promise<OperationResult>
@@ -948,6 +955,46 @@ export const useAppStore = create<AppState>((set, get) => ({
       await get().refreshQueues(req.connectionId)
     }
     return result
+  },
+
+  async exportMessages(queue, connectionId) {
+    const cid = connectionId ?? get().selectedConnectionId
+    if (!cid) return
+    // Export stops the peeker (main side) to read held messages.
+    const result = await window.api.exportMessages({ connectionId: cid, queue })
+    if (result.ok) {
+      get().addToast(
+        'success',
+        `Exported ${result.count ?? 0} message${result.count === 1 ? '' : 's'} from "${queue}" to ${result.path}`
+      )
+    } else if (!result.canceled) {
+      get().addToast('error', `Export failed: ${result.error ?? 'unknown error'}`)
+    }
+    // Resume the live peek only if the queue's tab is still open *now* — it may
+    // have been closed during the export (its peeker shutdown is driven by tab
+    // close), so a stale "was open" flag would orphan a peeker with no tab.
+    if (get().tabs.some((t) => t.id === queueTabId(cid, queue))) {
+      void window.api.startPeek(cid, queue)
+    }
+  },
+
+  copyMessage(message, format) {
+    const record = toExportRecord(message)
+    const text = format === 'json' ? JSON.stringify(record, null, 2) : JSON.stringify(record)
+    window.api.copyText(text)
+    get().addToast('success', `Copied message as ${format.toUpperCase()}.`)
+  },
+
+  async exportMessage(message) {
+    const result = await window.api.saveMessages({
+      defaultName: `${message.queue}-message`,
+      messages: [toExportRecord(message)]
+    })
+    if (result.ok) {
+      get().addToast('success', `Exported message to ${result.path}`)
+    } else if (!result.canceled) {
+      get().addToast('error', `Export failed: ${result.error ?? 'unknown error'}`)
+    }
   },
 
   async refreshExchanges(connectionId) {
