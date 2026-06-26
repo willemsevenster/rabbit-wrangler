@@ -231,10 +231,14 @@ function ConnectionNode({
   const activeTabId = useAppStore((s) => s.activeTabId)
   const collapsed = useAppStore((s) => s.connectionCollapsed)
   const state = useAppStore((s) => s.statuses[connection.id]?.state ?? 'disconnected')
+  const transport = useAppStore((s) => s.statuses[connection.id]?.transport ?? 'amqp')
+  // boolean once resolved on connect; undefined = not yet known (don't treat as "unreachable").
+  const amqpAvailable = useAppStore((s) => s.statuses[connection.id]?.amqpAvailable)
   const cluster = useAppStore((s) => s.clusterByConn[connection.id])
   const select = useAppStore((s) => s.selectConnection)
   const connect = useAppStore((s) => s.connectConnection)
   const disconnect = useAppStore((s) => s.disconnectConnection)
+  const setBrowseMode = useAppStore((s) => s.setBrowseMode)
   const checkHealth = useAppStore((s) => s.checkHealth)
   const openConnectionsTab = useAppStore((s) => s.openConnectionsTab)
   const exportDefinitions = useAppStore((s) => s.exportDefinitions)
@@ -303,6 +307,33 @@ function ConnectionNode({
         onClick: () => void importDefinitions(connection.id)
       })
       items.push({ separator: true })
+      // Browse-mode switch — only once AMQP availability is actually known.
+      // `false` = probed unreachable (HTTP forced); `true` = both work, offer the
+      // toggle; `undefined` = not resolved yet, so show nothing.
+      if (amqpAvailable === false) {
+        items.push({
+          label: 'HTTP browse (AMQP port unreachable)',
+          icon: 'globe',
+          disabled: true,
+          onClick: () => {}
+        })
+        items.push({ separator: true })
+      } else if (amqpAvailable === true) {
+        items.push(
+          transport === 'http'
+            ? {
+                label: 'Use AMQP Mode',
+                icon: 'plug',
+                onClick: () => void setBrowseMode(connection.id, 'auto')
+              }
+            : {
+                label: 'Use HTTP Browse Mode',
+                icon: 'globe',
+                onClick: () => void setBrowseMode(connection.id, 'http')
+              }
+        )
+        items.push({ separator: true })
+      }
       items.push({
         label: 'Disconnect',
         icon: 'debug-disconnect',

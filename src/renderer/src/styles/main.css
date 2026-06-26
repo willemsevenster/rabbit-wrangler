@@ -582,6 +582,14 @@ body.resizing {
   font-weight: 600;
 }
 
+.badge--http {
+  background: var(--button-bg);
+  color: #fff;
+  font-weight: 600;
+  margin-left: 8px;
+  vertical-align: middle;
+}
+
 .tree__empty {
   color: var(--text-muted);
   padding: 8px 20px;
@@ -1326,6 +1334,17 @@ body.resizing .msg-detail__resizer {
   font-weight: 600;
 }
 .statusbar__item--alarm .codicon {
+  color: #fff;
+}
+
+.statusbar__item--http {
+  background: var(--button-bg);
+  color: #fff;
+  padding: 0 8px;
+  border-radius: 3px;
+  font-weight: 600;
+}
+.statusbar__item--http .codicon {
   color: #fff;
 }
 

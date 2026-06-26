@@ -16,13 +16,16 @@ export function MessageDetail({
   onMove,
   onDelete,
   metaWidth,
-  onMetaWidthChange
+  onMetaWidthChange,
+  canMutate = true
 }: {
   message: PeekedMessage
   onMove: () => void
   onDelete: () => void
   metaWidth: number
   onMetaWidthChange: (width: number) => void
+  /** False in HTTP browse mode — Move/Delete need AMQP, so they're disabled. */
+  canMutate?: boolean
 }) {
   const props = propertyRows(m.properties)
   const deaths = deathRecords(m.headers)
@@ -51,7 +54,12 @@ export function MessageDetail({
     <div className="msg-detail" ref={detailRef}>
       <div className="msg-detail__meta" style={{ width: metaWidth }}>
         <div className="msg-detail__actions">
-          <button className="btn btn--sm btn--secondary" onClick={onMove}>
+          <button
+            className="btn btn--sm btn--secondary"
+            onClick={onMove}
+            disabled={!canMutate}
+            title={canMutate ? 'Move this message' : 'Moving needs AMQP (unavailable in HTTP browse mode)'}
+          >
             <span className="codicon codicon-arrow-right" />
             Move
           </button>
@@ -71,7 +79,12 @@ export function MessageDetail({
             <span className="codicon codicon-save" />
             Export
           </button>
-          <button className="btn btn--sm btn--danger" onClick={onDelete}>
+          <button
+            className="btn btn--sm btn--danger"
+            onClick={onDelete}
+            disabled={!canMutate}
+            title={canMutate ? 'Delete this message' : 'Deleting needs AMQP (unavailable in HTTP browse mode)'}
+          >
             <span className="codicon codicon-trash" />
             Delete
           </button>

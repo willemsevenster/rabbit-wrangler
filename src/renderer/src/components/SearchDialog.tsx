@@ -24,6 +24,7 @@ export function SearchDialog() {
 function SearchModal() {
   const close = useAppStore((s) => s.closeSearch)
   const tabs = useAppStore((s) => s.tabs)
+  const statuses = useAppStore((s) => s.statuses)
   const openMoveDialog = useAppStore((s) => s.openMoveDialog)
   const deleteMessage = useAppStore((s) => s.deleteMessage)
   const maybeConfirm = useAppStore((s) => s.maybeConfirm)
@@ -105,6 +106,10 @@ function SearchModal() {
   const shown = matches.slice(0, RESULT_LIMIT)
   const selected = matches.find((r) => r.key === selectedKey)?.msg ?? null
   const hasQueueTabs = tabs.some((t) => t.kind === 'queue')
+  // The selected result may belong to an HTTP-browse connection — gate move/delete.
+  const canMutate = selected
+    ? (statuses[selected.connectionId]?.transport ?? 'amqp') === 'amqp'
+    : true
 
   function doMove(m: PeekedMessage): void {
     openMoveDialog(m.queue, m.connectionId, m.fingerprint)
@@ -267,6 +272,7 @@ function SearchModal() {
               onDelete={() => void doDelete(selected)}
               metaWidth={metaWidth}
               onMetaWidthChange={setMetaWidth}
+              canMutate={canMutate}
             />
           ) : (
             <div className="placeholder">Select a result to view its details and payload.</div>

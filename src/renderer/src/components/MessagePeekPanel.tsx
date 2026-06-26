@@ -57,6 +57,9 @@ export function MessagePeekPanel({ tab }: { tab: QueueTab }) {
   const addToast = useAppStore((s) => s.addToast)
   const metaWidth = useAppStore((s) => s.detailMetaWidth)
   const setMetaWidth = useAppStore((s) => s.setDetailMetaWidth)
+  // HTTP browse mode is read-only — move/delete need the AMQP port.
+  const transport = useAppStore((s) => s.statuses[tab.connectionId]?.transport ?? 'amqp')
+  const canMutate = transport === 'amqp'
 
   const setSelectedId = (id: string): void => selectMessage(tab.id, id)
   const selected = peeks.find((m) => m.id === selectedId) ?? null
@@ -85,8 +88,19 @@ export function MessagePeekPanel({ tab }: { tab: QueueTab }) {
     return [
       ...menuFor(m),
       { separator: true },
-      { label: 'Move Message…', icon: 'arrow-right', onClick: () => moveMessage(m) },
-      { label: 'Delete Message', icon: 'trash', danger: true, onClick: () => void removeMessage(m) }
+      {
+        label: 'Move Message…',
+        icon: 'arrow-right',
+        disabled: !canMutate,
+        onClick: () => moveMessage(m)
+      },
+      {
+        label: 'Delete Message',
+        icon: 'trash',
+        danger: true,
+        disabled: !canMutate,
+        onClick: () => void removeMessage(m)
+      }
     ]
   }
 
@@ -134,8 +148,8 @@ export function MessagePeekPanel({ tab }: { tab: QueueTab }) {
     <div className="peek" ref={peekRef}>
       <div className="peek__toolbar">
         <span className="codicon codicon-eye" />
-        {peeks.length} unique message{peeks.length === 1 ? '' : 's'} · live · de-duplicated ·
-        non-destructive
+        {peeks.length} unique message{peeks.length === 1 ? '' : 's'} ·{' '}
+        {canMutate ? 'live · de-duplicated · non-destructive' : 'HTTP browse · polled · read-only'}
       </div>
 
       <div className="peek__table-wrap" onKeyDown={onTableKeyDown}>
@@ -189,6 +203,7 @@ export function MessagePeekPanel({ tab }: { tab: QueueTab }) {
             onDelete={() => void removeMessage(selected)}
             metaWidth={metaWidth}
             onMetaWidthChange={setMetaWidth}
+            canMutate={canMutate}
           />
         ) : (
           <div className="placeholder">Select a message to view its details and payload.</div>

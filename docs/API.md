@@ -38,8 +38,10 @@ Defined in [`src/shared/ipc.ts`](../src/shared/ipc.ts), bridged in
 | `listConnections(): Promise<SafeConnectionConfig[]>`                  | `connections:list`       | `config-store`       | Returns configs **without** passwords.                         |
 | `saveConnection(config: ConnectionConfig): Promise<SafeConnectionConfig>` | `connections:save`       | `config-store`       | Password encrypted via OS vault (`safeStorage`).               |
 | `deleteConnection(id: string): Promise<void>`                         | `connections:delete`     | registry + store     | Disconnects first, then removes the saved config.              |
-| `connect(id: string): Promise<void>`                                  | `connections:connect`    | `connection-manager` | Verifies the management endpoint (`/whoami`); AMQP stays lazy. |
-| `disconnect(id: string): Promise<void>`                               | `connections:disconnect` | `connection-manager` | Disposes peekers + AMQP connection.
+| `connect(id: string): Promise<void>`                                  | `connections:connect`    | `connection-manager` | Verifies the management endpoint (`/whoami`), probes the AMQP port to pick the transport; AMQP stays lazy. |
+| `disconnect(id: string): Promise<void>`                               | `connections:disconnect` | `connection-manager` | Disposes peekers + AMQP connection. |
+| `getConnectionRuntime(id: string): Promise<ConnectionRuntime>`        | `connections:runtime`    | `connection-manager` | AMQP availability + effective transport (`amqp`/`http`). |
+| `setBrowseMode(id: string, mode: BrowseMode): Promise<ConnectionRuntime>` | `connections:set-browse-mode` | `connection-manager` | Switch browse mode live (no reconnect); persists the preference. |
 
 ### Queues (management plane)
 
@@ -103,7 +105,7 @@ addressed as `amq.default`, the default vhost `/` as `%2F`).
 | ✅     | DELETE | `/queues/{vhost}/{name}/contents` | Purge (delete ready messages).                                                                            |
 | ⭐     | PUT    | `/queues/{vhost}/{name}`          | **Declare/create a queue** (e.g. a move target, a redrive queue).                                         |
 | ⭐     | DELETE | `/queues/{vhost}/{name}`          | **Delete a queue** (not just purge). Supports `if-empty` / `if-unused`.                                   |
-| ⭐     | POST   | `/queues/{vhost}/{name}/get`      | **Pull N messages** (HTTP browse with `ackmode=reject_requeue_true`) — an AMQP-free fallback peek/export. |
+| ✅     | POST   | `/queues/{vhost}/{name}/get`      | **Pull N messages** (HTTP browse with `ackmode=reject_requeue_true`) — the AMQP-free fallback peek path. |
 | ◻︎      | GET    | `/queues`                         | All queues across vhosts.                                                                                 |
 | ◻︎      | GET    | `/queues/{vhost}/{name}/bindings` | Bindings terminating at a queue.                                                                          |
 | ◻︎      | POST   | `/queues/{vhost}/{name}/actions`  | `sync` / `cancel_sync` (classic mirrored queues).                                                         |
@@ -252,8 +254,13 @@ recovery as the marquee workflow.
     Messages…** drains a queue's ready messages **non-destructively** (AMQP
     `get`-loop holding unacked, requeued on close) and saves them to **NDJSON or
     JSON** — a safety net + audit trail before a move or purge.
-11. **HTTP browse fallback** — `POST /queues/{vhost}/{name}/get` as a peek path
-    when the AMQP port (`5672`) is firewalled but `15672` is reachable.
+11. ✅ **HTTP browse fallback** *(done)* — when the AMQP port (`5672`) is firewalled
+    but `15672` is reachable, peeking falls back to `POST /queues/{vhost}/{name}/get`
+    (`ackmode=reject_requeue_true`, polled + de-duplicated, still non-destructive).
+    AMQP availability is **auto-probed** on connect; a per-connection **Message
+    browsing** setting (Auto / HTTP-only) plus a right-click toggle let you choose
+    the mode when both work. HTTP browse is read-only — move/delete/export-to-file
+    need AMQP and are disabled.
 12. **Server-side shovel for large moves** — for very large DLQs, a dynamic
     shovel (`PUT /parameters/shovel/{vhost}/{name}`) moves messages broker-side,
     avoiding pulling every message through the app.
