@@ -61,7 +61,7 @@ Right-click a connected broker and choose **Check Health** to run a deep livenes
 Right-click a connected broker and choose **View Policies** to open a tab listing the virtual host's policies. Policies apply settings to every queue or exchange whose name matches a pattern — the standard way to configure **dead-lettering, TTLs, and length limits** in bulk.
 
 - **Add Policy** / **Edit** open a dialog where you set the **name**, a **pattern** (regex matched against names), **apply-to** (all / queues / exchanges), a **priority**, and the **definition** — typed key/value entries such as `message-ttl` (Number), `max-length` (Number), or `dead-letter-exchange` (String).
-- **Delete** removes a policy (matching objects lose its settings).
+- **Delete** removes a policy (matching objects lose their settings).
 
 This is the configuration counterpart to moving dead-letters: set a queue's DLX or TTL here, then use [Move](./moving-and-purging) to recover messages operationally.
 

@@ -3,7 +3,7 @@ import { useAppStore } from '../store/app-store'
 import { HelpPopover } from './HelpPopover'
 import type { CreatePolicyRequest } from '@shared/types'
 
-type ArgType = 'String' | 'Number' | 'Boolean'
+type ArgType = 'String' | 'Number' | 'Boolean' | 'JSON'
 interface DefRow {
   key: string
   value: string
@@ -28,6 +28,9 @@ const COMMON_KEYS = [
   'ha-sync-mode'
 ]
 
+/** Values RabbitMQ accepts for a policy's apply-to. */
+const APPLY_TO_OPTIONS = ['all', 'queues', 'exchanges', 'classic_queues', 'quorum_queues']
+
 const DEF_HINT =
   'The policy definition. Common keys: message-ttl (Number, ms), max-length / ' +
   'max-length-bytes (Number), dead-letter-exchange / dead-letter-routing-key (String), ' +
@@ -36,15 +39,25 @@ const DEF_HINT =
 function coerce(value: string, type: ArgType): unknown {
   if (type === 'Number') return value === '' ? 0 : Number(value)
   if (type === 'Boolean') return value.trim().toLowerCase() === 'true'
+  if (type === 'JSON') {
+    try {
+      return JSON.parse(value)
+    } catch {
+      return value // leave malformed JSON as a plain string rather than throwing
+    }
+  }
   return value
 }
 
-/** Build editable rows from an existing policy definition, inferring each type. */
+/** Build editable rows from an existing policy definition, inferring each type.
+ * Structured values (arrays/objects) round-trip as JSON so they aren't corrupted
+ * into a plain string on save. */
 function rowsFrom(def: Record<string, unknown>): DefRow[] {
   return Object.entries(def).map(([key, v]) => {
     if (typeof v === 'number') return { key, value: String(v), type: 'Number' }
     if (typeof v === 'boolean') return { key, value: String(v), type: 'Boolean' }
-    return { key, value: typeof v === 'object' ? JSON.stringify(v) : String(v), type: 'String' }
+    if (v !== null && typeof v === 'object') return { key, value: JSON.stringify(v), type: 'JSON' }
+    return { key, value: String(v), type: 'String' }
   })
 }
 
@@ -167,9 +180,13 @@ export function PolicyDialog() {
               value={applyTo}
               onChange={(e) => setApplyTo(e.target.value)}
             >
-              <option value="all">all</option>
-              <option value="queues">queues</option>
-              <option value="exchanges">exchanges</option>
+              {APPLY_TO_OPTIONS.map((o) => (
+                <option key={o} value={o}>
+                  {o}
+                </option>
+              ))}
+              {/* Preserve an unrecognised value (e.g. a future broker variant). */}
+              {!APPLY_TO_OPTIONS.includes(applyTo) && <option value={applyTo}>{applyTo}</option>}
             </select>
           </div>
 
@@ -222,6 +239,7 @@ export function PolicyDialog() {
                   <option value="String">String</option>
                   <option value="Number">Number</option>
                   <option value="Boolean">Boolean</option>
+                  <option value="JSON">JSON</option>
                 </select>
                 <button className="icon-button" title="Remove" onClick={() => removeRow(i)}>
                   <span className="codicon codicon-close" />

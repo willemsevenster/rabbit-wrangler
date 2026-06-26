@@ -17,7 +17,7 @@ export function PoliciesView({ tab }: { tab: PoliciesTab }) {
   async function onDelete(p: PolicyInfo): Promise<void> {
     const ok = await maybeConfirm({
       title: 'Delete policy',
-      message: `Delete policy "${p.name}"? Queues/exchanges matching "${p.pattern}" will lose its settings.`,
+      message: `Delete policy "${p.name}"? Queues/exchanges matching "${p.pattern}" will lose their settings.`,
       confirmLabel: 'Delete',
       danger: true
     })
