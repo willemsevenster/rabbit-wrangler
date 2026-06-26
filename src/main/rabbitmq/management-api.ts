@@ -380,6 +380,27 @@ export class ManagementApi {
     }
   }
 
+  /** Export this vhost's topology (queues/exchanges/bindings/policies/parameters).
+   * The vhost-scoped endpoint excludes users/permissions, so no credentials leak.
+   * Requires the broker user's `administrator` tag. */
+  async getDefinitions(): Promise<Record<string, unknown>> {
+    return this.request<Record<string, unknown>>(`/definitions/${this.vhostSegment()}`)
+  }
+
+  /** Apply a definitions document to this vhost (creates/updates; never deletes).
+   * Idempotent and additive; requires the `administrator` tag. */
+  async importDefinitions(defs: unknown): Promise<OperationResult> {
+    try {
+      await this.request<void>(`/definitions/${this.vhostSegment()}`, {
+        method: 'POST',
+        body: JSON.stringify(defs)
+      })
+      return { ok: true, affected: 1 }
+    } catch (err) {
+      return { ok: false, affected: 0, error: err instanceof Error ? err.message : String(err) }
+    }
+  }
+
   async publishMessage(req: PublishMessageRequest): Promise<OperationResult> {
     try {
       // Invalid properties are ignored (only the known AMQP basic properties pass).

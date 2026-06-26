@@ -56,6 +56,17 @@ If a node trips its **memory** or **disk** high-watermark, RabbitMQ **blocks pub
 
 Right-click a connected broker and choose **Check Health** to run a deep liveness probe (`/aliveness-test`): the broker declares a temporary queue, publishes and consumes a message, then removes it. Unlike the connection check (which only verifies your credentials), this proves the broker can actually **move a message** on your virtual host — and reports the broker's own reason if it can't.
 
+## Backing up the topology (definitions)
+
+Right-click a connected broker for **Export Definitions…** and **Import Definitions…** — a backup/restore for the virtual host's **topology**: its queues, exchanges, bindings, and policies.
+
+- **Export** writes the vhost's definitions to a JSON file. Because it's scoped to the vhost, the file contains **no users, permissions, or passwords** — just topology. Great for backups, diffing environments, or copying a setup to staging.
+- **Import** reads a definitions file, shows you what it contains (counts of queues / exchanges / bindings / policies), and after you confirm, applies it. Import is **additive**: matching objects are created or updated, and **nothing is deleted**.
+
+::: warning
+Definitions are an administrative operation — they require a broker user with the **administrator** tag. With a locked-down user you'll get a permission error.
+:::
+
 ## Client connections & consumers
 
 Right-click a connected broker and choose **View Connections** to open a tab listing:

@@ -31,6 +31,13 @@ const api: RabbitApi = {
   exportConnections: () => ipcRenderer.invoke(IPC.exportConnections),
   importConnections: () => ipcRenderer.invoke(IPC.importConnections),
 
+  exportDefinitions: (connectionId: string) =>
+    ipcRenderer.invoke(IPC.exportDefinitions, connectionId),
+  previewImportDefinitions: (connectionId: string) =>
+    ipcRenderer.invoke(IPC.previewImportDefinitions, connectionId),
+  importDefinitions: (connectionId: string, token: string) =>
+    ipcRenderer.invoke(IPC.importDefinitions, connectionId, token),
+
   getOverview: (connectionId: string) => ipcRenderer.invoke(IPC.getOverview, connectionId),
   getNodes: (connectionId: string) => ipcRenderer.invoke(IPC.getNodes, connectionId),
   checkHealth: (connectionId: string) => ipcRenderer.invoke(IPC.checkHealth, connectionId),

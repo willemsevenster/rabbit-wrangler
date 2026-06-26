@@ -223,6 +223,10 @@ interface AppState {
   refreshCluster(connectionId: string): Promise<void>
   /** Run a deep health probe (aliveness round-trip) and report via a toast. */
   checkHealth(connectionId: string): Promise<void>
+  /** Export the connection's vhost topology to a JSON file; reports via toast. */
+  exportDefinitions(connectionId: string): Promise<void>
+  /** Pick a definitions file, confirm (with counts), then apply it; reports via toast. */
+  importDefinitions(connectionId: string): Promise<void>
   purgeQueue(queue: string, connectionId?: string): Promise<OperationResult>
   openCreateQueueDialog(connectionId?: string): void
   closeCreateQueueDialog(): void
@@ -819,6 +823,51 @@ export const useAppStore = create<AppState>((set, get) => ({
       set({ clusterByConn: { ...get().clusterByConn, [connectionId]: { overview, nodes } } })
     } catch {
       // Transient; the cluster-stats poll will refill once the broker responds.
+    }
+  },
+
+  async exportDefinitions(connectionId) {
+    const name = get().connections.find((c) => c.id === connectionId)?.name ?? 'broker'
+    const result = await window.api.exportDefinitions(connectionId)
+    if (result.ok) {
+      get().addToast('success', `Exported definitions for "${name}" (${result.count ?? 0} objects) to ${result.path}`)
+    } else if (!result.canceled) {
+      get().addToast('error', `Export definitions failed: ${result.error ?? 'unknown error'}`)
+    }
+  },
+
+  async importDefinitions(connectionId) {
+    const conn = get().connections.find((c) => c.id === connectionId)
+    const name = conn?.name ?? 'broker'
+    const vhost = conn?.vhost ?? '/'
+    const preview = await window.api.previewImportDefinitions(connectionId)
+    if (preview.canceled) return
+    if (!preview.ok || !preview.token || !preview.summary) {
+      get().addToast('error', `Could not read definitions file: ${preview.error ?? 'unknown error'}`)
+      return
+    }
+    const s = preview.summary
+    const ok = await get().confirm({
+      title: 'Import definitions',
+      message:
+        `Import ${s.queues} queue(s), ${s.exchanges} exchange(s), ${s.bindings} binding(s), ` +
+        `${s.policies} polic${s.policies === 1 ? 'y' : 'ies'} and ${s.parameters} parameter(s) ` +
+        `into vhost "${vhost}" on "${name}"? ` +
+        `Existing objects with the same names are updated; nothing is deleted.`,
+      confirmLabel: 'Import',
+      danger: true
+    })
+    if (!ok) return
+    try {
+      const result = await window.api.importDefinitions(connectionId, preview.token)
+      if (result.ok) {
+        get().addToast('success', `Imported definitions into "${name}". Refreshing…`)
+        await Promise.all([get().refreshQueues(connectionId), get().refreshExchanges(connectionId)])
+      } else {
+        get().addToast('error', `Import failed: ${result.error ?? 'unknown error'}`)
+      }
+    } catch (e) {
+      get().addToast('error', `Import failed: ${e instanceof Error ? e.message : String(e)}`)
     }
   },
 

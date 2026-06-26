@@ -181,6 +181,28 @@ export interface SaveMessagesRequest {
   messages: ExportedMessage[]
 }
 
+/** Counts of the objects in a vhost definitions document. */
+export interface DefinitionsSummary {
+  queues: number
+  exchanges: number
+  bindings: number
+  policies: number
+  parameters: number
+}
+
+/** Result of reading a definitions file for import (parsed + held in main, not yet applied). */
+export interface DefinitionsPreview {
+  ok: boolean
+  /** True when the user dismissed the open dialog. */
+  canceled?: boolean
+  /** Opaque token for the parsed file held in main — passed back to apply the import.
+   * The file path never crosses to the renderer, so it can't ask main to read an
+   * arbitrary file. */
+  token?: string
+  summary?: DefinitionsSummary
+  error?: string
+}
+
 export interface OperationResult {
   ok: boolean
   /** Number of messages affected (purged, moved, ...). For publish: 1 if routed. */

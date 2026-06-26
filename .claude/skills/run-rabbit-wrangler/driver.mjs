@@ -100,6 +100,19 @@ const COMMANDS = {
     console.log('stubbed save dialog ->', p)
   },
 
+  // stub-open-dialog <path> — stub Electron's native Open dialog (main process)
+  // to return [<path>] (or "cancel"). Companion to stub-save-dialog, for import flows.
+  async 'stub-open-dialog'(p) {
+    if (!app) return console.log('ERROR: launch first')
+    await app.evaluate(({ dialog }, filePath) => {
+      dialog.showOpenDialog = async () =>
+        filePath === 'cancel'
+          ? { canceled: true, filePaths: [] }
+          : { canceled: false, filePaths: [filePath] }
+    }, p)
+    console.log('stubbed open dialog ->', p)
+  },
+
   // fill <selector> <value> — sets a (React-controlled) input via Playwright.
   async fill(rest) {
     if (!page) return console.log('ERROR: launch first')
