@@ -5,6 +5,7 @@ import { toExportRecord } from '../lib/message-format'
 import type { StreamEvent, UpdateStatusPayload } from '@shared/ipc'
 import type {
   BindingInfo,
+  BrowseMode,
   ClientConnectionInfo,
   ClusterOverview,
   ConnectionConfig,
@@ -197,6 +198,9 @@ interface AppState {
   selectConnection(id: string): Promise<void>
   connectConnection(id: string): Promise<void>
   disconnectConnection(id: string): Promise<void>
+  /** Switch a connection's message browse mode live (AMQP ⇄ HTTP), clearing
+   * stale peek buffers so the new transport's messages re-surface. */
+  setBrowseMode(id: string, mode: BrowseMode): Promise<void>
   toggleConnectionCollapsed(): void
   /** Collapse the whole tree to the connections level (global "collapse all"). */
   collapseTree(): void
@@ -553,8 +557,21 @@ export const useAppStore = create<AppState>((set, get) => ({
     try {
       await window.api.connect(id)
       // Derive status from the call result — the WS status events emitted during
-      // connect() can race the renderer's socket setup and be missed.
-      set({ statuses: { ...get().statuses, [id]: { connectionId: id, state: 'connected' } } })
+      // connect() can race the renderer's socket setup and be missed. Fold in the
+      // resolved transport (AMQP availability / HTTP browse) so the UI gates AMQP-
+      // only actions correctly.
+      const rt = await window.api.getConnectionRuntime(id).catch(() => undefined)
+      set({
+        statuses: {
+          ...get().statuses,
+          [id]: {
+            connectionId: id,
+            state: 'connected',
+            amqpAvailable: rt?.amqpAvailable,
+            transport: rt?.transport
+          }
+        }
+      })
       await Promise.all([get().refreshQueues(id), get().refreshExchanges(id)])
     } catch (e) {
       set({
@@ -575,6 +592,40 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ statuses: { ...get().statuses, [id]: { connectionId: id, state: 'disconnected' } } })
     closeTabsFor(set, get, id)
     if (get().selectedConnectionId === id) set({ selectedConnectionId: null })
+  },
+
+  async setBrowseMode(id, mode) {
+    const name = get().connections.find((c) => c.id === id)?.name ?? 'broker'
+    try {
+      // main switches transport live (restarting any active peekers) and returns
+      // the resolved runtime.
+      const rt = await window.api.setBrowseMode(id, mode)
+      set({
+        statuses: {
+          ...get().statuses,
+          [id]: {
+            ...get().statuses[id],
+            connectionId: id,
+            state: 'connected',
+            amqpAvailable: rt.amqpAvailable,
+            transport: rt.transport
+          }
+        },
+        // The transport changed, so each open queue tab's buffer is stale — clear
+        // it; the restarted browser re-surfaces the head window.
+        tabs: get().tabs.map((t) =>
+          t.kind === 'queue' && t.connectionId === id
+            ? { ...t, peeks: [], unread: 0, selectedMessageId: null }
+            : t
+        )
+      })
+      get().addToast(
+        'success',
+        `"${name}" is now using ${rt.transport === 'http' ? 'HTTP browse' : 'AMQP'} mode.`
+      )
+    } catch (e) {
+      get().addToast('error', `Could not switch mode: ${e instanceof Error ? e.message : String(e)}`)
+    }
   },
 
   openOverviewTab(connectionId) {

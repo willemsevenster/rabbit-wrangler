@@ -1,13 +1,16 @@
 import { eventBus } from '../event-bus'
 import { ManagementApi } from '../rabbitmq/management-api'
 import { MessagePeeker } from '../rabbitmq/message-peeker'
+import { HttpBrowser } from '../rabbitmq/http-browser'
 import { deleteMessage, exportMessages, moveMessage, moveMessages } from '../rabbitmq/operations'
-import { connectAmqp, type AmqpConnection } from '../rabbitmq/amqp'
+import { connectAmqp, probeAmqpReachable, type AmqpConnection } from '../rabbitmq/amqp'
 import type {
   BindingInfo,
+  BrowseMode,
   ClientConnectionInfo,
   ClusterOverview,
   ConnectionConfig,
+  ConnectionRuntime,
   ConnectionState,
   ConsumerInfo,
   CreateBindingRequest,
@@ -21,6 +24,7 @@ import type {
   ExportedMessage,
   ExportMessagesRequest,
   HealthResult,
+  MessageTransport,
   MoveMessageRequest,
   MoveMessagesRequest,
   NodeInfo,
@@ -29,6 +33,14 @@ import type {
   PublishMessageRequest,
   QueueInfo
 } from '@shared/types'
+
+/** One queue browser — either the live AMQP peeker or the polled HTTP browser.
+ * Both surface `peek` events; only `stop()` is needed by ClusterConnection. */
+type QueueBrowser = MessagePeeker | HttpBrowser
+
+/** Surfaced when an AMQP-only message operation is attempted in HTTP browse mode. */
+const HTTP_ONLY_ERROR =
+  'This action needs the AMQP port, which is unavailable in HTTP browse mode.'
 
 /**
  * One live connection to a single RabbitMQ cluster. Owns both transports for
@@ -43,11 +55,18 @@ export class ClusterConnection {
   readonly api: ManagementApi
   private amqp: AmqpConnection | null = null
   private state: ConnectionState = 'disconnected'
-  private readonly peekers = new Map<string, MessagePeeker>()
+  private readonly peekers = new Map<string, QueueBrowser>()
   private statsTimer: ReturnType<typeof setInterval> | null = null
+  /** User preference for how to browse messages (persisted on the config). */
+  private browseMode: BrowseMode
+  /** Whether the AMQP port answered a TCP probe on connect. */
+  private amqpReachable = false
+  /** Effective transport, resolved from browseMode + amqpReachable on connect. */
+  private transport: MessageTransport = 'amqp'
 
   constructor(private readonly config: ConnectionConfig) {
     this.api = new ManagementApi(config)
+    this.browseMode = config.browseMode ?? 'auto'
   }
 
   get id(): string {
@@ -58,25 +77,62 @@ export class ClusterConnection {
     return this.state
   }
 
+  /** AMQP availability + effective transport (for the renderer's UI gating). */
+  runtime(): ConnectionRuntime {
+    return { amqpAvailable: this.amqpReachable, transport: this.transport }
+  }
+
   private setState(state: ConnectionState, error?: string): void {
     this.state = state
     eventBus.emitStream({
       type: 'connection-status',
-      payload: { connectionId: this.config.id, state, error }
+      payload: {
+        connectionId: this.config.id,
+        state,
+        error,
+        amqpAvailable: this.amqpReachable,
+        transport: this.transport
+      }
     })
   }
 
-  /** Verify the management endpoint is reachable; AMQP stays lazy. */
+  /** Compute the effective transport from the current preference + AMQP reachability. */
+  private resolveTransport(): MessageTransport {
+    return this.browseMode === 'http' || !this.amqpReachable ? 'http' : 'amqp'
+  }
+
+  /** Verify the management endpoint is reachable, then probe the AMQP port so we
+   * know whether to use AMQP or the HTTP browse fallback. AMQP stays lazy. */
   async connect(): Promise<void> {
     this.setState('connecting')
     try {
       await this.api.ping()
+      // Detect whether AMQP is reachable; if it's firewalled, force HTTP browse.
+      this.amqpReachable = await probeAmqpReachable(this.config)
+      this.transport = this.resolveTransport()
       this.setState('connected')
       this.startStatsPolling()
     } catch (err) {
       this.setState('error', err instanceof Error ? err.message : String(err))
       throw err
     }
+  }
+
+  /** Switch the browse-mode preference at runtime (no reconnect): recompute the
+   * effective transport and, if it changed, restart any active queue browsers in
+   * the new transport. Re-broadcasts the connection status so the UI re-gates. */
+  async applyBrowseMode(mode: BrowseMode): Promise<ConnectionRuntime> {
+    this.browseMode = mode
+    const next = this.resolveTransport()
+    if (next !== this.transport) {
+      const active = [...this.peekers.keys()]
+      await Promise.all([...this.peekers.values()].map((p) => p.stop()))
+      this.peekers.clear()
+      this.transport = next
+      for (const queue of active) await this.startPeek(queue)
+    }
+    this.setState('connected') // re-emit with the (possibly) new transport
+    return this.runtime()
   }
 
   /** Periodically push fresh queue stats for THIS cluster to the renderer, so the
@@ -224,9 +280,13 @@ export class ClusterConnection {
 
   async startPeek(queue: string): Promise<void> {
     if (this.peekers.has(queue)) return
-    const peeker = new MessagePeeker(this.config.id, queue, await this.amqpConnection())
-    this.peekers.set(queue, peeker)
-    await peeker.start()
+    // HTTP mode polls the management API; AMQP mode opens a live nack/requeue consumer.
+    const browser: QueueBrowser =
+      this.transport === 'http'
+        ? new HttpBrowser(this.config.id, queue, this.api)
+        : new MessagePeeker(this.config.id, queue, await this.amqpConnection())
+    this.peekers.set(queue, browser)
+    await browser.start()
   }
 
   async stopPeek(queue: string): Promise<void> {
@@ -237,6 +297,7 @@ export class ClusterConnection {
   }
 
   async moveMessages(req: MoveMessagesRequest): Promise<OperationResult> {
+    if (this.transport === 'http') return { ok: false, affected: 0, error: HTTP_ONLY_ERROR }
     // Like purge: a running peeker holds the source queue's messages unacked, so
     // the move's get-loop wouldn't see them. Release it first.
     await this.stopPeek(req.sourceQueue)
@@ -244,17 +305,21 @@ export class ClusterConnection {
   }
 
   async moveMessage(req: MoveMessageRequest): Promise<OperationResult> {
+    if (this.transport === 'http') return { ok: false, affected: 0, error: HTTP_ONLY_ERROR }
     // Release the peeker so the scan can pull the target (held unacked otherwise).
     await this.stopPeek(req.sourceQueue)
     return moveMessage(await this.amqpConnection(), req)
   }
 
   async deleteMessage(req: DeleteMessageRequest): Promise<OperationResult> {
+    if (this.transport === 'http') return { ok: false, affected: 0, error: HTTP_ONLY_ERROR }
     await this.stopPeek(req.sourceQueue)
     return deleteMessage(await this.amqpConnection(), req)
   }
 
   async exportMessages(req: ExportMessagesRequest): Promise<ExportedMessage[]> {
+    // The drain-to-file path is AMQP-only; the UI also hides it in HTTP mode.
+    if (this.transport === 'http') throw new Error(HTTP_ONLY_ERROR)
     // Release the peeker so its held messages are ready to be read (like move).
     await this.stopPeek(req.queue)
     return exportMessages(await this.amqpConnection(), req)

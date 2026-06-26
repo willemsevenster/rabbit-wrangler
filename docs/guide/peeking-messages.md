@@ -13,6 +13,14 @@ Each unique message is shown **once** — the app de-duplicates, so a message th
 Only the messages at the **head of the queue** are visible. Peeking shows you what's at the front, not the entire backlog of a deep queue.
 :::
 
+::: info HTTP browse mode
+If a broker's AMQP port is firewalled, peeking falls back to a **read-only HTTP
+browse** (a blue **HTTP browse** badge appears on the tab). It works the same way —
+non-destructive, de-duplicated, head-of-queue — but it's **polled** (messages
+refresh every couple of seconds, not instantly) and **Move/Delete/Export-to-file
+are disabled**. See [Message browsing: AMQP vs HTTP](./connections#message-browsing-amqp-vs-http).
+:::
+
 ## Inspecting a message
 
 Click any row in the table to open the **detail pane** below it. The detail pane shows:

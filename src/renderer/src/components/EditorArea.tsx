@@ -301,6 +301,8 @@ function QueueTab({ tab }: { tab: Extract<EditorTab, { kind: 'queue' }> }) {
   const info = useAppStore((s) =>
     s.queuesByConn[tab.connectionId]?.find((q) => q.name === tab.queue)
   )
+  // HTTP browse mode is read-only — Move needs the AMQP port.
+  const httpOnly = useAppStore((s) => (s.statuses[tab.connectionId]?.transport ?? 'amqp') === 'http')
 
   async function purge() {
     const ok = await maybeConfirm({
@@ -320,6 +322,14 @@ function QueueTab({ tab }: { tab: Extract<EditorTab, { kind: 'queue' }> }) {
         <h2>
           <span className="codicon codicon-inbox" />
           {tab.queue}
+          {httpOnly && (
+            <span
+              className="badge badge--http"
+              title="Browsing over HTTP (AMQP unavailable or HTTP mode selected) — read-only"
+            >
+              HTTP browse
+            </span>
+          )}
         </h2>
         <span className="spacer" />
         <button
@@ -332,6 +342,8 @@ function QueueTab({ tab }: { tab: Extract<EditorTab, { kind: 'queue' }> }) {
         </button>
         <button
           className="btn btn--sm btn--secondary"
+          disabled={httpOnly}
+          title={httpOnly ? 'Moving needs AMQP (unavailable in HTTP browse mode)' : 'Move messages'}
           onClick={() => openMoveDialog(tab.queue, tab.connectionId)}
         >
           <span className="codicon codicon-arrow-right" />

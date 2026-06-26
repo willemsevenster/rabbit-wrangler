@@ -12,9 +12,11 @@
  */
 import type {
   BindingInfo,
+  BrowseMode,
   ClientConnectionInfo,
   ClusterOverview,
   ConnectionConfig,
+  ConnectionRuntime,
   ConsumerInfo,
   CreateBindingRequest,
   CreatePolicyRequest,
@@ -50,6 +52,8 @@ export const IPC = {
   disconnect: 'connections:disconnect',
   exportConnections: 'connections:export',
   importConnections: 'connections:import',
+  getConnectionRuntime: 'connections:runtime',
+  setBrowseMode: 'connections:set-browse-mode',
 
   // policies (RabbitMQ management HTTP API, vhost-scoped)
   listPolicies: 'policies:list',
@@ -122,6 +126,10 @@ export interface RabbitApi {
   exportConnections(): Promise<ExportResult>
   /** Read a connections JSON file (passwords excluded) for the import dialog. */
   importConnections(): Promise<ImportResult>
+  /** Effective message transport for a live connection (AMQP availability + mode). */
+  getConnectionRuntime(connectionId: string): Promise<ConnectionRuntime>
+  /** Switch a live connection's browse mode (no reconnect); persists + returns the new runtime. */
+  setBrowseMode(connectionId: string, mode: BrowseMode): Promise<ConnectionRuntime>
 
   /** List the vhost's policies. */
   listPolicies(connectionId: string): Promise<PolicyInfo[]>

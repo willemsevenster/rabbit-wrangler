@@ -87,6 +87,14 @@ Each connected cluster (`src/main/connections/cluster-connection.ts`) owns
 When adding an operation, decide which plane it belongs to — don't reach for AMQP
 when the management API already exposes it (e.g. purge is an HTTP `DELETE`).
 
+On `connect()` the cluster also **probes the AMQP port** (`probeAmqpReachable`, a
+plain TCP connect in `rabbitmq/amqp.ts`) to pick a **message transport**: `amqp`
+(full peek + move/delete/export) or `http` (read-only browse over the management
+API, for when 5672 is firewalled). Effective transport = `browseMode === 'http' ||
+!amqpReachable ? 'http' : 'amqp'`, surfaced to the renderer on `ConnectionStatus`
+(`transport`/`amqpAvailable`) and via `getConnectionRuntime`. See the HTTP-browse
+Key behavior below.
+
 ### Key behaviors
 
 - **Peeking is non-destructive and de-duplicated** (`rabbitmq/message-peeker.ts`):
@@ -105,6 +113,24 @@ when the management API already exposes it (e.g. purge is an HTTP `DELETE`).
   for DLQ messages) and the payload in a read-only **Monaco** editor
   (`MonacoViewer`; workers bundled via Vite `?worker`, so the renderer CSP allows
   `worker-src 'self' blob:`).
+- **HTTP browse mode** (`rabbitmq/http-browser.ts`, roadmap Tier 3 #11): the
+  read-only fallback when the AMQP port is firewalled but the management port is
+  reachable. `HttpBrowser` polls `POST /queues/{vhost}/{name}/get` (ManagementApi
+  `browseMessages`, `ackmode=reject_requeue_true`, head `BROWSE_WINDOW`) every
+  `POLL_INTERVAL_MS` and emits the **same** `peek` StreamEvent as the AMQP peeker
+  (de-duped by the shared `fingerprintOf`), so the peek UI is identical — just
+  polled, not pushed. `ClusterConnection.startPeek` picks `HttpBrowser` vs
+  `MessagePeeker` from `this.transport`; the `peekers` map holds either
+  (`QueueBrowser`). Transport is resolved on connect (AMQP probe + `browseMode`),
+  switchable live via `applyBrowseMode` (restarts active browsers, no reconnect) —
+  IPC `setBrowseMode` (persists the pref) / `getConnectionRuntime`. HTTP mode is
+  **read-only**: `moveMessages`/`moveMessage`/`deleteMessage`/`exportMessages` are
+  guarded in `ClusterConnection` **and** disabled in the UI (Move/Delete buttons,
+  queue + message context menus, `MessageDetail` `canMutate`); per-message
+  copy/export still work (they act on the already-fetched record). The mode is
+  surfaced by a `badge--http` on the queue tab and a `statusbar__item--http` chip,
+  and a `browseMode` select in `ConnectionDialog` + a right-click toggle in the
+  connection menu (offered only when AMQP is reachable).
 - **Tabbed editor** (`EditorArea`, store `tabs`/`activeTabId`): the right-hand
   area is a VSCode-style tab strip. Opening a queue, exchange, or connection
   overview from the tree opens (or focuses — never duplicates) a tab keyed by

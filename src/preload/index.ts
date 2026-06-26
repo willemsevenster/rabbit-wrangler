@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer, clipboard } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
 import { IPC, type RabbitApi } from '@shared/ipc'
 import type {
+  BrowseMode,
   ConnectionConfig,
   CreateBindingRequest,
   CreateExchangeRequest,
@@ -31,6 +32,10 @@ const api: RabbitApi = {
   disconnect: (id: string) => ipcRenderer.invoke(IPC.disconnect, id),
   exportConnections: () => ipcRenderer.invoke(IPC.exportConnections),
   importConnections: () => ipcRenderer.invoke(IPC.importConnections),
+  getConnectionRuntime: (connectionId: string) =>
+    ipcRenderer.invoke(IPC.getConnectionRuntime, connectionId),
+  setBrowseMode: (connectionId: string, mode: BrowseMode) =>
+    ipcRenderer.invoke(IPC.setBrowseMode, connectionId, mode),
 
   listPolicies: (connectionId: string) => ipcRenderer.invoke(IPC.listPolicies, connectionId),
   createPolicy: (request: CreatePolicyRequest) => ipcRenderer.invoke(IPC.createPolicy, request),

@@ -25,6 +25,10 @@ export function StatusBar() {
     ? (statuses[selectedId]?.state ?? 'connecting')
     : 'disconnected'
   const state = effectiveConnectionState(rawState, cluster)
+  const httpBrowse =
+    selectedId != null &&
+    rawState === 'connected' &&
+    statuses[selectedId]?.transport === 'http'
   const totalMessages = queues.reduce((acc, q) => acc + q.messages, 0)
   const memAlarm = cluster?.nodes.some((n) => n.memAlarm) ?? false
   const diskAlarm = cluster?.nodes.some((n) => n.diskFreeAlarm) ?? false
@@ -47,6 +51,15 @@ export function StatusBar() {
         <span className="statusbar__item statusbar__item--alarm" title="A broker node has tripped a resource alarm; publishers are blocked.">
           <span className="codicon codicon-warning" />
           {alarmLabel}
+        </span>
+      )}
+      {httpBrowse && (
+        <span
+          className="statusbar__item statusbar__item--http"
+          title="Browsing over HTTP — the AMQP port is unavailable or HTTP mode is selected. Move/delete need AMQP."
+        >
+          <span className="codicon codicon-globe" />
+          HTTP browse
         </span>
       )}
       <span className="statusbar__spacer" />

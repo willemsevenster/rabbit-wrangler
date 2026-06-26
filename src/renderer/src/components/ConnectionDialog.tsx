@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useAppStore } from '../store/app-store'
-import type { ConnectionConfig } from '@shared/types'
+import type { BrowseMode, ConnectionConfig } from '@shared/types'
 
 /** Modal form for creating (or editing) a RabbitMQ connection. */
 export function ConnectionDialog() {
@@ -16,6 +16,7 @@ export function ConnectionDialog() {
   const [username, setUsername] = useState(editing?.username ?? 'guest')
   const [password, setPassword] = useState('')
   const [tls, setTls] = useState(editing?.tls ?? false)
+  const [browseMode, setBrowseMode] = useState<BrowseMode>(editing?.browseMode ?? 'auto')
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
 
@@ -43,7 +44,8 @@ export function ConnectionDialog() {
       vhost,
       username,
       password,
-      tls
+      tls,
+      browseMode
     }
     try {
       await save(config)
@@ -127,6 +129,22 @@ export function ConnectionDialog() {
           <div className="field--check">
             <input id="tls" type="checkbox" checked={tls} onChange={(e) => setTls(e.target.checked)} />
             <label htmlFor="tls">Use TLS (amqps / https)</label>
+          </div>
+          <div className="field">
+            <label htmlFor="conn-browse-mode">Message browsing</label>
+            <select
+              id="conn-browse-mode"
+              value={browseMode}
+              onChange={(e) => setBrowseMode(e.target.value as BrowseMode)}
+            >
+              <option value="auto">Auto — use AMQP when available (full move / delete)</option>
+              <option value="http">HTTP browse only — read-only, no AMQP port needed</option>
+            </select>
+            <span style={{ color: 'var(--text-muted)', fontSize: 12, marginTop: 4 }}>
+              HTTP browse works when the AMQP port (5672) is firewalled. It’s read-only — moving and
+              deleting messages need AMQP. If the AMQP port is unreachable, HTTP browse is used
+              automatically.
+            </span>
           </div>
           {error && <div className="modal__error">{error}</div>}
         </div>

@@ -33,9 +33,12 @@ export function buildQueueMenu(connectionId: string, q: QueueInfo): MenuItem[] {
     exportMessages,
     maybeConfirm,
     addToast,
-    dlqSuffixes
+    dlqSuffixes,
+    statuses
   } = useAppStore.getState()
   const isDeadLetter = isDeadLetterQueue(q.name, dlqSuffixes)
+  // Move + drain-to-file need AMQP; disable them in HTTP browse mode.
+  const httpOnly = (statuses[connectionId]?.transport ?? 'amqp') === 'http'
   return [
     { label: 'Peek Messages', icon: 'eye', onClick: () => openQueueTab(connectionId, q.name) },
     { label: 'Refresh', icon: 'refresh', onClick: () => void refreshQueues(connectionId) },
@@ -50,11 +53,13 @@ export function buildQueueMenu(connectionId: string, q: QueueInfo): MenuItem[] {
     {
       label: 'Move Messages…',
       icon: 'arrow-right',
+      disabled: httpOnly,
       onClick: () => openMoveDialog(q.name, connectionId)
     },
     {
       label: 'Export Messages…',
       icon: 'save',
+      disabled: httpOnly,
       onClick: () => void exportMessages(q.name, connectionId)
     },
     { separator: true },

@@ -4,6 +4,24 @@
  * it can be bundled into every target.
  */
 
+/** How a connection browses messages.
+ * - `auto` (default): use AMQP (full peek + move/delete) when its port is
+ *   reachable, otherwise fall back to the read-only HTTP browse path.
+ * - `http`: always use the HTTP browse path, even when AMQP is reachable. */
+export type BrowseMode = 'auto' | 'http'
+
+/** The message transport actually in use for a live connection. `http` is a
+ * read-only, polled browse (no move/delete/drain). */
+export type MessageTransport = 'amqp' | 'http'
+
+/** Runtime transport facts for a live connection, resolved on connect. */
+export interface ConnectionRuntime {
+  /** Whether the AMQP port was reachable when probed on connect. */
+  amqpAvailable: boolean
+  /** Effective transport: `http` when forced by config or AMQP is unreachable. */
+  transport: MessageTransport
+}
+
 /** Stored configuration for a single RabbitMQ cluster the user can connect to. */
 export interface ConnectionConfig {
   id: string
@@ -20,6 +38,8 @@ export interface ConnectionConfig {
   password: string
   /** Use amqps:// + https:// when true. */
   tls: boolean
+  /** Message-browsing preference. Absent = `auto` (prefer AMQP when available). */
+  browseMode?: BrowseMode
 }
 
 /** A connection config without secrets, safe to ship to the renderer. */
@@ -54,6 +74,10 @@ export interface ConnectionStatus {
   state: ConnectionState
   /** Populated when state is "error". */
   error?: string
+  /** Whether the AMQP port was reachable (set once connected). */
+  amqpAvailable?: boolean
+  /** Effective message transport once connected (`http` = read-only browse). */
+  transport?: MessageTransport
 }
 
 /** Subset of the RabbitMQ management API queue payload that the UI renders. */

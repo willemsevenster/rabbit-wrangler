@@ -13,6 +13,9 @@ A connection points Rabbit Wrangler at one RabbitMQ broker. You can have as many
    - **Virtual host** — the vhost to operate in (default **/**).
    - **Username** and **Password** — your broker credentials.
    - **TLS** — turn this on if your broker uses encrypted connections.
+   - **Message browsing** — how to read messages: **Auto** (use AMQP when its port
+     is reachable, falling back to HTTP) or **HTTP browse only** (never use AMQP).
+     See [Message browsing: AMQP vs HTTP](#message-browsing-amqp-vs-http) below.
 3. Save.
 
 Saving a connection **automatically connects it** and opens its overview, so you go straight to work.
@@ -20,6 +23,35 @@ Saving a connection **automatically connects it** and opens its overview, so you
 ## Editing a connection
 
 When you edit an existing connection, the **password field starts blank**. This is on purpose — the app never shows you the stored password. Leave it blank to keep the existing password, or type a new one to replace it.
+
+## Message browsing: AMQP vs HTTP
+
+Rabbit Wrangler reads messages two ways, and picks the best one for each broker:
+
+- **AMQP** (the default, port **5672**) — the full message plane. Live, push-based
+  peeking plus **moving and deleting** individual messages and **draining a queue
+  to a file**.
+- **HTTP browse** (the management port, **15672**) — a **read-only** fallback that
+  pulls messages with `POST /queues/{vhost}/{name}/get` and requeues them, so it's
+  still non-destructive. It works when the AMQP port is **firewalled** but the
+  management port is reachable — a common lockdown. It's **polled** (messages
+  refresh every couple of seconds rather than instantly) and, because the HTTP API
+  has no "move/delete one message" primitive, **Move, Delete and Export-to-file are
+  disabled** in this mode. You can still copy or export an individual message you're
+  looking at (that works on the message already in front of you).
+
+**How the mode is chosen:**
+
+- On connect, Rabbit Wrangler probes the AMQP port. **If it's unreachable, HTTP
+  browse is used automatically** — there's nothing to configure.
+- If the AMQP port **is** reachable, the **Message browsing** setting decides:
+  **Auto** uses AMQP (the most capable mode); **HTTP browse only** forces HTTP even
+  though AMQP would work.
+
+When a connection is browsing over HTTP you'll see a blue **HTTP browse** badge on
+each queue tab and a matching chip in the status bar. To switch a connected broker
+between modes without editing it, right-click it and choose **Use HTTP Browse Mode**
+or **Use AMQP Mode** (the toggle is only offered when the AMQP port is reachable).
 
 ## How your credentials are protected
 

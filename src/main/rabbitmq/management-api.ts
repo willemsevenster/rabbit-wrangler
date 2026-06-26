@@ -225,6 +225,24 @@ export class ManagementApi {
     }))
   }
 
+  /**
+   * HTTP browse: pull up to `count` messages from the head of a queue WITHOUT
+   * consuming them (`ackmode=reject_requeue_true` nacks-and-requeues each), so the
+   * queue is unchanged. An AMQP-free read path for when the AMQP port (5672) is
+   * firewalled but the management port is reachable. Needs only read permission on
+   * the queue — no monitoring/admin tag. `encoding=auto` returns UTF-8 payloads as
+   * strings and binary ones as base64.
+   */
+  async browseMessages(queue: string, count: number): Promise<RawGetMessage[]> {
+    return this.request<RawGetMessage[]>(
+      `/queues/${this.vhostSegment()}/${encodeURIComponent(queue)}/get`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ count, ackmode: 'reject_requeue_true', encoding: 'auto' })
+      }
+    )
+  }
+
   async purgeQueue(queue: string): Promise<OperationResult> {
     try {
       const before = await this.request<RawQueue>(
@@ -594,6 +612,17 @@ interface RawQueue {
     deliver_get_details?: RawRate
     ack_details?: RawRate
   }
+}
+
+/** One message from `POST /queues/{vhost}/{name}/get` (the HTTP browse path). */
+export interface RawGetMessage {
+  payload: string
+  payload_encoding: 'string' | 'base64'
+  redelivered: boolean
+  exchange: string
+  routing_key: string
+  message_count?: number
+  properties?: Record<string, unknown>
 }
 
 interface RawExchange {

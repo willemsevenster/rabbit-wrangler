@@ -19,6 +19,7 @@ import { setStoredTheme, titleBarOverlay } from './store/ui-prefs'
 import { connectionManager } from './connections/connection-manager'
 import { eventStreamServer } from './websocket-server'
 import type {
+  BrowseMode,
   ConnectionConfig,
   CreateBindingRequest,
   CreateExchangeRequest,
@@ -57,6 +58,17 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle(IPC.exportConnections, () => exportConnections(new Date().toISOString()))
   ipcMain.handle(IPC.importConnections, () => readImportFile())
+
+  ipcMain.handle(IPC.getConnectionRuntime, (_e, connectionId: string) =>
+    connectionManager.require(connectionId).runtime()
+  )
+
+  ipcMain.handle(IPC.setBrowseMode, (_e, connectionId: string, mode: BrowseMode) => {
+    // Persist the preference so it survives reconnect/restart, then apply it live.
+    const cfg = configStore.get(connectionId)
+    if (cfg) configStore.save({ ...cfg, browseMode: mode })
+    return connectionManager.require(connectionId).applyBrowseMode(mode)
+  })
 
   ipcMain.handle(IPC.listPolicies, (_e, connectionId: string) =>
     connectionManager.require(connectionId).listPolicies()
