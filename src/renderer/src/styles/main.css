@@ -627,6 +627,15 @@ body.resizing {
 .admin-toolbar {
   margin-bottom: 12px;
 }
+.admin-section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 24px 0 8px;
+  font-weight: 600;
+  border-top: 1px solid var(--modal-border);
+  padding-top: 16px;
+}
 
 /* Toggleable + static user-tag chips. */
 .tag-chips {

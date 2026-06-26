@@ -19,9 +19,13 @@ import type {
   CreateUserRequest,
   CreateVhostRequest,
   CurrentUser,
+  PermissionInfo,
   PolicyInfo,
+  SetPermissionRequest,
+  SetTopicPermissionRequest,
   ShovelInfo,
   ShovelSupport,
+  TopicPermissionInfo,
   UserInfo,
   VhostInfo,
   DeleteBindingRequest,
@@ -116,6 +120,8 @@ export type EditorTab =
       error: string | null
       users: UserInfo[]
       vhosts: VhostInfo[]
+      permissions: PermissionInfo[]
+      topicPermissions: TopicPermissionInfo[]
     }
 
 /** Sections of the Administration tab. */
@@ -194,6 +200,10 @@ interface AppState {
   userDialog: { connectionId: string; editing?: UserInfo } | null
   /** Open Vhost dialog (null = closed); `editing` set ⇒ editing that vhost. */
   vhostDialog: { connectionId: string; editing?: VhostInfo } | null
+  /** Open Permission dialog (null = closed); `editing` set ⇒ editing that permission. */
+  permissionDialog: { connectionId: string; editing?: PermissionInfo } | null
+  /** Open Topic-permission dialog (null = closed); `editing` set ⇒ editing that one. */
+  topicPermissionDialog: { connectionId: string; editing?: TopicPermissionInfo } | null
   /** Last-used move destination per source queue (persisted), for default values. */
   lastMoveTargets: Record<string, MoveTarget>
 
@@ -280,6 +290,14 @@ interface AppState {
   closeVhostDialog(): void
   createVhost(req: CreateVhostRequest): Promise<OperationResult>
   deleteVhost(connectionId: string, name: string): Promise<OperationResult>
+  openPermissionDialog(connectionId: string, editing?: PermissionInfo): void
+  closePermissionDialog(): void
+  setPermission(req: SetPermissionRequest): Promise<OperationResult>
+  deletePermission(connectionId: string, vhost: string, user: string): Promise<OperationResult>
+  openTopicPermissionDialog(connectionId: string, editing?: TopicPermissionInfo): void
+  closeTopicPermissionDialog(): void
+  setTopicPermission(req: SetTopicPermissionRequest): Promise<OperationResult>
+  deleteTopicPermission(connectionId: string, vhost: string, user: string): Promise<OperationResult>
   /** Open (or focus) the cluster's dynamic-shovels tab. */
   openShovelsTab(connectionId: string): Promise<void>
   openShovelDialog(queue: string, connectionId?: string): void
@@ -519,6 +537,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   shovelDialog: null,
   userDialog: null,
   vhostDialog: null,
+  permissionDialog: null,
+  topicPermissionDialog: null,
   lastMoveTargets: loadMoveTargets(),
   sidebarWidth: initialSidebarWidth,
   sidebarVisible: true,
@@ -941,7 +961,9 @@ export const useAppStore = create<AppState>((set, get) => ({
           currentUser: null,
           error: null,
           users: [],
-          vhosts: []
+          vhosts: [],
+          permissions: [],
+          topicPermissions: []
         }
       ],
       activeTabId: id
@@ -1011,6 +1033,64 @@ export const useAppStore = create<AppState>((set, get) => ({
       await get().refreshTab(adminTabId(connectionId))
     } else {
       get().addToast('error', `Delete failed: ${result.error ?? 'unknown error'}`)
+    }
+    return result
+  },
+
+  openPermissionDialog(connectionId, editing) {
+    set({ permissionDialog: { connectionId, editing } })
+  },
+
+  closePermissionDialog() {
+    set({ permissionDialog: null })
+  },
+
+  async setPermission(req) {
+    const result = await window.api.setPermission(req)
+    if (result.ok) {
+      set({ permissionDialog: null })
+      get().addToast('success', `Saved permissions for "${req.user}" on "${req.vhost}".`)
+      await get().refreshTab(adminTabId(req.connectionId))
+    }
+    return result
+  },
+
+  async deletePermission(connectionId, vhost, user) {
+    const result = await window.api.deletePermission(connectionId, vhost, user)
+    if (result.ok) {
+      get().addToast('success', `Removed "${user}" permissions on "${vhost}".`)
+      await get().refreshTab(adminTabId(connectionId))
+    } else {
+      get().addToast('error', `Remove failed: ${result.error ?? 'unknown error'}`)
+    }
+    return result
+  },
+
+  openTopicPermissionDialog(connectionId, editing) {
+    set({ topicPermissionDialog: { connectionId, editing } })
+  },
+
+  closeTopicPermissionDialog() {
+    set({ topicPermissionDialog: null })
+  },
+
+  async setTopicPermission(req) {
+    const result = await window.api.setTopicPermission(req)
+    if (result.ok) {
+      set({ topicPermissionDialog: null })
+      get().addToast('success', `Saved topic permissions for "${req.user}" on "${req.vhost}".`)
+      await get().refreshTab(adminTabId(req.connectionId))
+    }
+    return result
+  },
+
+  async deleteTopicPermission(connectionId, vhost, user) {
+    const result = await window.api.deleteTopicPermission(connectionId, vhost, user)
+    if (result.ok) {
+      get().addToast('success', `Removed "${user}" topic permissions on "${vhost}".`)
+      await get().refreshTab(adminTabId(connectionId))
+    } else {
+      get().addToast('error', `Remove failed: ${result.error ?? 'unknown error'}`)
     }
     return result
   },
@@ -1134,12 +1214,16 @@ export const useAppStore = create<AppState>((set, get) => ({
         const currentUser = await window.api.getCurrentUser(tab.connectionId)
         let users: UserInfo[] = []
         let vhosts: VhostInfo[] = []
+        let permissions: PermissionInfo[] = []
+        let topicPermissions: TopicPermissionInfo[] = []
         let error: string | null = null
         if (currentUser.isAdministrator) {
           try {
-            ;[users, vhosts] = await Promise.all([
+            ;[users, vhosts, permissions, topicPermissions] = await Promise.all([
               window.api.listUsers(tab.connectionId),
-              window.api.listVhosts(tab.connectionId)
+              window.api.listVhosts(tab.connectionId),
+              window.api.listPermissions(tab.connectionId),
+              window.api.listTopicPermissions(tab.connectionId)
             ])
           } catch (e) {
             error = e instanceof Error ? e.message : String(e)
@@ -1147,7 +1231,9 @@ export const useAppStore = create<AppState>((set, get) => ({
         }
         set({
           tabs: get().tabs.map((t) =>
-            t.id === id && t.kind === 'admin' ? { ...t, currentUser, users, vhosts, error } : t
+            t.id === id && t.kind === 'admin'
+              ? { ...t, currentUser, users, vhosts, permissions, topicPermissions, error }
+              : t
           )
         })
       } catch (e) {
@@ -1159,6 +1245,8 @@ export const useAppStore = create<AppState>((set, get) => ({
                   currentUser: null,
                   users: [],
                   vhosts: [],
+                  permissions: [],
+                  topicPermissions: [],
                   error: e instanceof Error ? e.message : String(e)
                 }
               : t

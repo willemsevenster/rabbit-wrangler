@@ -18,11 +18,15 @@ import type {
   HealthResult,
   NodeInfo,
   OperationResult,
+  PermissionInfo,
   PolicyInfo,
   PublishMessageRequest,
   QueueInfo,
+  SetPermissionRequest,
+  SetTopicPermissionRequest,
   ShovelInfo,
   ShovelSupport,
+  TopicPermissionInfo,
   UserInfo,
   VhostInfo
 } from '@shared/types'
@@ -199,6 +203,88 @@ export class ManagementApi {
   async deleteVhost(name: string): Promise<OperationResult> {
     try {
       await this.request<void>(`/vhosts/${encodeURIComponent(name)}`, { method: 'DELETE' })
+      return { ok: true, affected: 1 }
+    } catch (err) {
+      return { ok: false, affected: 0, error: err instanceof Error ? err.message : String(err) }
+    }
+  }
+
+  /** List all (user, vhost) permissions across the cluster. */
+  async listPermissions(): Promise<PermissionInfo[]> {
+    const raw = await this.request<RawPermission[]>('/permissions')
+    return raw.map((p) => ({
+      vhost: p.vhost,
+      user: p.user,
+      configure: p.configure ?? '',
+      write: p.write ?? '',
+      read: p.read ?? ''
+    }))
+  }
+
+  /** Grant/replace a user's configure/write/read permissions on a vhost (regexes). */
+  async setPermission(req: SetPermissionRequest): Promise<OperationResult> {
+    try {
+      await this.request<void>(
+        `/permissions/${encodeURIComponent(req.vhost)}/${encodeURIComponent(req.user)}`,
+        {
+          method: 'PUT',
+          body: JSON.stringify({ configure: req.configure, write: req.write, read: req.read })
+        }
+      )
+      return { ok: true, affected: 1 }
+    } catch (err) {
+      return { ok: false, affected: 0, error: err instanceof Error ? err.message : String(err) }
+    }
+  }
+
+  async deletePermission(vhost: string, user: string): Promise<OperationResult> {
+    try {
+      await this.request<void>(
+        `/permissions/${encodeURIComponent(vhost)}/${encodeURIComponent(user)}`,
+        { method: 'DELETE' }
+      )
+      return { ok: true, affected: 1 }
+    } catch (err) {
+      return { ok: false, affected: 0, error: err instanceof Error ? err.message : String(err) }
+    }
+  }
+
+  /** List all (user, vhost, exchange) topic permissions across the cluster. */
+  async listTopicPermissions(): Promise<TopicPermissionInfo[]> {
+    const raw = await this.request<RawTopicPermission[]>('/topic-permissions')
+    return raw.map((p) => ({
+      vhost: p.vhost,
+      user: p.user,
+      exchange: p.exchange ?? '',
+      write: p.write ?? '',
+      read: p.read ?? ''
+    }))
+  }
+
+  /** Set a user's topic (write/read) permissions for an exchange on a vhost. */
+  async setTopicPermission(req: SetTopicPermissionRequest): Promise<OperationResult> {
+    try {
+      await this.request<void>(
+        `/topic-permissions/${encodeURIComponent(req.vhost)}/${encodeURIComponent(req.user)}`,
+        {
+          method: 'PUT',
+          body: JSON.stringify({ exchange: req.exchange, write: req.write, read: req.read })
+        }
+      )
+      return { ok: true, affected: 1 }
+    } catch (err) {
+      return { ok: false, affected: 0, error: err instanceof Error ? err.message : String(err) }
+    }
+  }
+
+  /** Remove a user's topic permissions on a vhost (the HTTP API clears all
+   * exchanges for that user+vhost — there's no per-exchange delete). */
+  async deleteTopicPermission(vhost: string, user: string): Promise<OperationResult> {
+    try {
+      await this.request<void>(
+        `/topic-permissions/${encodeURIComponent(vhost)}/${encodeURIComponent(user)}`,
+        { method: 'DELETE' }
+      )
       return { ok: true, affected: 1 }
     } catch (err) {
       return { ok: false, affected: 0, error: err instanceof Error ? err.message : String(err) }
@@ -890,6 +976,22 @@ interface RawVhost {
   default_queue_type?: string
   tags?: string[] | string
   messages?: number
+}
+
+interface RawPermission {
+  vhost: string
+  user: string
+  configure?: string
+  write?: string
+  read?: string
+}
+
+interface RawTopicPermission {
+  vhost: string
+  user: string
+  exchange?: string
+  write?: string
+  read?: string
 }
 
 interface RawShovel {
