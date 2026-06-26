@@ -279,11 +279,11 @@ administration** is now being built as the **Administration tab** — the milest
 the first **v1.0.0** release, making Rabbit Wrangler a complete RabbitMQ admin tool.
 Delivered in phases:
 
-13. ⏳ **Users** — `GET`/`PUT`/`DELETE /users` (tags + password) + `/whoami` for
+13. ✅ **Users** — `GET`/`PUT`/`DELETE /users` (tags + password) + `/whoami` for
     current-user/admin gating. Administration → Users.
-14. ⏳ **Virtual hosts** — `GET`/`PUT`/`DELETE /vhosts` (description + default queue
+14. ✅ **Virtual hosts** — `GET`/`PUT`/`DELETE /vhosts` (description + default queue
     type). Administration → Virtual hosts.
 15. ◻︎ **Permissions** — `GET`/`PUT`/`DELETE /permissions/{vhost}/{user}` and
-    `/topic-permissions/{vhost}/{user}`. Administration → Permissions.
+    `/topic-permissions/{vhost}/{user}`. Administration → Permissions. _(next)_
 
 All require the broker user's **administrator** tag.

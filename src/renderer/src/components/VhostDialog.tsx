@@ -92,6 +92,11 @@ export function VhostDialog() {
                   {t || '(broker default)'}
                 </option>
               ))}
+              {/* Preserve an unrecognised value (e.g. a future queue type) instead of
+                  silently overwriting it on save. */}
+              {defaultQueueType && !QUEUE_TYPES.includes(defaultQueueType) && (
+                <option value={defaultQueueType}>{defaultQueueType}</option>
+              )}
             </select>
             <span style={{ color: 'var(--text-muted)', fontSize: 12, marginTop: 4 }}>
               Applied to queues declared in this vhost without an explicit type.
