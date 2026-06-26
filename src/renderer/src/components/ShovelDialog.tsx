@@ -54,8 +54,10 @@ export function ShovelDialog() {
       setError('Provide a name for the shovel.')
       return
     }
-    if (!destExchange.trim() && !destRoutingKey.trim()) {
-      setError('Provide a destination exchange or routing key.')
+    if (!destRoutingKey.trim()) {
+      // Required in every case: it's the destination queue name on the default
+      // exchange, and the routing key on a named one.
+      setError('Provide a destination routing key (the target queue name when no exchange is set).')
       return
     }
     setBusy(true)

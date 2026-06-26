@@ -993,17 +993,32 @@ export const useAppStore = create<AppState>((set, get) => ({
         // leave policies as-is
       }
     } else if (tab.kind === 'shovels') {
-      // Probe support first; only list shovels when the plugins are usable.
-      const support = await window.api.getShovelSupport(tab.connectionId)
-      let shovels: ShovelInfo[] = []
-      if (support.supported) {
-        shovels = await window.api.listShovels(tab.connectionId).catch(() => [])
+      // Probe support first; only list shovels when the plugins are usable. A
+      // failure (e.g. the connection dropped) lands a deterministic unsupported
+      // state rather than leaving the tab stuck on "Checking…".
+      try {
+        const support = await window.api.getShovelSupport(tab.connectionId)
+        const shovels = support.supported
+          ? await window.api.listShovels(tab.connectionId).catch(() => [])
+          : []
+        set({
+          tabs: get().tabs.map((t) =>
+            t.id === id && t.kind === 'shovels' ? { ...t, support, shovels } : t
+          )
+        })
+      } catch (e) {
+        set({
+          tabs: get().tabs.map((t) =>
+            t.id === id && t.kind === 'shovels'
+              ? {
+                  ...t,
+                  support: { supported: false, reason: e instanceof Error ? e.message : String(e) },
+                  shovels: []
+                }
+              : t
+          )
+        })
       }
-      set({
-        tabs: get().tabs.map((t) =>
-          t.id === id && t.kind === 'shovels' ? { ...t, support, shovels } : t
-        )
-      })
     } else {
       await Promise.all([
         get().refreshQueues(tab.connectionId),
