@@ -12,7 +12,9 @@ import type {
   ConsumerInfo,
   CreateBindingRequest,
   CreateExchangeRequest,
+  CreatePolicyRequest,
   CreateQueueRequest,
+  PolicyInfo,
   DeleteBindingRequest,
   DeleteMessageRequest,
   DeleteQueueRequest,
@@ -76,11 +78,19 @@ export type EditorTab =
       clientConnections: ClientConnectionInfo[]
       consumers: ConsumerInfo[]
     }
+  | {
+      id: string
+      kind: 'policies'
+      connectionId: string
+      title: string
+      policies: PolicyInfo[]
+    }
 
 export const overviewTabId = (c: string): string => `o:${c}`
 export const queueTabId = (c: string, q: string): string => `q:${c}:${q}`
 export const exchangeTabId = (c: string, x: string): string => `x:${c}:${x}`
 export const connectionsTabId = (c: string): string => `c:${c}`
+export const policiesTabId = (c: string): string => `pol:${c}`
 
 /** A transient toast notification (auto-dismisses). */
 export interface Toast {
@@ -139,6 +149,8 @@ interface AppState {
   createExchangeDialog: { connectionId: string } | null
   /** Target of the open Add-binding dialog (null = closed); `source` is the exchange. */
   bindingDialog: { connectionId: string; source: string } | null
+  /** Open Policy dialog (null = closed); `editing` set ⇒ editing that policy. */
+  policyDialog: { connectionId: string; editing?: PolicyInfo } | null
   /** Last-used move destination per source queue (persisted), for default values. */
   lastMoveTargets: Record<string, MoveTarget>
 
@@ -204,6 +216,12 @@ interface AppState {
   openConnectionsTab(connectionId: string): Promise<void>
   /** Force-close a client connection, then refresh the connections tab. */
   closeClientConnection(connectionId: string, name: string): Promise<OperationResult>
+  /** Open (or focus) the cluster's policies tab. */
+  openPoliciesTab(connectionId: string): Promise<void>
+  openPolicyDialog(connectionId: string, editing?: PolicyInfo): void
+  closePolicyDialog(): void
+  createPolicy(req: CreatePolicyRequest): Promise<OperationResult>
+  deletePolicy(connectionId: string, name: string): Promise<OperationResult>
   /** Open a tab for every queue on a connection. */
   openAllQueueTabs(connectionId: string): void
   /** Close every open queue tab belonging to a connection. */
@@ -433,6 +451,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   deleteQueueDialog: null,
   createExchangeDialog: null,
   bindingDialog: null,
+  policyDialog: null,
   lastMoveTargets: loadMoveTargets(),
   sidebarWidth: initialSidebarWidth,
   sidebarVisible: true,
@@ -687,6 +706,50 @@ export const useAppStore = create<AppState>((set, get) => ({
     return result
   },
 
+  async openPoliciesTab(connectionId) {
+    const id = policiesTabId(connectionId)
+    if (get().tabs.some((t) => t.id === id)) {
+      set({ activeTabId: id })
+      await get().refreshTab(id)
+      return
+    }
+    const connName = get().connections.find((c) => c.id === connectionId)?.name ?? connectionId
+    set({
+      tabs: [...get().tabs, { id, kind: 'policies', connectionId, title: `${connName} - Policies`, policies: [] }],
+      activeTabId: id
+    })
+    await get().refreshTab(id)
+  },
+
+  openPolicyDialog(connectionId, editing) {
+    set({ policyDialog: { connectionId, editing } })
+  },
+
+  closePolicyDialog() {
+    set({ policyDialog: null })
+  },
+
+  async createPolicy(req) {
+    const result = await window.api.createPolicy(req)
+    if (result.ok) {
+      set({ policyDialog: null })
+      get().addToast('success', `Saved policy "${req.name}".`)
+      await get().refreshTab(policiesTabId(req.connectionId))
+    }
+    return result
+  },
+
+  async deletePolicy(connectionId, name) {
+    const result = await window.api.deletePolicy(connectionId, name)
+    if (result.ok) {
+      get().addToast('success', `Deleted policy "${name}".`)
+      await get().refreshTab(policiesTabId(connectionId))
+    } else {
+      get().addToast('error', `Delete failed: ${result.error ?? 'unknown error'}`)
+    }
+    return result
+  },
+
   setActiveTab(id) {
     set({
       activeTabId: id,
@@ -787,6 +850,17 @@ export const useAppStore = create<AppState>((set, get) => ({
         })
       } catch {
         // leave lists as-is
+      }
+    } else if (tab.kind === 'policies') {
+      try {
+        const policies = await window.api.listPolicies(tab.connectionId)
+        set({
+          tabs: get().tabs.map((t) =>
+            t.id === id && t.kind === 'policies' ? { ...t, policies } : t
+          )
+        })
+      } catch {
+        // leave policies as-is
       }
     } else {
       await Promise.all([

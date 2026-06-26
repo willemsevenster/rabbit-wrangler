@@ -974,6 +974,13 @@ body.resizing {
   color: #fff;
 }
 
+/* Inline action buttons in a table row (e.g. policy edit/delete). */
+.policy-actions {
+  display: flex;
+  gap: 2px;
+  white-space: nowrap;
+}
+
 /* ---------- queue overview table ---------- */
 .queue-table__toolbar {
   display: flex;

@@ -22,6 +22,7 @@ import type {
   ConnectionConfig,
   CreateBindingRequest,
   CreateExchangeRequest,
+  CreatePolicyRequest,
   CreateQueueRequest,
   DeleteBindingRequest,
   DeleteMessageRequest,
@@ -56,6 +57,18 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle(IPC.exportConnections, () => exportConnections(new Date().toISOString()))
   ipcMain.handle(IPC.importConnections, () => readImportFile())
+
+  ipcMain.handle(IPC.listPolicies, (_e, connectionId: string) =>
+    connectionManager.require(connectionId).listPolicies()
+  )
+
+  ipcMain.handle(IPC.createPolicy, (_e, req: CreatePolicyRequest) =>
+    connectionManager.require(req.connectionId).createPolicy(req)
+  )
+
+  ipcMain.handle(IPC.deletePolicy, (_e, connectionId: string, name: string) =>
+    connectionManager.require(connectionId).deletePolicy(name)
+  )
 
   ipcMain.handle(IPC.exportDefinitions, (_e, connectionId: string) => {
     const name = configStore.list().find((c) => c.id === connectionId)?.name ?? 'rabbitmq'

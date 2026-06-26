@@ -239,6 +239,7 @@ function ConnectionNode({
   const openConnectionsTab = useAppStore((s) => s.openConnectionsTab)
   const exportDefinitions = useAppStore((s) => s.exportDefinitions)
   const importDefinitions = useAppStore((s) => s.importDefinitions)
+  const openPoliciesTab = useAppStore((s) => s.openPoliciesTab)
   const toggleCollapsed = useAppStore((s) => s.toggleConnectionCollapsed)
   const expandConnection = useAppStore((s) => s.expandConnection)
   const collapseConnection = useAppStore((s) => s.collapseConnection)
@@ -284,6 +285,11 @@ function ConnectionNode({
         label: 'View Connections',
         icon: 'plug',
         onClick: () => void openConnectionsTab(connection.id)
+      })
+      items.push({
+        label: 'View Policies',
+        icon: 'law',
+        onClick: () => void openPoliciesTab(connection.id)
       })
       items.push({ separator: true })
       items.push({

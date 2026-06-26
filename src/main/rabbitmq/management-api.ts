@@ -6,6 +6,7 @@ import type {
   ConsumerInfo,
   CreateBindingRequest,
   CreateExchangeRequest,
+  CreatePolicyRequest,
   CreateQueueRequest,
   DeleteBindingRequest,
   DeleteQueueRequest,
@@ -13,6 +14,7 @@ import type {
   HealthResult,
   NodeInfo,
   OperationResult,
+  PolicyInfo,
   PublishMessageRequest,
   QueueInfo
 } from '@shared/types'
@@ -380,6 +382,46 @@ export class ManagementApi {
     }
   }
 
+  async listPolicies(): Promise<PolicyInfo[]> {
+    const raw = await this.request<RawPolicy[]>(`/policies/${this.vhostSegment()}`)
+    return raw.map((p) => ({
+      name: p.name,
+      vhost: p.vhost,
+      pattern: p.pattern ?? '',
+      applyTo: p['apply-to'] ?? 'all',
+      definition: p.definition ?? {},
+      priority: p.priority ?? 0
+    }))
+  }
+
+  async createPolicy(req: CreatePolicyRequest): Promise<OperationResult> {
+    try {
+      await this.request<void>(`/policies/${this.vhostSegment()}/${encodeURIComponent(req.name)}`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          pattern: req.pattern,
+          definition: req.definition,
+          priority: req.priority,
+          'apply-to': req.applyTo
+        })
+      })
+      return { ok: true, affected: 1 }
+    } catch (err) {
+      return { ok: false, affected: 0, error: err instanceof Error ? err.message : String(err) }
+    }
+  }
+
+  async deletePolicy(name: string): Promise<OperationResult> {
+    try {
+      await this.request<void>(`/policies/${this.vhostSegment()}/${encodeURIComponent(name)}`, {
+        method: 'DELETE'
+      })
+      return { ok: true, affected: 1 }
+    } catch (err) {
+      return { ok: false, affected: 0, error: err instanceof Error ? err.message : String(err) }
+    }
+  }
+
   /** Export this vhost's topology (queues/exchanges/bindings/policies/parameters).
    * The vhost-scoped endpoint excludes users/permissions, so no credentials leak.
    * Requires the broker user's `administrator` tag. */
@@ -584,6 +626,15 @@ interface RawConnection {
   ssl?: boolean
   connected_at?: number
   client_properties?: Record<string, unknown>
+}
+
+interface RawPolicy {
+  name: string
+  vhost: string
+  pattern?: string
+  'apply-to'?: string
+  definition?: Record<string, unknown>
+  priority?: number
 }
 
 interface RawConsumer {

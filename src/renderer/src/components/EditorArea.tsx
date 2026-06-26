@@ -5,6 +5,7 @@ import { ClusterOverviewPanel } from './ClusterOverviewPanel'
 import { MessagePeekPanel } from './MessagePeekPanel'
 import { ExchangeDetail } from './ExchangeDetail'
 import { ConnectionsView } from './ConnectionsView'
+import { PoliciesView } from './PoliciesView'
 import { ContextMenu, useContextMenu, type MenuItem } from './ContextMenu'
 import { openManual } from '../lib/help'
 import { formatBytes, formatRate } from '../lib/message-format'
@@ -13,7 +14,8 @@ const TAB_ICON: Record<EditorTab['kind'], string> = {
   overview: 'codicon-database',
   queue: 'codicon-inbox',
   exchange: 'codicon-symbol-namespace',
-  connections: 'codicon-plug'
+  connections: 'codicon-plug',
+  policies: 'codicon-law'
 }
 
 /** Same icons, bare names, for the context-menu (overflow) list. */
@@ -21,7 +23,8 @@ const TAB_MENU_ICON: Record<EditorTab['kind'], string> = {
   overview: 'database',
   queue: 'inbox',
   exchange: 'symbol-namespace',
-  connections: 'plug'
+  connections: 'plug',
+  policies: 'law'
 }
 
 /**
@@ -45,6 +48,7 @@ export function EditorArea() {
       {active?.kind === 'queue' && <QueueTab tab={active} />}
       {active?.kind === 'exchange' && <ExchangeDetail tab={active} />}
       {active?.kind === 'connections' && <ConnectionsView tab={active} />}
+      {active?.kind === 'policies' && <PoliciesView tab={active} />}
       {!active && <NoTab />}
     </div>
   )

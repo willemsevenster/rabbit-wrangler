@@ -243,9 +243,11 @@ recovery as the marquee workflow.
    bindings, policies) via `GET`/`POST /definitions/{vhost}` — for backup,
    environment diffing, and "copy this vhost's setup to staging." Vhost-scoped, so
    exports carry no users/credentials; needs the `administrator` tag.
-9. **Policy management** — `GET`/`PUT`/`DELETE /policies/{vhost}` to set a DLX,
-   message TTL, or max-length without leaving the app — the configuration side of
-   the DLQ story the move feature handles operationally.
+9. ✅ **Policy management** *(done)* — a per-cluster **Policies** tab
+   (`GET`/`PUT`/`DELETE /policies/{vhost}`) lists policies and lets you add / edit /
+   delete them (name pattern, apply-to, priority + a typed definition editor for
+   `message-ttl`, `max-length`, `dead-letter-exchange`, …) — the configuration side
+   of the DLQ story. Needs the `administrator` / `policymaker` tag.
 10. ✅ **Message export to file** *(done)* — the queue context menu's **Export
     Messages…** drains a queue's ready messages **non-destructively** (AMQP
     `get`-loop holding unacked, requeued on close) and saves them to **NDJSON or
