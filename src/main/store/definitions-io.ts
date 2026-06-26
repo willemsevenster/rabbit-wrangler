@@ -68,7 +68,11 @@ export async function previewDefinitionsFile(): Promise<DefinitionsPreview> {
   })
   if (canceled || filePaths.length === 0) return { ok: false, canceled: true }
   try {
-    const defs = JSON.parse(await fs.readFile(filePaths[0], 'utf8'))
+    const text = await fs.readFile(filePaths[0], 'utf8')
+    // Strip a leading UTF-8 BOM (charCode 0xFEFF) — some editors / exporters add
+    // one, and JSON.parse chokes on it.
+    const raw = text.charCodeAt(0) === 0xfeff ? text.slice(1) : text
+    const defs = JSON.parse(raw)
     const token = randomUUID()
     pending.set(token, defs)
     return { ok: true, token, summary: summarize(defs) }
