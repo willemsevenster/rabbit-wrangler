@@ -9,6 +9,7 @@ import type {
   CreatePolicyRequest,
   CreateQueueRequest,
   CreateShovelRequest,
+  CreateUserRequest,
   DeleteBindingRequest,
   DeleteMessageRequest,
   DeleteQueueRequest,
@@ -37,6 +38,12 @@ const api: RabbitApi = {
     ipcRenderer.invoke(IPC.getConnectionRuntime, connectionId),
   setBrowseMode: (connectionId: string, mode: BrowseMode) =>
     ipcRenderer.invoke(IPC.setBrowseMode, connectionId, mode),
+
+  getCurrentUser: (connectionId: string) => ipcRenderer.invoke(IPC.getCurrentUser, connectionId),
+  listUsers: (connectionId: string) => ipcRenderer.invoke(IPC.listUsers, connectionId),
+  createUser: (request: CreateUserRequest) => ipcRenderer.invoke(IPC.createUser, request),
+  deleteUser: (connectionId: string, name: string) =>
+    ipcRenderer.invoke(IPC.deleteUser, connectionId, name),
 
   listPolicies: (connectionId: string) => ipcRenderer.invoke(IPC.listPolicies, connectionId),
   createPolicy: (request: CreatePolicyRequest) => ipcRenderer.invoke(IPC.createPolicy, request),

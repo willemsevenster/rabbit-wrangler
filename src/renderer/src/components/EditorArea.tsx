@@ -7,6 +7,7 @@ import { ExchangeDetail } from './ExchangeDetail'
 import { ConnectionsView } from './ConnectionsView'
 import { PoliciesView } from './PoliciesView'
 import { ShovelsView } from './ShovelsView'
+import { AdministrationView } from './AdministrationView'
 import { ContextMenu, useContextMenu, type MenuItem } from './ContextMenu'
 import { openManual } from '../lib/help'
 import { formatBytes, formatRate } from '../lib/message-format'
@@ -17,7 +18,8 @@ const TAB_ICON: Record<EditorTab['kind'], string> = {
   exchange: 'codicon-symbol-namespace',
   connections: 'codicon-plug',
   policies: 'codicon-law',
-  shovels: 'codicon-arrow-swap'
+  shovels: 'codicon-arrow-swap',
+  admin: 'codicon-organization'
 }
 
 /** Same icons, bare names, for the context-menu (overflow) list. */
@@ -27,7 +29,8 @@ const TAB_MENU_ICON: Record<EditorTab['kind'], string> = {
   exchange: 'symbol-namespace',
   connections: 'plug',
   policies: 'law',
-  shovels: 'arrow-swap'
+  shovels: 'arrow-swap',
+  admin: 'organization'
 }
 
 /**
@@ -53,6 +56,7 @@ export function EditorArea() {
       {active?.kind === 'connections' && <ConnectionsView tab={active} />}
       {active?.kind === 'policies' && <PoliciesView tab={active} />}
       {active?.kind === 'shovels' && <ShovelsView tab={active} />}
+      {active?.kind === 'admin' && <AdministrationView tab={active} />}
       {!active && <NoTab />}
     </div>
   )

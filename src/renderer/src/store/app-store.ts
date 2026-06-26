@@ -16,9 +16,12 @@ import type {
   CreatePolicyRequest,
   CreateQueueRequest,
   CreateShovelRequest,
+  CreateUserRequest,
+  CurrentUser,
   PolicyInfo,
   ShovelInfo,
   ShovelSupport,
+  UserInfo,
   DeleteBindingRequest,
   DeleteMessageRequest,
   DeleteQueueRequest,
@@ -98,6 +101,22 @@ export type EditorTab =
       support: ShovelSupport | null
       shovels: ShovelInfo[]
     }
+  | {
+      id: string
+      kind: 'admin'
+      connectionId: string
+      title: string
+      /** Active sub-section of the Administration tab. */
+      section: AdminSection
+      /** The connected broker user (for identity + self-lockout guards); null until loaded. */
+      currentUser: CurrentUser | null
+      /** Fetch error for the active section (e.g. permission denied), else null. */
+      error: string | null
+      users: UserInfo[]
+    }
+
+/** Sections of the Administration tab. */
+export type AdminSection = 'users' | 'vhosts' | 'permissions'
 
 export const overviewTabId = (c: string): string => `o:${c}`
 export const queueTabId = (c: string, q: string): string => `q:${c}:${q}`
@@ -105,6 +124,7 @@ export const exchangeTabId = (c: string, x: string): string => `x:${c}:${x}`
 export const connectionsTabId = (c: string): string => `c:${c}`
 export const policiesTabId = (c: string): string => `pol:${c}`
 export const shovelsTabId = (c: string): string => `shv:${c}`
+export const adminTabId = (c: string): string => `adm:${c}`
 
 /** A transient toast notification (auto-dismisses). */
 export interface Toast {
@@ -167,6 +187,8 @@ interface AppState {
   policyDialog: { connectionId: string; editing?: PolicyInfo } | null
   /** Open Shovel dialog (null = closed); `queue` is the source to drain. */
   shovelDialog: { connectionId: string; queue: string } | null
+  /** Open User dialog (null = closed); `editing` set ⇒ editing that user. */
+  userDialog: { connectionId: string; editing?: UserInfo } | null
   /** Last-used move destination per source queue (persisted), for default values. */
   lastMoveTargets: Record<string, MoveTarget>
 
@@ -241,6 +263,14 @@ interface AppState {
   closePolicyDialog(): void
   createPolicy(req: CreatePolicyRequest): Promise<OperationResult>
   deletePolicy(connectionId: string, name: string): Promise<OperationResult>
+  /** Open (or focus) the cluster's Administration tab. */
+  openAdminTab(connectionId: string): Promise<void>
+  /** Switch the active section of an open Administration tab. */
+  setAdminSection(connectionId: string, section: AdminSection): void
+  openUserDialog(connectionId: string, editing?: UserInfo): void
+  closeUserDialog(): void
+  createUser(req: CreateUserRequest): Promise<OperationResult>
+  deleteUser(connectionId: string, name: string): Promise<OperationResult>
   /** Open (or focus) the cluster's dynamic-shovels tab. */
   openShovelsTab(connectionId: string): Promise<void>
   openShovelDialog(queue: string, connectionId?: string): void
@@ -478,6 +508,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   bindingDialog: null,
   policyDialog: null,
   shovelDialog: null,
+  userDialog: null,
   lastMoveTargets: loadMoveTargets(),
   sidebarWidth: initialSidebarWidth,
   sidebarVisible: true,
@@ -880,6 +911,70 @@ export const useAppStore = create<AppState>((set, get) => ({
     return result
   },
 
+  async openAdminTab(connectionId) {
+    const id = adminTabId(connectionId)
+    if (get().tabs.some((t) => t.id === id)) {
+      set({ activeTabId: id })
+      await get().refreshTab(id)
+      return
+    }
+    const connName = get().connections.find((c) => c.id === connectionId)?.name ?? connectionId
+    set({
+      tabs: [
+        ...get().tabs,
+        {
+          id,
+          kind: 'admin',
+          connectionId,
+          title: `${connName} - Administration`,
+          section: 'users',
+          currentUser: null,
+          error: null,
+          users: []
+        }
+      ],
+      activeTabId: id
+    })
+    await get().refreshTab(id)
+  },
+
+  setAdminSection(connectionId, section) {
+    set({
+      tabs: get().tabs.map((t) =>
+        t.id === adminTabId(connectionId) && t.kind === 'admin' ? { ...t, section } : t
+      )
+    })
+  },
+
+  openUserDialog(connectionId, editing) {
+    set({ userDialog: { connectionId, editing } })
+  },
+
+  closeUserDialog() {
+    set({ userDialog: null })
+  },
+
+  async createUser(req) {
+    const result = await window.api.createUser(req)
+    if (result.ok) {
+      set({ userDialog: null })
+      get().addToast('success', `Saved user "${req.name}".`)
+      await get().refreshTab(adminTabId(req.connectionId))
+    }
+    return result
+  },
+
+  async deleteUser(connectionId, name) {
+    const result = await window.api.deleteUser(connectionId, name)
+    if (result.ok) {
+      get().addToast('success', `Deleted user "${name}".`)
+      await get().refreshTab(adminTabId(connectionId))
+    } else {
+      get().addToast('error', `Delete failed: ${result.error ?? 'unknown error'}`)
+    }
+    return result
+  },
+
   setActiveTab(id) {
     set({
       activeTabId: id,
@@ -991,6 +1086,34 @@ export const useAppStore = create<AppState>((set, get) => ({
         })
       } catch {
         // leave policies as-is
+      }
+    } else if (tab.kind === 'admin') {
+      // Identify the connected user first (gates the admin surface). Only an
+      // administrator can list users; a non-admin gets a banner, not a raw 403.
+      try {
+        const currentUser = await window.api.getCurrentUser(tab.connectionId)
+        let users: UserInfo[] = []
+        let error: string | null = null
+        if (currentUser.isAdministrator) {
+          try {
+            users = await window.api.listUsers(tab.connectionId)
+          } catch (e) {
+            error = e instanceof Error ? e.message : String(e)
+          }
+        }
+        set({
+          tabs: get().tabs.map((t) =>
+            t.id === id && t.kind === 'admin' ? { ...t, currentUser, users, error } : t
+          )
+        })
+      } catch (e) {
+        set({
+          tabs: get().tabs.map((t) =>
+            t.id === id && t.kind === 'admin'
+              ? { ...t, currentUser: null, users: [], error: e instanceof Error ? e.message : String(e) }
+              : t
+          )
+        })
       }
     } else if (tab.kind === 'shovels') {
       // Probe support first; only list shovels when the plugins are usable. A

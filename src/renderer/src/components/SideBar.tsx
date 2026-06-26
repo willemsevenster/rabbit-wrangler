@@ -245,6 +245,7 @@ function ConnectionNode({
   const importDefinitions = useAppStore((s) => s.importDefinitions)
   const openPoliciesTab = useAppStore((s) => s.openPoliciesTab)
   const openShovelsTab = useAppStore((s) => s.openShovelsTab)
+  const openAdminTab = useAppStore((s) => s.openAdminTab)
   const toggleCollapsed = useAppStore((s) => s.toggleConnectionCollapsed)
   const expandConnection = useAppStore((s) => s.expandConnection)
   const collapseConnection = useAppStore((s) => s.collapseConnection)
@@ -300,6 +301,11 @@ function ConnectionNode({
         label: 'View Shovels',
         icon: 'arrow-swap',
         onClick: () => void openShovelsTab(connection.id)
+      })
+      items.push({
+        label: 'Administration',
+        icon: 'organization',
+        onClick: () => void openAdminTab(connection.id)
       })
       items.push({ separator: true })
       items.push({

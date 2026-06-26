@@ -590,6 +590,89 @@ body.resizing {
   vertical-align: middle;
 }
 
+/* ---------- administration ---------- */
+.admin-identity {
+  color: var(--text-muted);
+  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-right: 8px;
+}
+.admin-sections {
+  display: flex;
+  gap: 2px;
+  padding: 6px 12px 0;
+  border-bottom: 1px solid var(--modal-border);
+}
+.admin-section-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 13px;
+}
+.admin-section-tab:hover {
+  color: var(--text);
+}
+.admin-section-tab.is-active {
+  color: var(--text);
+  border-bottom-color: var(--button-bg);
+}
+.admin-toolbar {
+  margin-bottom: 12px;
+}
+
+/* Toggleable + static user-tag chips. */
+.tag-chips {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.tag-chip {
+  font-size: 12px;
+  padding: 2px 10px;
+  border-radius: 11px;
+  border: 1px solid var(--input-border);
+  background: var(--input-bg);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.tag-chip.is-on {
+  background: var(--button-bg);
+  border-color: var(--button-bg);
+  color: #fff;
+}
+.tag-chip.is-static {
+  cursor: default;
+  color: var(--text);
+}
+
+/* Generic neutral notice box (e.g. the "needs administrator tag" banner). */
+.notice {
+  background: var(--input-bg);
+  border: 1px solid var(--modal-border);
+  border-radius: 4px;
+  padding: 12px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.notice p {
+  margin: 0 0 6px;
+}
+.notice p:last-child {
+  margin-bottom: 0;
+}
+.notice .codicon-warning {
+  color: var(--warning);
+  margin-right: 4px;
+}
+
 /* ---------- shovels ---------- */
 .shovel-unsupported {
   background: var(--input-bg);

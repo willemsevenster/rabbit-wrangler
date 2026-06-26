@@ -14,6 +14,7 @@ import { CreateExchangeDialog } from './components/CreateExchangeDialog'
 import { AddBindingDialog } from './components/AddBindingDialog'
 import { PolicyDialog } from './components/PolicyDialog'
 import { ShovelDialog } from './components/ShovelDialog'
+import { UserDialog } from './components/UserDialog'
 import { MenuBar } from './components/MenuBar'
 import { Resizer } from './components/Resizer'
 import { UpdateButton } from './components/UpdateButton'
@@ -37,6 +38,7 @@ function App() {
   const bindingDialog = useAppStore((s) => s.bindingDialog)
   const policyDialog = useAppStore((s) => s.policyDialog)
   const shovelDialog = useAppStore((s) => s.shovelDialog)
+  const userDialog = useAppStore((s) => s.userDialog)
   const importDialog = useAppStore((s) => s.importDialog)
   const sidebarWidth = useAppStore((s) => s.sidebarWidth)
   const sidebarVisible = useAppStore((s) => s.sidebarVisible)
@@ -80,6 +82,7 @@ function App() {
       {bindingDialog && <AddBindingDialog />}
       {policyDialog && <PolicyDialog />}
       {shovelDialog && <ShovelDialog />}
+      {userDialog && <UserDialog />}
       <ConfirmDialog />
       <AboutDialog />
       <SettingsDialog />
