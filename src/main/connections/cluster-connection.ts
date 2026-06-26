@@ -133,6 +133,14 @@ export class ClusterConnection {
     return this.api.getNodes()
   }
 
+  async getDefinitions(): Promise<Record<string, unknown>> {
+    return this.api.getDefinitions()
+  }
+
+  async importDefinitions(defs: unknown): Promise<OperationResult> {
+    return this.api.importDefinitions(defs)
+  }
+
   async checkHealth(): Promise<HealthResult> {
     return this.api.checkAliveness()
   }

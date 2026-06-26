@@ -238,8 +238,11 @@ recovery as the marquee workflow.
 
 ### Tier 3 — power features
 
-8. **Export / import definitions** — `GET`/`POST /definitions` for topology
-   backup, environment diffing, and "copy this vhost's setup to staging."
+8. ✅ **Export / import definitions** *(done)* — the connection menu's **Export /
+   Import Definitions** back up and restore a vhost's topology (queues, exchanges,
+   bindings, policies) via `GET`/`POST /definitions/{vhost}` — for backup,
+   environment diffing, and "copy this vhost's setup to staging." Vhost-scoped, so
+   exports carry no users/credentials; needs the `administrator` tag.
 9. **Policy management** — `GET`/`PUT`/`DELETE /policies/{vhost}` to set a DLX,
    message TTL, or max-length without leaving the app — the configuration side of
    the DLQ story the move feature handles operationally.

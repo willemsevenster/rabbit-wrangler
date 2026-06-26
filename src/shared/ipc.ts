@@ -17,6 +17,7 @@ import type {
   ConnectionConfig,
   ConsumerInfo,
   CreateBindingRequest,
+  DefinitionsPreview,
   CreateExchangeRequest,
   CreateQueueRequest,
   DeleteBindingRequest,
@@ -47,6 +48,11 @@ export const IPC = {
   disconnect: 'connections:disconnect',
   exportConnections: 'connections:export',
   importConnections: 'connections:import',
+
+  // topology definitions (RabbitMQ management HTTP API, vhost-scoped)
+  exportDefinitions: 'definitions:export',
+  previewImportDefinitions: 'definitions:preview',
+  importDefinitions: 'definitions:import',
 
   // cluster health (RabbitMQ management HTTP API)
   getOverview: 'cluster:overview',
@@ -109,6 +115,13 @@ export interface RabbitApi {
   exportConnections(): Promise<ExportResult>
   /** Read a connections JSON file (passwords excluded) for the import dialog. */
   importConnections(): Promise<ImportResult>
+
+  /** Export the connection's vhost topology (queues/exchanges/bindings/policies) to a JSON file. */
+  exportDefinitions(connectionId: string): Promise<ExportResult>
+  /** Prompt for a definitions file and return a parsed summary (not yet applied). */
+  previewImportDefinitions(connectionId: string): Promise<DefinitionsPreview>
+  /** Apply a previously-previewed definitions file to the connection's vhost. */
+  importDefinitions(connectionId: string, path: string): Promise<OperationResult>
 
   /** Cluster-wide summary (version, totals, rates). */
   getOverview(connectionId: string): Promise<ClusterOverview>

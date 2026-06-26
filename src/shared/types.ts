@@ -181,6 +181,25 @@ export interface SaveMessagesRequest {
   messages: ExportedMessage[]
 }
 
+/** Counts of the objects in a vhost definitions document. */
+export interface DefinitionsSummary {
+  queues: number
+  exchanges: number
+  bindings: number
+  policies: number
+}
+
+/** Result of reading a definitions file for import (parsed, not yet applied). */
+export interface DefinitionsPreview {
+  ok: boolean
+  /** True when the user dismissed the open dialog. */
+  canceled?: boolean
+  /** Absolute path of the chosen file, on success. */
+  path?: string
+  summary?: DefinitionsSummary
+  error?: string
+}
+
 export interface OperationResult {
   ok: boolean
   /** Number of messages affected (purged, moved, ...). For publish: 1 if routed. */

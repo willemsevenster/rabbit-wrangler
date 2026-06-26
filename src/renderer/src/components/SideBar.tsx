@@ -237,6 +237,8 @@ function ConnectionNode({
   const disconnect = useAppStore((s) => s.disconnectConnection)
   const checkHealth = useAppStore((s) => s.checkHealth)
   const openConnectionsTab = useAppStore((s) => s.openConnectionsTab)
+  const exportDefinitions = useAppStore((s) => s.exportDefinitions)
+  const importDefinitions = useAppStore((s) => s.importDefinitions)
   const toggleCollapsed = useAppStore((s) => s.toggleConnectionCollapsed)
   const expandConnection = useAppStore((s) => s.expandConnection)
   const collapseConnection = useAppStore((s) => s.collapseConnection)
@@ -283,6 +285,18 @@ function ConnectionNode({
         icon: 'plug',
         onClick: () => void openConnectionsTab(connection.id)
       })
+      items.push({ separator: true })
+      items.push({
+        label: 'Export Definitions…',
+        icon: 'cloud-download',
+        onClick: () => void exportDefinitions(connection.id)
+      })
+      items.push({
+        label: 'Import Definitions…',
+        icon: 'cloud-upload',
+        onClick: () => void importDefinitions(connection.id)
+      })
+      items.push({ separator: true })
       items.push({
         label: 'Disconnect',
         icon: 'debug-disconnect',

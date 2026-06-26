@@ -154,6 +154,18 @@ when the management API already exposes it (e.g. purge is an HTTP `DELETE`).
   `flow`-state queues). `refreshCluster` does a one-off fetch on overview-tab open /
   Refresh so the panel isn't blank before the first poll. `ManagementApi.getOverview`/
   `getNodes` map the raw payloads (incl. `mem_alarm`/`disk_free_alarm`).
+- **Definitions export/import** (`ManagementApi.getDefinitions`/`importDefinitions`,
+  `store/definitions-io.ts`, UI via the connection context menu → "Export/Import
+  Definitions…"): vhost-scoped topology backup/restore over `GET`/`POST
+  /definitions/{vhost}` (queues, exchanges, bindings, policies, parameters — **not**
+  users/permissions, so no credentials leak). **Export** GETs first (so a permission
+  error fails before the save dialog), then writes pretty JSON. **Import** is a
+  two-step: `previewImportDefinitions` (open dialog → parse → `DefinitionsSummary`
+  counts) → renderer `confirm` naming the vhost + counts → `importDefinitions(path)`
+  re-reads + `POST`s (additive/idempotent; nothing deleted), then refreshes
+  queues/exchanges. **Requires the `administrator` tag** (like `/nodes` needs
+  monitoring); a locked-down user gets a surfaced permission error. Driven via the
+  `stub-save-dialog`/`stub-open-dialog` driver commands.
 - **Client connections & consumers** (`ManagementApi.listConnections`/`listConsumers`/
   `closeConnection`, UI: `components/ConnectionsView` in a `connections` editor tab):
   a per-cluster tab (opened from the connection context menu → **View Connections**,
