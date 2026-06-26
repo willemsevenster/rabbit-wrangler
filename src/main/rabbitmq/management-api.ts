@@ -126,14 +126,18 @@ export class ManagementApi {
    * password with no `keepPassword` makes the user passwordless. */
   async createUser(req: CreateUserRequest): Promise<OperationResult> {
     try {
-      const body: Record<string, unknown> = { tags: req.tags }
+      // RabbitMQ accepts `tags` as a comma-separated string on every version
+      // (arrays only on newer ones) — send CSV for the broadest compatibility.
+      const body: Record<string, unknown> = { tags: req.tags.join(',') }
       if (req.password) {
         body.password = req.password
       } else if (req.keepPassword) {
-        const existing = await this.request<RawUser>(
-          `/users/${encodeURIComponent(req.name)}`
-        ).catch(() => undefined)
-        body.password_hash = existing?.password_hash ?? ''
+        // Re-assert the existing hash so a tag-only edit keeps the password. Let a
+        // GET failure throw (caught below) rather than fall back to '' — that would
+        // silently make the user passwordless. ('' here only when the user really
+        // has no password, which correctly keeps it passwordless.)
+        const existing = await this.request<RawUser>(`/users/${encodeURIComponent(req.name)}`)
+        body.password_hash = existing.password_hash ?? ''
       } else {
         body.password_hash = '' // explicit passwordless
       }

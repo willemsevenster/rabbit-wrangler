@@ -40,7 +40,24 @@ export function AdministrationView({ tab }: { tab: AdminTab }) {
         </button>
       </div>
 
-      {currentUser && !isAdmin ? (
+      {currentUser == null ? (
+        // Identity not yet known — never show the mutating section UI before the
+        // admin-gating decision is made.
+        <div className="editor__body" style={{ padding: 16, overflow: 'auto' }}>
+          {error ? (
+            <div className="notice">
+              <p>
+                <span className="codicon codicon-warning" /> Couldn’t determine your broker access.
+              </p>
+              <p style={{ color: 'var(--text-muted)' }}>{error}</p>
+            </div>
+          ) : (
+            <p className="placeholder" style={{ padding: 0 }}>
+              Checking access…
+            </p>
+          )}
+        </div>
+      ) : !isAdmin ? (
         <div className="editor__body" style={{ padding: 16, overflow: 'auto' }}>
           <div className="notice">
             <p>

@@ -1,8 +1,8 @@
 # Administration
 
 Right-click a connected broker and choose **Administration** to open its admin tab —
-the identity and access surface for the whole cluster. The tab has sections for
-**Users**, **Virtual hosts**, and **Permissions**.
+the identity and access surface for the whole cluster. It starts with the **Users**
+section; **Virtual hosts** and **Permissions** sections are on the way.
 
 ::: warning Requires the administrator tag
 Administration needs a broker user with the **administrator** tag. If you're connected
