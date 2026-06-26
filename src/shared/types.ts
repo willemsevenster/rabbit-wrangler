@@ -228,6 +228,40 @@ export interface CreatePolicyRequest {
   priority: number
 }
 
+/** Whether dynamic shovels are usable on this broker (the `rabbitmq_shovel` +
+ * `rabbitmq_shovel_management` plugins). Probed lazily before offering the feature. */
+export interface ShovelSupport {
+  supported: boolean
+  /** Why not, when unsupported (plugin disabled, permission, unreachable). */
+  reason?: string
+}
+
+/** A dynamic shovel as reported by `GET /api/shovels/{vhost}`. */
+export interface ShovelInfo {
+  name: string
+  vhost: string
+  /** "running" | "starting" | "terminated" | ... as reported by the broker. */
+  state: string
+  /** Shovel type — "dynamic" for the ones this app creates. */
+  type?: string
+  /** Source/destination, when reported (varies by broker version). */
+  source?: string
+  destination?: string
+}
+
+/** Create a one-shot dynamic shovel that drains a queue's backlog broker-side. */
+export interface CreateShovelRequest {
+  connectionId: string
+  /** Parameter name for the shovel (must be unique within the vhost). */
+  name: string
+  /** Queue to drain (the source). */
+  srcQueue: string
+  /** Destination exchange; "" means the default exchange (route by key to a queue). */
+  destExchange: string
+  /** Routing key used at the destination (and the queue name on the default exchange). */
+  destRoutingKey: string
+}
+
 /** Counts of the objects in a vhost definitions document. */
 export interface DefinitionsSummary {
   queues: number

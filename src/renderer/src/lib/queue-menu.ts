@@ -29,6 +29,7 @@ export function buildQueueMenu(connectionId: string, q: QueueInfo): MenuItem[] {
     refreshQueues,
     purgeQueue,
     openMoveDialog,
+    openShovelDialog,
     openDeleteQueueDialog,
     exportMessages,
     maybeConfirm,
@@ -55,6 +56,12 @@ export function buildQueueMenu(connectionId: string, q: QueueInfo): MenuItem[] {
       icon: 'arrow-right',
       disabled: httpOnly,
       onClick: () => openMoveDialog(q.name, connectionId)
+    },
+    {
+      // Server-side shovel is a management-plane op, so it works even in HTTP mode.
+      label: 'Move via Server-Side Shovel…',
+      icon: 'arrow-swap',
+      onClick: () => openShovelDialog(q.name, connectionId)
     },
     {
       label: 'Export Messages…',

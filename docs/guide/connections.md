@@ -112,6 +112,34 @@ Right-click a connected broker for **Export Definitions…** and **Import Defini
 Definitions are an administrative operation — they require a broker user with the **administrator** tag. With a locked-down user you'll get a permission error.
 :::
 
+## Server-side moves (shovels)
+
+For a **very large** dead-letter queue, pulling every message through the app (the
+normal [Move](./moving-and-purging)) can be slow. Right-click a queue and choose
+**Move via Server-Side Shovel…** to have the **broker** do the move instead.
+
+This creates a **one-shot dynamic shovel**: it drains the queue's current backlog to
+your chosen destination entirely broker-side, then deletes itself when done. Acks are
+publisher-confirmed, so a failure can duplicate but never drop. Leave the destination
+exchange blank to route by key to the queue of that name (e.g. returning dead-letters
+to their original queue). Because it's a management-plane operation, it works even when
+the [AMQP port is firewalled](#message-browsing-amqp-vs-http) (HTTP browse mode).
+
+Right-click a connected broker and choose **View Shovels** to watch active shovels and
+their state, or to delete one. Shovels you start here delete themselves once the backlog
+is drained, so an **empty list after a move is normal**.
+
+::: warning Prerequisites
+Dynamic shovels require the broker's **`rabbitmq_shovel`** and
+**`rabbitmq_shovel_management`** plugins, and a user with the **administrator** (or
+**policymaker** + **monitoring**) tag. If the plugins aren't enabled, the dialog tells
+you — enable them on the broker with:
+
+```sh
+rabbitmq-plugins enable rabbitmq_shovel rabbitmq_shovel_management
+```
+:::
+
 ## Client connections & consumers
 
 Right-click a connected broker and choose **View Connections** to open a tab listing:

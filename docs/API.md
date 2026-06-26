@@ -161,7 +161,8 @@ addressed as `amq.default`, the default vhost `/` as `%2F`).
 | ⭐     | POST           | `/definitions` · `/definitions/{vhost}`  | **Import** definitions (restore/replicate topology).                                  |
 | ⭐     | GET/PUT/DELETE | `/policies/{vhost}[/{name}]`             | Manage DLX / TTL / max-length / quorum policies — directly relevant to DLQ workflows. |
 | ◻︎      | GET/PUT/DELETE | `/operator-policies/{vhost}[/{name}]`    | Operator policies.                                                                    |
-| ◻︎      | GET/PUT/DELETE | `/parameters/{component}/{vhost}/{name}` | Runtime parameters — e.g. **dynamic shovel** for large server-side moves.             |
+| ✅     | GET/PUT/DELETE | `/parameters/shovel/{vhost}[/{name}]` · `/shovels/{vhost}` | **Dynamic shovels** for large server-side moves (one-shot DLQ drains).    |
+| ◻︎      | GET/PUT/DELETE | `/parameters/{component}/{vhost}/{name}` | Other runtime parameters.                                                             |
 | ◻︎      | GET/PUT/DELETE | `/global-parameters/{name}`              | Global parameters.                                                                    |
 
 ### Identity & access (admin surface)
@@ -261,9 +262,15 @@ recovery as the marquee workflow.
     browsing** setting (Auto / HTTP-only) plus a right-click toggle let you choose
     the mode when both work. HTTP browse is read-only — move/delete/export-to-file
     need AMQP and are disabled.
-12. **Server-side shovel for large moves** — for very large DLQs, a dynamic
-    shovel (`PUT /parameters/shovel/{vhost}/{name}`) moves messages broker-side,
-    avoiding pulling every message through the app.
+12. ✅ **Server-side shovel for large moves** *(done)* — the queue menu's **Move via
+    Server-Side Shovel…** creates a **one-shot dynamic shovel**
+    (`PUT /parameters/shovel/{vhost}/{name}`, `src-delete-after: queue-length`,
+    `ack-mode: on-confirm`) that drains a backlog **broker-side** then deletes itself,
+    avoiding pulling every message through the app. Shovel support is **probed first**
+    (`GET /shovels/{vhost}`); if the `rabbitmq_shovel` / `rabbitmq_shovel_management`
+    plugins are off, the UI says how to enable them. A **View Shovels** tab
+    (`GET /shovels/{vhost}`, `DELETE /parameters/shovel/{vhost}/{name}`) monitors and
+    removes shovels. Needs the `administrator` (or `policymaker` + `monitoring`) tag.
 
 ### Probably out of scope (note, don't build unless asked)
 

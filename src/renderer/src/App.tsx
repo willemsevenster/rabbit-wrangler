@@ -13,6 +13,7 @@ import { DeleteQueueDialog } from './components/DeleteQueueDialog'
 import { CreateExchangeDialog } from './components/CreateExchangeDialog'
 import { AddBindingDialog } from './components/AddBindingDialog'
 import { PolicyDialog } from './components/PolicyDialog'
+import { ShovelDialog } from './components/ShovelDialog'
 import { MenuBar } from './components/MenuBar'
 import { Resizer } from './components/Resizer'
 import { UpdateButton } from './components/UpdateButton'
@@ -35,6 +36,7 @@ function App() {
   const createExchangeDialog = useAppStore((s) => s.createExchangeDialog)
   const bindingDialog = useAppStore((s) => s.bindingDialog)
   const policyDialog = useAppStore((s) => s.policyDialog)
+  const shovelDialog = useAppStore((s) => s.shovelDialog)
   const importDialog = useAppStore((s) => s.importDialog)
   const sidebarWidth = useAppStore((s) => s.sidebarWidth)
   const sidebarVisible = useAppStore((s) => s.sidebarVisible)
@@ -77,6 +79,7 @@ function App() {
       {createExchangeDialog && <CreateExchangeDialog />}
       {bindingDialog && <AddBindingDialog />}
       {policyDialog && <PolicyDialog />}
+      {shovelDialog && <ShovelDialog />}
       <ConfirmDialog />
       <AboutDialog />
       <SettingsDialog />

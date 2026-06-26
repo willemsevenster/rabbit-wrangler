@@ -590,6 +590,35 @@ body.resizing {
   vertical-align: middle;
 }
 
+/* ---------- shovels ---------- */
+.shovel-unsupported {
+  background: var(--input-bg);
+  border: 1px solid var(--modal-border);
+  border-radius: 4px;
+  padding: 12px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.shovel-unsupported p {
+  margin: 0 0 6px;
+}
+.shovel-unsupported p:last-child {
+  margin-bottom: 0;
+}
+.shovel-unsupported .codicon-warning {
+  color: var(--warning);
+  margin-right: 4px;
+}
+.shovel-state {
+  text-transform: capitalize;
+}
+.shovel-state--running {
+  color: var(--success);
+}
+.shovel-state--terminated {
+  color: var(--text-muted);
+}
+
 .tree__empty {
   color: var(--text-muted);
   padding: 8px 20px;

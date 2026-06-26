@@ -203,6 +203,23 @@ Key behavior below.
   queues/exchanges. **Requires the `administrator` tag** (like `/nodes` needs
   monitoring); a locked-down user gets a surfaced permission error. Driven via the
   `stub-save-dialog`/`stub-open-dialog` driver commands.
+- **Server-side shovels** (`ManagementApi.getShovelSupport`/`listShovels`/`createShovel`/
+  `deleteShovel`, UI: `ShovelDialog` from the queue menu → "Move via Server-Side
+  Shovel…" + `ShovelsView` in a `shovels` editor tab via connection menu → "View
+  Shovels", keyed `shovelsTabId` = `shv:${connId}`, roadmap Tier 3 #12): a **one-shot
+  dynamic shovel** for draining a large DLQ **broker-side** instead of pulling every
+  message through the app. `createShovel` does `PUT /parameters/shovel/{vhost}/{name}`
+  with `src-delete-after: queue-length` (drain the current backlog, then auto-delete),
+  `ack-mode: on-confirm`, and **`src-uri`/`dest-uri` = the connection's own
+  `buildAmqpUrl(config)`** (the broker connects back to itself with the user's
+  creds+vhost) — so it works even in **HTTP browse mode** (it's a management-plane op).
+  **Support is probed lazily** (`getShovelSupport` → `GET /shovels/{vhost}`): any
+  non-2xx that isn't 401/403 is treated as "shovel plugins not enabled" and the dialog
+  + tab show the exact `rabbitmq-plugins enable rabbitmq_shovel rabbitmq_shovel_management`
+  command (the probe returns 400 **or** 404 depending on version, hence the broad
+  check). Needs the `administrator` (or `policymaker` + `monitoring`) tag. The `shovels`
+  tab holds `support` + `shovels` (fetched on open/Refresh, like policies); one-shot
+  shovels self-delete, so an empty list after a move is normal.
 - **Client connections & consumers** (`ManagementApi.listConnections`/`listConsumers`/
   `closeConnection`, UI: `components/ConnectionsView` in a `connections` editor tab):
   a per-cluster tab (opened from the connection context menu → **View Connections**,
