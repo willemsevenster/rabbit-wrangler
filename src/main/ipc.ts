@@ -27,6 +27,7 @@ import type {
   CreateQueueRequest,
   CreateShovelRequest,
   CreateUserRequest,
+  CreateVhostRequest,
   DeleteBindingRequest,
   DeleteMessageRequest,
   DeleteQueueRequest,
@@ -119,6 +120,18 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle(IPC.deleteUser, (_e, connectionId: string, name: string) =>
     connectionManager.require(connectionId).deleteUser(name)
+  )
+
+  ipcMain.handle(IPC.listVhosts, (_e, connectionId: string) =>
+    connectionManager.require(connectionId).listVhosts()
+  )
+
+  ipcMain.handle(IPC.createVhost, (_e, req: CreateVhostRequest) =>
+    connectionManager.require(req.connectionId).createVhost(req)
+  )
+
+  ipcMain.handle(IPC.deleteVhost, (_e, connectionId: string, name: string) =>
+    connectionManager.require(connectionId).deleteVhost(name)
   )
 
   ipcMain.handle(IPC.getShovelSupport, (_e, connectionId: string) =>

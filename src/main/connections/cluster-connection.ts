@@ -18,6 +18,7 @@ import type {
   CreatePolicyRequest,
   CreateQueueRequest,
   CreateUserRequest,
+  CreateVhostRequest,
   CurrentUser,
   DeleteBindingRequest,
   DeleteMessageRequest,
@@ -37,7 +38,8 @@ import type {
   CreateShovelRequest,
   ShovelInfo,
   ShovelSupport,
-  UserInfo
+  UserInfo,
+  VhostInfo
 } from '@shared/types'
 
 /** One queue browser — either the live AMQP peeker or the polled HTTP browser.
@@ -225,6 +227,18 @@ export class ClusterConnection {
 
   async deleteUser(name: string): Promise<OperationResult> {
     return this.api.deleteUser(name)
+  }
+
+  async listVhosts(): Promise<VhostInfo[]> {
+    return this.api.listVhosts()
+  }
+
+  async createVhost(req: CreateVhostRequest): Promise<OperationResult> {
+    return this.api.createVhost(req)
+  }
+
+  async deleteVhost(name: string): Promise<OperationResult> {
+    return this.api.deleteVhost(name)
   }
 
   async getShovelSupport(): Promise<ShovelSupport> {

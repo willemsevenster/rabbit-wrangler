@@ -17,11 +17,13 @@ import type {
   CreateQueueRequest,
   CreateShovelRequest,
   CreateUserRequest,
+  CreateVhostRequest,
   CurrentUser,
   PolicyInfo,
   ShovelInfo,
   ShovelSupport,
   UserInfo,
+  VhostInfo,
   DeleteBindingRequest,
   DeleteMessageRequest,
   DeleteQueueRequest,
@@ -113,6 +115,7 @@ export type EditorTab =
       /** Fetch error for the active section (e.g. permission denied), else null. */
       error: string | null
       users: UserInfo[]
+      vhosts: VhostInfo[]
     }
 
 /** Sections of the Administration tab. */
@@ -189,6 +192,8 @@ interface AppState {
   shovelDialog: { connectionId: string; queue: string } | null
   /** Open User dialog (null = closed); `editing` set ⇒ editing that user. */
   userDialog: { connectionId: string; editing?: UserInfo } | null
+  /** Open Vhost dialog (null = closed); `editing` set ⇒ editing that vhost. */
+  vhostDialog: { connectionId: string; editing?: VhostInfo } | null
   /** Last-used move destination per source queue (persisted), for default values. */
   lastMoveTargets: Record<string, MoveTarget>
 
@@ -271,6 +276,10 @@ interface AppState {
   closeUserDialog(): void
   createUser(req: CreateUserRequest): Promise<OperationResult>
   deleteUser(connectionId: string, name: string): Promise<OperationResult>
+  openVhostDialog(connectionId: string, editing?: VhostInfo): void
+  closeVhostDialog(): void
+  createVhost(req: CreateVhostRequest): Promise<OperationResult>
+  deleteVhost(connectionId: string, name: string): Promise<OperationResult>
   /** Open (or focus) the cluster's dynamic-shovels tab. */
   openShovelsTab(connectionId: string): Promise<void>
   openShovelDialog(queue: string, connectionId?: string): void
@@ -509,6 +518,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   policyDialog: null,
   shovelDialog: null,
   userDialog: null,
+  vhostDialog: null,
   lastMoveTargets: loadMoveTargets(),
   sidebarWidth: initialSidebarWidth,
   sidebarVisible: true,
@@ -930,7 +940,8 @@ export const useAppStore = create<AppState>((set, get) => ({
           section: 'users',
           currentUser: null,
           error: null,
-          users: []
+          users: [],
+          vhosts: []
         }
       ],
       activeTabId: id
@@ -968,6 +979,35 @@ export const useAppStore = create<AppState>((set, get) => ({
     const result = await window.api.deleteUser(connectionId, name)
     if (result.ok) {
       get().addToast('success', `Deleted user "${name}".`)
+      await get().refreshTab(adminTabId(connectionId))
+    } else {
+      get().addToast('error', `Delete failed: ${result.error ?? 'unknown error'}`)
+    }
+    return result
+  },
+
+  openVhostDialog(connectionId, editing) {
+    set({ vhostDialog: { connectionId, editing } })
+  },
+
+  closeVhostDialog() {
+    set({ vhostDialog: null })
+  },
+
+  async createVhost(req) {
+    const result = await window.api.createVhost(req)
+    if (result.ok) {
+      set({ vhostDialog: null })
+      get().addToast('success', `Saved virtual host "${req.name}".`)
+      await get().refreshTab(adminTabId(req.connectionId))
+    }
+    return result
+  },
+
+  async deleteVhost(connectionId, name) {
+    const result = await window.api.deleteVhost(connectionId, name)
+    if (result.ok) {
+      get().addToast('success', `Deleted virtual host "${name}".`)
       await get().refreshTab(adminTabId(connectionId))
     } else {
       get().addToast('error', `Delete failed: ${result.error ?? 'unknown error'}`)
@@ -1093,24 +1133,34 @@ export const useAppStore = create<AppState>((set, get) => ({
       try {
         const currentUser = await window.api.getCurrentUser(tab.connectionId)
         let users: UserInfo[] = []
+        let vhosts: VhostInfo[] = []
         let error: string | null = null
         if (currentUser.isAdministrator) {
           try {
-            users = await window.api.listUsers(tab.connectionId)
+            ;[users, vhosts] = await Promise.all([
+              window.api.listUsers(tab.connectionId),
+              window.api.listVhosts(tab.connectionId)
+            ])
           } catch (e) {
             error = e instanceof Error ? e.message : String(e)
           }
         }
         set({
           tabs: get().tabs.map((t) =>
-            t.id === id && t.kind === 'admin' ? { ...t, currentUser, users, error } : t
+            t.id === id && t.kind === 'admin' ? { ...t, currentUser, users, vhosts, error } : t
           )
         })
       } catch (e) {
         set({
           tabs: get().tabs.map((t) =>
             t.id === id && t.kind === 'admin'
-              ? { ...t, currentUser: null, users: [], error: e instanceof Error ? e.message : String(e) }
+              ? {
+                  ...t,
+                  currentUser: null,
+                  users: [],
+                  vhosts: [],
+                  error: e instanceof Error ? e.message : String(e)
+                }
               : t
           )
         })

@@ -1,8 +1,8 @@
 # Administration
 
 Right-click a connected broker and choose **Administration** to open its admin tab —
-the identity and access surface for the whole cluster. It starts with the **Users**
-section; **Virtual hosts** and **Permissions** sections are on the way.
+the identity and access surface for the whole cluster. It has **Users** and **Virtual
+hosts** sections (a **Permissions** section is on the way).
 
 ::: warning Requires the administrator tag
 Administration needs a broker user with the **administrator** tag. If you're connected
@@ -30,4 +30,20 @@ host) with their **tags** and whether a **password** is set.
 The user **this connection authenticates as** is marked **you**. Deleting it, or
 removing your own `administrator` tag, will revoke your access — Rabbit Wrangler warns
 you before letting either happen.
+:::
+
+## Virtual hosts
+
+The **Virtual hosts** section lists every vhost with its **description**, **default queue
+type**, and current **message** count.
+
+- **Add Vhost** / **Edit** open a dialog for the **name**, an optional **description**,
+  and an optional **default queue type** (`classic` / `quorum` / `stream`) applied to
+  queues declared without an explicit type.
+- **Delete** removes a vhost.
+
+::: danger Deleting a vhost is destructive
+Deleting a virtual host **permanently removes every queue, exchange, binding and message
+in it** — it can't be undone. You're always asked to confirm, with an extra warning when
+it's the vhost the current connection targets.
 :::

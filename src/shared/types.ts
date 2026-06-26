@@ -260,6 +260,26 @@ export interface CreateUserRequest {
   keepPassword?: boolean
 }
 
+/** A virtual host (cluster-wide), from `GET /vhosts`. */
+export interface VhostInfo {
+  name: string
+  description?: string
+  /** Default queue type for queues declared without an explicit type. */
+  defaultQueueType?: string
+  tags: string[]
+  /** Total messages across the vhost's queues (when reported). */
+  messages?: number
+}
+
+/** Create or update a virtual host (`PUT /vhosts/{name}`). */
+export interface CreateVhostRequest {
+  connectionId: string
+  name: string
+  description?: string
+  /** "classic" | "quorum" | "stream" — blank lets the broker decide. */
+  defaultQueueType?: string
+}
+
 /** Whether dynamic shovels are usable on this broker (the `rabbitmq_shovel` +
  * `rabbitmq_shovel_management` plugins). Probed lazily before offering the feature. */
 export interface ShovelSupport {
