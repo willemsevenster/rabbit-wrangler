@@ -10,6 +10,7 @@ import type {
   CreateQueueRequest,
   CreateShovelRequest,
   CreateUserRequest,
+  CreateVhostRequest,
   DeleteBindingRequest,
   DeleteMessageRequest,
   DeleteQueueRequest,
@@ -44,6 +45,10 @@ const api: RabbitApi = {
   createUser: (request: CreateUserRequest) => ipcRenderer.invoke(IPC.createUser, request),
   deleteUser: (connectionId: string, name: string) =>
     ipcRenderer.invoke(IPC.deleteUser, connectionId, name),
+  listVhosts: (connectionId: string) => ipcRenderer.invoke(IPC.listVhosts, connectionId),
+  createVhost: (request: CreateVhostRequest) => ipcRenderer.invoke(IPC.createVhost, request),
+  deleteVhost: (connectionId: string, name: string) =>
+    ipcRenderer.invoke(IPC.deleteVhost, connectionId, name),
 
   listPolicies: (connectionId: string) => ipcRenderer.invoke(IPC.listPolicies, connectionId),
   createPolicy: (request: CreatePolicyRequest) => ipcRenderer.invoke(IPC.createPolicy, request),

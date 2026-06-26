@@ -237,8 +237,10 @@ Key behavior below.
   UI: `AdministrationView` in an `admin` editor tab via connection menu →
   **Administration**, keyed `adminTabId` = `adm:${connId}`, roadmap Tier 4 → v1.0.0):
   the cluster-wide **identity/access** surface. One tab with a `section` switcher
-  (`users` now; `vhosts`/`permissions` land in later PRs); each section is a sub-view
-  (`UsersSection` + `UserDialog`). **Cluster-wide**, so it ignores the connection's
+  (`users` + `vhosts`; `permissions` lands next); each section is a sub-view
+  (`UsersSection`/`VhostsSection` + `UserDialog`/`VhostDialog`). **Vhost delete** is
+  destructive (drops all its objects) — always `store.confirm`, with an extra warning
+  when it's the connection's own vhost. **Cluster-wide**, so it ignores the connection's
   vhost. `whoami` (`GET /whoami`, was discarded by `ping()`) is captured into
   `CurrentUser` (`{name, tags, isAdministrator}`) via `getCurrentUser`: it shows
   "connected as X", **gates** the tab (a non-admin sees a banner, not a raw 403 — the

@@ -22,6 +22,7 @@ import type {
   CreatePolicyRequest,
   CreateShovelRequest,
   CreateUserRequest,
+  CreateVhostRequest,
   CurrentUser,
   DefinitionsPreview,
   CreateExchangeRequest,
@@ -46,7 +47,8 @@ import type {
   SaveMessagesRequest,
   ShovelInfo,
   ShovelSupport,
-  UserInfo
+  UserInfo,
+  VhostInfo
 } from './types'
 
 export const IPC = {
@@ -66,6 +68,9 @@ export const IPC = {
   listUsers: 'admin:users:list',
   createUser: 'admin:users:create',
   deleteUser: 'admin:users:delete',
+  listVhosts: 'admin:vhosts:list',
+  createVhost: 'admin:vhosts:create',
+  deleteVhost: 'admin:vhosts:delete',
 
   // policies (RabbitMQ management HTTP API, vhost-scoped)
   listPolicies: 'policies:list',
@@ -157,6 +162,12 @@ export interface RabbitApi {
   createUser(request: CreateUserRequest): Promise<OperationResult>
   /** Delete a user by name. */
   deleteUser(connectionId: string, name: string): Promise<OperationResult>
+  /** List the broker's virtual hosts (cluster-wide). */
+  listVhosts(connectionId: string): Promise<VhostInfo[]>
+  /** Create or update a virtual host. */
+  createVhost(request: CreateVhostRequest): Promise<OperationResult>
+  /** Delete a virtual host (and everything in it) by name. */
+  deleteVhost(connectionId: string, name: string): Promise<OperationResult>
 
   /** List the vhost's policies. */
   listPolicies(connectionId: string): Promise<PolicyInfo[]>

@@ -10,6 +10,7 @@ import type {
   CreateQueueRequest,
   CreateShovelRequest,
   CreateUserRequest,
+  CreateVhostRequest,
   CurrentUser,
   DeleteBindingRequest,
   DeleteQueueRequest,
@@ -22,7 +23,8 @@ import type {
   QueueInfo,
   ShovelInfo,
   ShovelSupport,
-  UserInfo
+  UserInfo,
+  VhostInfo
 } from '@shared/types'
 
 /** The complete set of AMQP basic message properties RabbitMQ accepts on publish. */
@@ -154,6 +156,49 @@ export class ManagementApi {
   async deleteUser(name: string): Promise<OperationResult> {
     try {
       await this.request<void>(`/users/${encodeURIComponent(name)}`, { method: 'DELETE' })
+      return { ok: true, affected: 1 }
+    } catch (err) {
+      return { ok: false, affected: 0, error: err instanceof Error ? err.message : String(err) }
+    }
+  }
+
+  /** List the broker's virtual hosts (cluster-wide). Needs the administrator tag. */
+  async listVhosts(): Promise<VhostInfo[]> {
+    const raw = await this.request<RawVhost[]>('/vhosts')
+    return raw.map((v) => ({
+      name: v.name,
+      description: v.description,
+      // The default vhost reports the literal string "undefined" when unset — treat
+      // that (and empty) as no default queue type.
+      defaultQueueType:
+        v.default_queue_type && v.default_queue_type !== 'undefined'
+          ? v.default_queue_type
+          : undefined,
+      tags: normalizeTags(v.tags),
+      messages: v.messages
+    }))
+  }
+
+  /** Create or update a virtual host. PUT is idempotent (re-asserting is a no-op). */
+  async createVhost(req: CreateVhostRequest): Promise<OperationResult> {
+    try {
+      const body: Record<string, unknown> = {}
+      if (req.description) body.description = req.description
+      if (req.defaultQueueType) body.default_queue_type = req.defaultQueueType
+      await this.request<void>(`/vhosts/${encodeURIComponent(req.name)}`, {
+        method: 'PUT',
+        body: JSON.stringify(body)
+      })
+      return { ok: true, affected: 1 }
+    } catch (err) {
+      return { ok: false, affected: 0, error: err instanceof Error ? err.message : String(err) }
+    }
+  }
+
+  /** Delete a virtual host — and every queue, exchange, binding and message in it. */
+  async deleteVhost(name: string): Promise<OperationResult> {
+    try {
+      await this.request<void>(`/vhosts/${encodeURIComponent(name)}`, { method: 'DELETE' })
       return { ok: true, affected: 1 }
     } catch (err) {
       return { ok: false, affected: 0, error: err instanceof Error ? err.message : String(err) }
@@ -837,6 +882,14 @@ interface RawUser {
   name: string
   tags?: string[] | string
   password_hash?: string
+}
+
+interface RawVhost {
+  name: string
+  description?: string
+  default_queue_type?: string
+  tags?: string[] | string
+  messages?: number
 }
 
 interface RawShovel {

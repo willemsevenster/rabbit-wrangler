@@ -171,7 +171,7 @@ addressed as `amq.default`, the default vhost `/` as `%2F`).
 | ------ | -------------- | -------------------------------------------------------- | ------------------------------------------ |
 | ✅     | GET            | `/whoami`                                                | Reachability + auth probe on connect; also surfaces the current user's name + tags (Administration tab gating). |
 | ✅     | GET/PUT/DELETE | `/users[/{name}]`                                        | **Manage users** (Administration → Users): tags + password.    |
-| ◻︎      | GET/PUT/DELETE | `/vhosts[/{name}]`                                       | Manage vhosts _(Administration → Vhosts, in progress)._        |
+| ✅     | GET/PUT/DELETE | `/vhosts[/{name}]`                                       | **Manage vhosts** (Administration → Virtual hosts): description, default queue type. |
 | ◻︎      | GET/PUT/DELETE | `/permissions/{vhost}/{user}` · `/topic-permissions/...` | Manage permissions _(Administration → Permissions, in progress)._ |
 | ◻︎      | GET            | `/extensions`                                            | Installed management extensions.           |
 
@@ -281,7 +281,8 @@ Delivered in phases:
 
 13. ⏳ **Users** — `GET`/`PUT`/`DELETE /users` (tags + password) + `/whoami` for
     current-user/admin gating. Administration → Users.
-14. ◻︎ **Virtual hosts** — `GET`/`PUT`/`DELETE /vhosts`. Administration → Vhosts.
+14. ⏳ **Virtual hosts** — `GET`/`PUT`/`DELETE /vhosts` (description + default queue
+    type). Administration → Virtual hosts.
 15. ◻︎ **Permissions** — `GET`/`PUT`/`DELETE /permissions/{vhost}/{user}` and
     `/topic-permissions/{vhost}/{user}`. Administration → Permissions.
 
