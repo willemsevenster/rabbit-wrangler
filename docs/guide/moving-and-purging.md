@@ -21,6 +21,12 @@ Messages are drained from the source and republished to the target with **publis
 
 If the target turns out to be **unroutable** (for example, a typo'd queue name), the move **aborts** rather than discarding messages.
 
+::: tip Very large queues
+For a huge backlog, moving every message through the app can be slow. Use
+**Move via Server-Side Shovel…** instead to have the **broker** drain the queue
+itself — see [Server-side moves (shovels)](./connections#server-side-moves-shovels).
+:::
+
 ## Move or delete a single message
 
 To act on just one message, right-click it in the table (or use the buttons in the detail pane) and choose **Move** or **Delete**.

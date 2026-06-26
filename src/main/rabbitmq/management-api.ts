@@ -8,6 +8,7 @@ import type {
   CreateExchangeRequest,
   CreatePolicyRequest,
   CreateQueueRequest,
+  CreateShovelRequest,
   DeleteBindingRequest,
   DeleteQueueRequest,
   ExchangeInfo,
@@ -16,7 +17,9 @@ import type {
   OperationResult,
   PolicyInfo,
   PublishMessageRequest,
-  QueueInfo
+  QueueInfo,
+  ShovelInfo,
+  ShovelSupport
 } from '@shared/types'
 
 /** The complete set of AMQP basic message properties RabbitMQ accepts on publish. */
@@ -440,6 +443,100 @@ export class ManagementApi {
     }
   }
 
+  /** Is the dynamic-shovel feature usable on this broker? Probes the shovel-
+   * management endpoint directly (so we can tell "plugin off" from "no permission"
+   * from "unreachable") rather than relying on `request`'s thrown message. */
+  async getShovelSupport(): Promise<ShovelSupport> {
+    const url = `${this.baseUrl}/shovels/${this.vhostSegment()}`
+    let res: Response
+    try {
+      res = await fetch(url, {
+        headers: { authorization: this.authHeader, 'content-type': 'application/json' }
+      })
+    } catch {
+      return { supported: false, reason: 'Could not reach the broker to check shovel support.' }
+    }
+    if (res.ok) return { supported: true }
+    // Auth errors are about the user, not the plugin.
+    if (res.status === 401 || res.status === 403) {
+      return {
+        supported: false,
+        reason:
+          'Your user lacks permission to manage shovels — it needs the administrator ' +
+          '(or policymaker + monitoring) tag.'
+      }
+    }
+    // The shovel-management endpoint answers non-2xx (404 or 400, depending on
+    // version) when the plugins aren't loaded — treat any other status as "off".
+    return {
+      supported: false,
+      reason:
+        'The shovel plugins are not enabled on this broker. Enable them on the broker with: ' +
+        'rabbitmq-plugins enable rabbitmq_shovel rabbitmq_shovel_management'
+    }
+  }
+
+  /** List the vhost's dynamic shovels and their state (`GET /api/shovels/{vhost}`). */
+  async listShovels(): Promise<ShovelInfo[]> {
+    const raw = await this.request<RawShovel[]>(`/shovels/${this.vhostSegment()}`)
+    return raw.map((s) => ({
+      name: s.name,
+      vhost: s.vhost,
+      state: s.state ?? 'unknown',
+      type: s.type,
+      source: s.src_queue ?? s.src_address,
+      destination: s.dest_queue ?? s.dest_exchange ?? s.dest_address
+    }))
+  }
+
+  /** Create a one-shot dynamic shovel that drains a queue broker-side, then
+   * deletes itself (`src-delete-after: queue-length`). `localUri` is the AMQP URI
+   * the broker uses to reach itself (the connection's own creds + vhost), so the
+   * shovel honours the vhost and doesn't need the AMQP port open to the *client*.
+   * `ack-mode: on-confirm` means the source ack waits for the destination confirm,
+   * so a failure can duplicate but never drop. Requires the administrator/policymaker tag. */
+  async createShovel(req: CreateShovelRequest, localUri: string): Promise<OperationResult> {
+    try {
+      const dest = req.destExchange
+        ? { 'dest-exchange': req.destExchange, 'dest-exchange-key': req.destRoutingKey }
+        : { 'dest-queue': req.destRoutingKey }
+      await this.request<void>(
+        `/parameters/shovel/${this.vhostSegment()}/${encodeURIComponent(req.name)}`,
+        {
+          method: 'PUT',
+          body: JSON.stringify({
+            value: {
+              'src-protocol': 'amqp091',
+              'src-uri': localUri,
+              'src-queue': req.srcQueue,
+              'dest-protocol': 'amqp091',
+              'dest-uri': localUri,
+              ...dest,
+              'ack-mode': 'on-confirm',
+              'src-delete-after': 'queue-length'
+            }
+          })
+        }
+      )
+      return { ok: true, affected: 1 }
+    } catch (err) {
+      return { ok: false, affected: 0, error: err instanceof Error ? err.message : String(err) }
+    }
+  }
+
+  /** Delete a dynamic shovel parameter (`DELETE /api/parameters/shovel/{vhost}/{name}`). */
+  async deleteShovel(name: string): Promise<OperationResult> {
+    try {
+      await this.request<void>(
+        `/parameters/shovel/${this.vhostSegment()}/${encodeURIComponent(name)}`,
+        { method: 'DELETE' }
+      )
+      return { ok: true, affected: 1 }
+    } catch (err) {
+      return { ok: false, affected: 0, error: err instanceof Error ? err.message : String(err) }
+    }
+  }
+
   /** Export this vhost's topology (queues/exchanges/bindings/policies/parameters).
    * The vhost-scoped endpoint excludes users/permissions, so no credentials leak.
    * Requires the broker user's `administrator` tag. */
@@ -664,6 +761,18 @@ interface RawPolicy {
   'apply-to'?: string
   definition?: Record<string, unknown>
   priority?: number
+}
+
+interface RawShovel {
+  name: string
+  vhost: string
+  state?: string
+  type?: string
+  src_queue?: string
+  src_address?: string
+  dest_queue?: string
+  dest_exchange?: string
+  dest_address?: string
 }
 
 interface RawConsumer {

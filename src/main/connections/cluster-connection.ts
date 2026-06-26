@@ -3,7 +3,7 @@ import { ManagementApi } from '../rabbitmq/management-api'
 import { MessagePeeker } from '../rabbitmq/message-peeker'
 import { HttpBrowser } from '../rabbitmq/http-browser'
 import { deleteMessage, exportMessages, moveMessage, moveMessages } from '../rabbitmq/operations'
-import { connectAmqp, probeAmqpReachable, type AmqpConnection } from '../rabbitmq/amqp'
+import { buildAmqpUrl, connectAmqp, probeAmqpReachable, type AmqpConnection } from '../rabbitmq/amqp'
 import type {
   BindingInfo,
   BrowseMode,
@@ -31,7 +31,10 @@ import type {
   OperationResult,
   PolicyInfo,
   PublishMessageRequest,
-  QueueInfo
+  QueueInfo,
+  CreateShovelRequest,
+  ShovelInfo,
+  ShovelSupport
 } from '@shared/types'
 
 /** One queue browser — either the live AMQP peeker or the polled HTTP browser.
@@ -203,6 +206,24 @@ export class ClusterConnection {
 
   async deletePolicy(name: string): Promise<OperationResult> {
     return this.api.deletePolicy(name)
+  }
+
+  async getShovelSupport(): Promise<ShovelSupport> {
+    return this.api.getShovelSupport()
+  }
+
+  async listShovels(): Promise<ShovelInfo[]> {
+    return this.api.listShovels()
+  }
+
+  async createShovel(req: CreateShovelRequest): Promise<OperationResult> {
+    // The shovel runs on the broker and connects back to it over AMQP — give it
+    // this connection's own URI (creds + vhost) so it honours the vhost.
+    return this.api.createShovel(req, buildAmqpUrl(this.config))
+  }
+
+  async deleteShovel(name: string): Promise<OperationResult> {
+    return this.api.deleteShovel(name)
   }
 
   async getDefinitions(): Promise<Record<string, unknown>> {

@@ -15,7 +15,10 @@ import type {
   CreateExchangeRequest,
   CreatePolicyRequest,
   CreateQueueRequest,
+  CreateShovelRequest,
   PolicyInfo,
+  ShovelInfo,
+  ShovelSupport,
   DeleteBindingRequest,
   DeleteMessageRequest,
   DeleteQueueRequest,
@@ -86,12 +89,22 @@ export type EditorTab =
       title: string
       policies: PolicyInfo[]
     }
+  | {
+      id: string
+      kind: 'shovels'
+      connectionId: string
+      title: string
+      /** null until the first support probe completes. */
+      support: ShovelSupport | null
+      shovels: ShovelInfo[]
+    }
 
 export const overviewTabId = (c: string): string => `o:${c}`
 export const queueTabId = (c: string, q: string): string => `q:${c}:${q}`
 export const exchangeTabId = (c: string, x: string): string => `x:${c}:${x}`
 export const connectionsTabId = (c: string): string => `c:${c}`
 export const policiesTabId = (c: string): string => `pol:${c}`
+export const shovelsTabId = (c: string): string => `shv:${c}`
 
 /** A transient toast notification (auto-dismisses). */
 export interface Toast {
@@ -152,6 +165,8 @@ interface AppState {
   bindingDialog: { connectionId: string; source: string } | null
   /** Open Policy dialog (null = closed); `editing` set ⇒ editing that policy. */
   policyDialog: { connectionId: string; editing?: PolicyInfo } | null
+  /** Open Shovel dialog (null = closed); `queue` is the source to drain. */
+  shovelDialog: { connectionId: string; queue: string } | null
   /** Last-used move destination per source queue (persisted), for default values. */
   lastMoveTargets: Record<string, MoveTarget>
 
@@ -226,6 +241,12 @@ interface AppState {
   closePolicyDialog(): void
   createPolicy(req: CreatePolicyRequest): Promise<OperationResult>
   deletePolicy(connectionId: string, name: string): Promise<OperationResult>
+  /** Open (or focus) the cluster's dynamic-shovels tab. */
+  openShovelsTab(connectionId: string): Promise<void>
+  openShovelDialog(queue: string, connectionId?: string): void
+  closeShovelDialog(): void
+  createShovel(req: CreateShovelRequest): Promise<OperationResult>
+  deleteShovel(connectionId: string, name: string): Promise<OperationResult>
   /** Open a tab for every queue on a connection. */
   openAllQueueTabs(connectionId: string): void
   /** Close every open queue tab belonging to a connection. */
@@ -456,6 +477,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   createExchangeDialog: null,
   bindingDialog: null,
   policyDialog: null,
+  shovelDialog: null,
   lastMoveTargets: loadMoveTargets(),
   sidebarWidth: initialSidebarWidth,
   sidebarVisible: true,
@@ -805,6 +827,59 @@ export const useAppStore = create<AppState>((set, get) => ({
     return result
   },
 
+  async openShovelsTab(connectionId) {
+    const id = shovelsTabId(connectionId)
+    if (get().tabs.some((t) => t.id === id)) {
+      set({ activeTabId: id })
+      await get().refreshTab(id)
+      return
+    }
+    const connName = get().connections.find((c) => c.id === connectionId)?.name ?? connectionId
+    set({
+      tabs: [
+        ...get().tabs,
+        { id, kind: 'shovels', connectionId, title: `${connName} - Shovels`, support: null, shovels: [] }
+      ],
+      activeTabId: id
+    })
+    await get().refreshTab(id)
+  },
+
+  openShovelDialog(queue, connectionId) {
+    const cid = connectionId ?? get().selectedConnectionId
+    if (!cid) return
+    set({ shovelDialog: { connectionId: cid, queue } })
+  },
+
+  closeShovelDialog() {
+    set({ shovelDialog: null })
+  },
+
+  async createShovel(req) {
+    const result = await window.api.createShovel(req)
+    if (result.ok) {
+      set({ shovelDialog: null })
+      get().addToast(
+        'success',
+        `Started server-side shovel "${req.name}" draining "${req.srcQueue}".`
+      )
+      // Open the Shovels tab so the user can watch the move drain broker-side.
+      await get().openShovelsTab(req.connectionId)
+    }
+    return result
+  },
+
+  async deleteShovel(connectionId, name) {
+    const result = await window.api.deleteShovel(connectionId, name)
+    if (result.ok) {
+      get().addToast('success', `Deleted shovel "${name}".`)
+      await get().refreshTab(shovelsTabId(connectionId))
+    } else {
+      get().addToast('error', `Delete failed: ${result.error ?? 'unknown error'}`)
+    }
+    return result
+  },
+
   setActiveTab(id) {
     set({
       activeTabId: id,
@@ -916,6 +991,33 @@ export const useAppStore = create<AppState>((set, get) => ({
         })
       } catch {
         // leave policies as-is
+      }
+    } else if (tab.kind === 'shovels') {
+      // Probe support first; only list shovels when the plugins are usable. A
+      // failure (e.g. the connection dropped) lands a deterministic unsupported
+      // state rather than leaving the tab stuck on "Checking…".
+      try {
+        const support = await window.api.getShovelSupport(tab.connectionId)
+        const shovels = support.supported
+          ? await window.api.listShovels(tab.connectionId).catch(() => [])
+          : []
+        set({
+          tabs: get().tabs.map((t) =>
+            t.id === id && t.kind === 'shovels' ? { ...t, support, shovels } : t
+          )
+        })
+      } catch (e) {
+        set({
+          tabs: get().tabs.map((t) =>
+            t.id === id && t.kind === 'shovels'
+              ? {
+                  ...t,
+                  support: { supported: false, reason: e instanceof Error ? e.message : String(e) },
+                  shovels: []
+                }
+              : t
+          )
+        })
       }
     } else {
       await Promise.all([

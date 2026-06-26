@@ -108,12 +108,22 @@ export function ConnectionDialog() {
           </div>
           <div className="field">
             <label>Virtual Host</label>
-            <input type="text" value={vhost} onChange={(e) => setVhost(e.target.value)} />
+            <input
+              id="conn-vhost"
+              type="text"
+              value={vhost}
+              onChange={(e) => setVhost(e.target.value)}
+            />
           </div>
           <div className="field field--row">
             <div className="field">
               <label>Username</label>
-              <input type="text" value={username} onChange={(e) => setUsername(e.target.value)} />
+              <input
+                id="conn-user"
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+              />
             </div>
             <div className="field">
               <label>Password</label>

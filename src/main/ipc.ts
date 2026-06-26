@@ -25,6 +25,7 @@ import type {
   CreateExchangeRequest,
   CreatePolicyRequest,
   CreateQueueRequest,
+  CreateShovelRequest,
   DeleteBindingRequest,
   DeleteMessageRequest,
   DeleteQueueRequest,
@@ -102,6 +103,22 @@ export function registerIpcHandlers(): void {
       return { ok: false, affected: 0, error: e instanceof Error ? e.message : String(e) }
     }
   })
+
+  ipcMain.handle(IPC.getShovelSupport, (_e, connectionId: string) =>
+    connectionManager.require(connectionId).getShovelSupport()
+  )
+
+  ipcMain.handle(IPC.listShovels, (_e, connectionId: string) =>
+    connectionManager.require(connectionId).listShovels()
+  )
+
+  ipcMain.handle(IPC.createShovel, (_e, req: CreateShovelRequest) =>
+    connectionManager.require(req.connectionId).createShovel(req)
+  )
+
+  ipcMain.handle(IPC.deleteShovel, (_e, connectionId: string, name: string) =>
+    connectionManager.require(connectionId).deleteShovel(name)
+  )
 
   ipcMain.handle(IPC.getOverview, (_e, connectionId: string) =>
     connectionManager.require(connectionId).getOverview()

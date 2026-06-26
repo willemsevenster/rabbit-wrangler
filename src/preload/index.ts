@@ -8,6 +8,7 @@ import type {
   CreateExchangeRequest,
   CreatePolicyRequest,
   CreateQueueRequest,
+  CreateShovelRequest,
   DeleteBindingRequest,
   DeleteMessageRequest,
   DeleteQueueRequest,
@@ -48,6 +49,13 @@ const api: RabbitApi = {
     ipcRenderer.invoke(IPC.previewImportDefinitions, connectionId),
   importDefinitions: (connectionId: string, token: string) =>
     ipcRenderer.invoke(IPC.importDefinitions, connectionId, token),
+
+  getShovelSupport: (connectionId: string) =>
+    ipcRenderer.invoke(IPC.getShovelSupport, connectionId),
+  listShovels: (connectionId: string) => ipcRenderer.invoke(IPC.listShovels, connectionId),
+  createShovel: (request: CreateShovelRequest) => ipcRenderer.invoke(IPC.createShovel, request),
+  deleteShovel: (connectionId: string, name: string) =>
+    ipcRenderer.invoke(IPC.deleteShovel, connectionId, name),
 
   getOverview: (connectionId: string) => ipcRenderer.invoke(IPC.getOverview, connectionId),
   getNodes: (connectionId: string) => ipcRenderer.invoke(IPC.getNodes, connectionId),

@@ -20,6 +20,7 @@ import type {
   ConsumerInfo,
   CreateBindingRequest,
   CreatePolicyRequest,
+  CreateShovelRequest,
   DefinitionsPreview,
   CreateExchangeRequest,
   CreateQueueRequest,
@@ -40,7 +41,9 @@ import type {
   PublishMessageRequest,
   QueueInfo,
   SafeConnectionConfig,
-  SaveMessagesRequest
+  SaveMessagesRequest,
+  ShovelInfo,
+  ShovelSupport
 } from './types'
 
 export const IPC = {
@@ -64,6 +67,12 @@ export const IPC = {
   exportDefinitions: 'definitions:export',
   previewImportDefinitions: 'definitions:preview',
   importDefinitions: 'definitions:import',
+
+  // dynamic shovels (rabbitmq_shovel plugin; vhost-scoped parameters)
+  getShovelSupport: 'shovels:support',
+  listShovels: 'shovels:list',
+  createShovel: 'shovels:create',
+  deleteShovel: 'shovels:delete',
 
   // cluster health (RabbitMQ management HTTP API)
   getOverview: 'cluster:overview',
@@ -144,6 +153,15 @@ export interface RabbitApi {
   previewImportDefinitions(connectionId: string): Promise<DefinitionsPreview>
   /** Apply a previously-previewed definitions file (by its preview token) to the vhost. */
   importDefinitions(connectionId: string, token: string): Promise<OperationResult>
+
+  /** Whether dynamic shovels are usable (shovel plugins enabled + permitted). */
+  getShovelSupport(connectionId: string): Promise<ShovelSupport>
+  /** List the vhost's dynamic shovels and their state. */
+  listShovels(connectionId: string): Promise<ShovelInfo[]>
+  /** Create a one-shot dynamic shovel that drains a queue broker-side. */
+  createShovel(request: CreateShovelRequest): Promise<OperationResult>
+  /** Delete a dynamic shovel parameter by name. */
+  deleteShovel(connectionId: string, name: string): Promise<OperationResult>
 
   /** Cluster-wide summary (version, totals, rates). */
   getOverview(connectionId: string): Promise<ClusterOverview>
