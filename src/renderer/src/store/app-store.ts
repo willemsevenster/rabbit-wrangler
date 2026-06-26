@@ -561,14 +561,18 @@ export const useAppStore = create<AppState>((set, get) => ({
       // resolved transport (AMQP availability / HTTP browse) so the UI gates AMQP-
       // only actions correctly.
       const rt = await window.api.getConnectionRuntime(id).catch(() => undefined)
+      // Prefer the freshly-fetched runtime, but fall back to whatever the
+      // connection-status event already streamed — so a benign getter race doesn't
+      // wipe a known transport and leave the UI guessing the mode.
+      const prev = get().statuses[id]
       set({
         statuses: {
           ...get().statuses,
           [id]: {
             connectionId: id,
             state: 'connected',
-            amqpAvailable: rt?.amqpAvailable,
-            transport: rt?.transport
+            amqpAvailable: rt?.amqpAvailable ?? prev?.amqpAvailable,
+            transport: rt?.transport ?? prev?.transport
           }
         }
       })

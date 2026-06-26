@@ -59,7 +59,9 @@ export class HttpBrowser {
         this.emit(raw, fingerprint)
       }
     } catch {
-      // Transient management-API hiccup; connection-status reports real failures.
+      // Transient browse failure (network blip, queue briefly gone, permission
+      // change). Swallowed and retried on the next poll — not surfaced as a
+      // connection error, since the connection itself is still up.
     } finally {
       this.inFlight = false
     }

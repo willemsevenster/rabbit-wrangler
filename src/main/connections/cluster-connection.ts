@@ -131,7 +131,9 @@ export class ClusterConnection {
       this.transport = next
       for (const queue of active) await this.startPeek(queue)
     }
-    this.setState('connected') // re-emit with the (possibly) new transport
+    // Re-broadcast the (possibly) new transport without changing the actual
+    // connection state — never force it to 'connected'.
+    this.setState(this.state)
     return this.runtime()
   }
 
