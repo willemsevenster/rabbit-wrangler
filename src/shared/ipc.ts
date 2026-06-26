@@ -120,8 +120,8 @@ export interface RabbitApi {
   exportDefinitions(connectionId: string): Promise<ExportResult>
   /** Prompt for a definitions file and return a parsed summary (not yet applied). */
   previewImportDefinitions(connectionId: string): Promise<DefinitionsPreview>
-  /** Apply a previously-previewed definitions file to the connection's vhost. */
-  importDefinitions(connectionId: string, path: string): Promise<OperationResult>
+  /** Apply a previously-previewed definitions file (by its preview token) to the vhost. */
+  importDefinitions(connectionId: string, token: string): Promise<OperationResult>
 
   /** Cluster-wide summary (version, totals, rates). */
   getOverview(connectionId: string): Promise<ClusterOverview>

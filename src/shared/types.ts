@@ -187,15 +187,18 @@ export interface DefinitionsSummary {
   exchanges: number
   bindings: number
   policies: number
+  parameters: number
 }
 
-/** Result of reading a definitions file for import (parsed, not yet applied). */
+/** Result of reading a definitions file for import (parsed + held in main, not yet applied). */
 export interface DefinitionsPreview {
   ok: boolean
   /** True when the user dismissed the open dialog. */
   canceled?: boolean
-  /** Absolute path of the chosen file, on success. */
-  path?: string
+  /** Opaque token for the parsed file held in main — passed back to apply the import.
+   * The file path never crosses to the renderer, so it can't ask main to read an
+   * arbitrary file. */
+  token?: string
   summary?: DefinitionsSummary
   error?: string
 }

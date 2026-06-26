@@ -13,7 +13,7 @@ import { saveMessagesToFile } from './store/message-io'
 import {
   exportDefinitionsToFile,
   previewDefinitionsFile,
-  readDefinitionsFile
+  takePendingDefinitions
 } from './store/definitions-io'
 import { setStoredTheme, titleBarOverlay } from './store/ui-prefs'
 import { connectionManager } from './connections/connection-manager'
@@ -66,9 +66,16 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle(IPC.previewImportDefinitions, () => previewDefinitionsFile())
 
-  ipcMain.handle(IPC.importDefinitions, async (_e, connectionId: string, path: string) => {
-    const defs = await readDefinitionsFile(path)
-    return connectionManager.require(connectionId).importDefinitions(defs)
+  ipcMain.handle(IPC.importDefinitions, (_e, connectionId: string, token: string) => {
+    try {
+      const defs = takePendingDefinitions(token)
+      if (defs === undefined) {
+        return { ok: false, affected: 0, error: 'Import session expired — please choose the file again.' }
+      }
+      return connectionManager.require(connectionId).importDefinitions(defs)
+    } catch (e) {
+      return { ok: false, affected: 0, error: e instanceof Error ? e.message : String(e) }
+    }
   })
 
   ipcMain.handle(IPC.getOverview, (_e, connectionId: string) =>

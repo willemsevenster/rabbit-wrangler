@@ -1,4 +1,5 @@
 import { dialog } from 'electron'
+import { randomUUID } from 'node:crypto'
 import { promises as fs } from 'node:fs'
 import type { DefinitionsPreview, DefinitionsSummary, ExportResult } from '@shared/types'
 
@@ -10,7 +11,8 @@ function summarize(defs: unknown): DefinitionsSummary {
     queues: len('queues'),
     exchanges: len('exchanges'),
     bindings: len('bindings'),
-    policies: len('policies')
+    policies: len('policies'),
+    parameters: len('parameters')
   }
 }
 
@@ -39,13 +41,25 @@ export async function exportDefinitionsToFile(
   try {
     await fs.writeFile(filePath, JSON.stringify(defs, null, 2), 'utf8')
     const s = summarize(defs)
-    return { ok: true, path: filePath, count: s.queues + s.exchanges + s.bindings + s.policies }
+    return {
+      ok: true,
+      path: filePath,
+      count: s.queues + s.exchanges + s.bindings + s.policies + s.parameters
+    }
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : String(e) }
   }
 }
 
-/** Prompt for a definitions file and return a parsed summary (not yet applied). */
+/**
+ * Parsed definitions from a recent preview, keyed by an opaque token. Keeping the
+ * file content in main (rather than handing the path back to the renderer, which
+ * would then ask main to re-read an arbitrary path) means the only file we ever
+ * read is the one the user picked here via the native dialog.
+ */
+const pending = new Map<string, unknown>()
+
+/** Prompt for a definitions file, parse it, hold it in main, and return a summary. */
 export async function previewDefinitionsFile(): Promise<DefinitionsPreview> {
   const { canceled, filePaths } = await dialog.showOpenDialog({
     title: 'Import Definitions',
@@ -55,13 +69,17 @@ export async function previewDefinitionsFile(): Promise<DefinitionsPreview> {
   if (canceled || filePaths.length === 0) return { ok: false, canceled: true }
   try {
     const defs = JSON.parse(await fs.readFile(filePaths[0], 'utf8'))
-    return { ok: true, path: filePaths[0], summary: summarize(defs) }
+    const token = randomUUID()
+    pending.set(token, defs)
+    return { ok: true, token, summary: summarize(defs) }
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : String(e) }
   }
 }
 
-/** Read + parse a definitions file for applying (throws on read/parse error). */
-export async function readDefinitionsFile(path: string): Promise<unknown> {
-  return JSON.parse(await fs.readFile(path, 'utf8'))
+/** Consume the parsed definitions for `token` (single-use). */
+export function takePendingDefinitions(token: string): unknown | undefined {
+  const defs = pending.get(token)
+  pending.delete(token)
+  return defs
 }

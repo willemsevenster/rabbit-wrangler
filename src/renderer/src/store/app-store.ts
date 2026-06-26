@@ -842,7 +842,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     const vhost = conn?.vhost ?? '/'
     const preview = await window.api.previewImportDefinitions(connectionId)
     if (preview.canceled) return
-    if (!preview.ok || !preview.path || !preview.summary) {
+    if (!preview.ok || !preview.token || !preview.summary) {
       get().addToast('error', `Could not read definitions file: ${preview.error ?? 'unknown error'}`)
       return
     }
@@ -850,19 +850,24 @@ export const useAppStore = create<AppState>((set, get) => ({
     const ok = await get().confirm({
       title: 'Import definitions',
       message:
-        `Import ${s.queues} queue(s), ${s.exchanges} exchange(s), ${s.bindings} binding(s) and ` +
-        `${s.policies} polic${s.policies === 1 ? 'y' : 'ies'} into vhost "${vhost}" on "${name}"? ` +
+        `Import ${s.queues} queue(s), ${s.exchanges} exchange(s), ${s.bindings} binding(s), ` +
+        `${s.policies} polic${s.policies === 1 ? 'y' : 'ies'} and ${s.parameters} parameter(s) ` +
+        `into vhost "${vhost}" on "${name}"? ` +
         `Existing objects with the same names are updated; nothing is deleted.`,
       confirmLabel: 'Import',
       danger: true
     })
     if (!ok) return
-    const result = await window.api.importDefinitions(connectionId, preview.path)
-    if (result.ok) {
-      get().addToast('success', `Imported definitions into "${name}". Refreshing…`)
-      await Promise.all([get().refreshQueues(connectionId), get().refreshExchanges(connectionId)])
-    } else {
-      get().addToast('error', `Import failed: ${result.error ?? 'unknown error'}`)
+    try {
+      const result = await window.api.importDefinitions(connectionId, preview.token)
+      if (result.ok) {
+        get().addToast('success', `Imported definitions into "${name}". Refreshing…`)
+        await Promise.all([get().refreshQueues(connectionId), get().refreshExchanges(connectionId)])
+      } else {
+        get().addToast('error', `Import failed: ${result.error ?? 'unknown error'}`)
+      }
+    } catch (e) {
+      get().addToast('error', `Import failed: ${e instanceof Error ? e.message : String(e)}`)
     }
   },
 
