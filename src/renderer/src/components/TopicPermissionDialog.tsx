@@ -17,13 +17,17 @@ export function TopicPermissionDialog() {
   const users = adminTab?.users ?? []
   const vhosts = adminTab?.vhosts ?? []
 
-  const [user, setUser] = useState(editing?.user ?? users[0]?.name ?? '')
-  const [vhost, setVhost] = useState(editing?.vhost ?? vhosts[0]?.name ?? '')
+  const [user, setUser] = useState(editing?.user ?? '')
+  const [vhost, setVhost] = useState(editing?.vhost ?? '')
   const [exchange, setExchange] = useState(editing?.exchange ?? '')
   const [write, setWrite] = useState(editing?.write ?? '.*')
   const [read, setRead] = useState(editing?.read ?? '.*')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+
+  // Derive the effective selection during render (the lists load async).
+  const selectedUser = user || users[0]?.name || ''
+  const selectedVhost = vhost || vhosts[0]?.name || ''
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
@@ -35,7 +39,7 @@ export function TopicPermissionDialog() {
 
   async function submit(): Promise<void> {
     if (!connectionId) return
-    if (!user || !vhost) {
+    if (!selectedUser || !selectedVhost) {
       setError('Pick a user and virtual host.')
       return
     }
@@ -47,8 +51,8 @@ export function TopicPermissionDialog() {
     setError('')
     const req: SetTopicPermissionRequest = {
       connectionId,
-      user,
-      vhost,
+      user: selectedUser,
+      vhost: selectedVhost,
       exchange: exchange.trim(),
       write,
       read
@@ -77,12 +81,12 @@ export function TopicPermissionDialog() {
               <label htmlFor="topic-user">User</label>
               <select
                 id="topic-user"
-                value={user}
+                value={selectedUser}
                 disabled={!!editing}
                 onChange={(e) => setUser(e.target.value)}
               >
-                {editing && !users.some((u) => u.name === user) && (
-                  <option value={user}>{user}</option>
+                {editing && !users.some((u) => u.name === selectedUser) && (
+                  <option value={selectedUser}>{selectedUser}</option>
                 )}
                 {users.map((u) => (
                   <option key={u.name} value={u.name}>
@@ -95,12 +99,12 @@ export function TopicPermissionDialog() {
               <label htmlFor="topic-vhost">Virtual host</label>
               <select
                 id="topic-vhost"
-                value={vhost}
+                value={selectedVhost}
                 disabled={!!editing}
                 onChange={(e) => setVhost(e.target.value)}
               >
-                {editing && !vhosts.some((v) => v.name === vhost) && (
-                  <option value={vhost}>{vhost}</option>
+                {editing && !vhosts.some((v) => v.name === selectedVhost) && (
+                  <option value={selectedVhost}>{selectedVhost}</option>
                 )}
                 {vhosts.map((v) => (
                   <option key={v.name} value={v.name}>
@@ -150,7 +154,7 @@ export function TopicPermissionDialog() {
           <button
             className="btn"
             onClick={() => void submit()}
-            disabled={busy || !user || !vhost || !exchange.trim()}
+            disabled={busy || !selectedUser || !selectedVhost || !exchange.trim()}
           >
             {busy ? 'Saving…' : 'Save topic permissions'}
           </button>

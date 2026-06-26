@@ -18,13 +18,18 @@ export function PermissionDialog() {
   const users = adminTab?.users ?? []
   const vhosts = adminTab?.vhosts ?? []
 
-  const [user, setUser] = useState(editing?.user ?? users[0]?.name ?? '')
-  const [vhost, setVhost] = useState(editing?.vhost ?? vhosts[0]?.name ?? '')
+  const [user, setUser] = useState(editing?.user ?? '')
+  const [vhost, setVhost] = useState(editing?.vhost ?? '')
   const [configure, setConfigure] = useState(editing?.configure ?? '.*')
   const [write, setWrite] = useState(editing?.write ?? '.*')
   const [read, setRead] = useState(editing?.read ?? '.*')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+
+  // Derive the effective selection during render (the lists load async, so fall
+  // back to the first option) — no setState-in-effect needed.
+  const selectedUser = user || users[0]?.name || ''
+  const selectedVhost = vhost || vhosts[0]?.name || ''
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
@@ -42,17 +47,24 @@ export function PermissionDialog() {
 
   async function submit(): Promise<void> {
     if (!connectionId) return
-    if (!user) {
+    if (!selectedUser) {
       setError('Pick a user.')
       return
     }
-    if (!vhost) {
+    if (!selectedVhost) {
       setError('Pick a virtual host.')
       return
     }
     setBusy(true)
     setError('')
-    const req: SetPermissionRequest = { connectionId, user, vhost, configure, write, read }
+    const req: SetPermissionRequest = {
+      connectionId,
+      user: selectedUser,
+      vhost: selectedVhost,
+      configure,
+      write,
+      read
+    }
     const result = await setPermission(req)
     if (!result.ok) {
       setError(result.error ?? 'Save failed.')
@@ -75,13 +87,13 @@ export function PermissionDialog() {
               <label htmlFor="perm-user">User</label>
               <select
                 id="perm-user"
-                value={user}
+                value={selectedUser}
                 disabled={!!editing}
                 onChange={(e) => setUser(e.target.value)}
               >
                 {!editing && users.length === 0 && <option value="">(no users)</option>}
-                {editing && !users.some((u) => u.name === user) && (
-                  <option value={user}>{user}</option>
+                {editing && !users.some((u) => u.name === selectedUser) && (
+                  <option value={selectedUser}>{selectedUser}</option>
                 )}
                 {users.map((u) => (
                   <option key={u.name} value={u.name}>
@@ -94,12 +106,12 @@ export function PermissionDialog() {
               <label htmlFor="perm-vhost">Virtual host</label>
               <select
                 id="perm-vhost"
-                value={vhost}
+                value={selectedVhost}
                 disabled={!!editing}
                 onChange={(e) => setVhost(e.target.value)}
               >
-                {editing && !vhosts.some((v) => v.name === vhost) && (
-                  <option value={vhost}>{vhost}</option>
+                {editing && !vhosts.some((v) => v.name === selectedVhost) && (
+                  <option value={selectedVhost}>{selectedVhost}</option>
                 )}
                 {vhosts.map((v) => (
                   <option key={v.name} value={v.name}>
@@ -151,7 +163,11 @@ export function PermissionDialog() {
           <button className="btn btn--secondary" onClick={close}>
             Cancel
           </button>
-          <button className="btn" onClick={() => void submit()} disabled={busy || !user || !vhost}>
+          <button
+            className="btn"
+            onClick={() => void submit()}
+            disabled={busy || !selectedUser || !selectedVhost}
+          >
             {busy ? 'Saving…' : 'Save permissions'}
           </button>
         </div>
