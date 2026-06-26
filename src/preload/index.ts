@@ -12,7 +12,8 @@ import type {
   ExportMessagesRequest,
   MoveMessageRequest,
   MoveMessagesRequest,
-  PublishMessageRequest
+  PublishMessageRequest,
+  SaveMessagesRequest
 } from '@shared/types'
 
 /**
@@ -54,6 +55,7 @@ const api: RabbitApi = {
   deleteMessage: (request: DeleteMessageRequest) => ipcRenderer.invoke(IPC.deleteMessage, request),
   exportMessages: (request: ExportMessagesRequest) =>
     ipcRenderer.invoke(IPC.exportMessages, request),
+  saveMessages: (request: SaveMessagesRequest) => ipcRenderer.invoke(IPC.saveMessages, request),
 
   listExchanges: (connectionId: string) => ipcRenderer.invoke(IPC.listExchanges, connectionId),
   listExchangeBindings: (connectionId: string, exchange: string) =>

@@ -1,22 +1,24 @@
 import { dialog } from 'electron'
 import { promises as fs } from 'node:fs'
-import type { ExportResult } from '@shared/types'
-import type { ExportedMessage } from '../rabbitmq/operations'
+import type { ExportResult, ExportedMessage } from '@shared/types'
 
 /**
- * Prompt for a destination, then serialize a queue's drained messages to it.
- * The save dialog is shown FIRST so a cancel skips the (non-destructive but not
- * free) drain. The file format follows the chosen extension: `.json` writes a
+ * Prompt for a destination, then serialize message records to it. The save
+ * dialog is shown FIRST so a cancel skips the (non-destructive but not free)
+ * `provide()` drain. The format follows the chosen extension: `.json` writes a
  * pretty-printed array, anything else (default `.ndjson`) writes one JSON object
  * per line — greppable and stream-friendly for large queues.
+ *
+ * `provide` is a thunk so the bulk path can drain the broker lazily (after the
+ * dialog) while the single-message path just returns a record it already has.
  */
-export async function exportMessagesToFile(
-  queue: string,
-  drain: () => Promise<ExportedMessage[]>
+export async function saveMessagesToFile(
+  defaultName: string,
+  provide: () => Promise<ExportedMessage[]>
 ): Promise<ExportResult> {
-  const safeName = queue.replace(/[^\w.-]+/g, '_') || 'queue'
+  const safeName = defaultName.replace(/[^\w.-]+/g, '_') || 'messages'
   const { canceled, filePath } = await dialog.showSaveDialog({
-    title: `Export messages from "${queue}"`,
+    title: `Export messages — ${defaultName}`,
     defaultPath: `${safeName}.ndjson`,
     filters: [
       { name: 'NDJSON (one message per line)', extensions: ['ndjson'] },
@@ -26,7 +28,7 @@ export async function exportMessagesToFile(
   if (canceled || !filePath) return { ok: false, canceled: true }
 
   try {
-    const messages = await drain()
+    const messages = await provide()
     const asJson = filePath.toLowerCase().endsWith('.json')
     const body = asJson
       ? JSON.stringify(messages, null, 2)

@@ -46,6 +46,15 @@ The export is **non-destructive**: messages are read and **requeued** (the same 
 Use this as an audit trail or a safety net — export a dead-letter queue right before you redrive or purge it.
 :::
 
+### A single message
+
+You don't have to export the whole queue. Select a message (or right-click a row), and from the **detail pane** or the **context menu** you can:
+
+- **Copy as JSON** / **Copy as NDJSON** — put the one message on the clipboard (full record: exchange, routing key, properties, headers, payload).
+- **Export Message…** — save just that message to a file.
+
+Handy for grabbing one offending message to share, replay, or inspect elsewhere.
+
 ## Purge a queue
 
 Purging **clears all messages** in a queue. Right-click the queue to purge it.

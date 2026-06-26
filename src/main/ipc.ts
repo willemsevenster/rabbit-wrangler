@@ -9,7 +9,7 @@ import {
 } from './updater'
 import { configStore } from './store/config-store'
 import { exportConnections, readImportFile } from './store/connection-io'
-import { exportMessagesToFile } from './store/message-io'
+import { saveMessagesToFile } from './store/message-io'
 import { setStoredTheme, titleBarOverlay } from './store/ui-prefs'
 import { connectionManager } from './connections/connection-manager'
 import { eventStreamServer } from './websocket-server'
@@ -24,7 +24,8 @@ import type {
   ExportMessagesRequest,
   MoveMessageRequest,
   MoveMessagesRequest,
-  PublishMessageRequest
+  PublishMessageRequest,
+  SaveMessagesRequest
 } from '@shared/types'
 
 /**
@@ -116,7 +117,12 @@ export function registerIpcHandlers(): void {
   )
 
   ipcMain.handle(IPC.exportMessages, (_e, req: ExportMessagesRequest) =>
-    exportMessagesToFile(req.queue, () => connectionManager.require(req.connectionId).exportMessages(req))
+    saveMessagesToFile(req.queue, () => connectionManager.require(req.connectionId).exportMessages(req))
+  )
+
+  // Save renderer-supplied records (e.g. one peeked message) — no broker needed.
+  ipcMain.handle(IPC.saveMessages, (_e, req: SaveMessagesRequest) =>
+    saveMessagesToFile(req.defaultName, () => Promise.resolve(req.messages))
   )
 
   ipcMain.handle(IPC.listExchanges, (_e, connectionId: string) =>

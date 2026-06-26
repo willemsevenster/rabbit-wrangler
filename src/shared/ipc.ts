@@ -34,7 +34,8 @@ import type {
   PeekedMessage,
   PublishMessageRequest,
   QueueInfo,
-  SafeConnectionConfig
+  SafeConnectionConfig,
+  SaveMessagesRequest
 } from './types'
 
 export const IPC = {
@@ -79,6 +80,7 @@ export const IPC = {
   moveMessage: 'messages:moveOne',
   deleteMessage: 'messages:deleteOne',
   exportMessages: 'messages:export',
+  saveMessages: 'messages:save',
 
   // event stream bootstrap
   getEventStreamPort: 'events:port',
@@ -154,6 +156,8 @@ export interface RabbitApi {
   deleteMessage(request: DeleteMessageRequest): Promise<OperationResult>
   /** Export a queue's ready messages to a user-chosen JSON/NDJSON file (non-destructive). */
   exportMessages(request: ExportMessagesRequest): Promise<ExportResult>
+  /** Save caller-supplied message records (e.g. one peeked message) to a JSON/NDJSON file. */
+  saveMessages(request: SaveMessagesRequest): Promise<ExportResult>
 
   /** Remember the chosen theme so the next launch's window opens without a flash. */
   persistTheme(theme: 'light' | 'dark'): Promise<void>

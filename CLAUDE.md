@@ -201,10 +201,16 @@ when the management API already exposes it (e.g. purge is an HTTP `DELETE`).
   close (same hold-and-requeue contract as peek/move; `ClusterConnection.exportMessages`
   stops the peeker first). Records (`ExportedMessage`: exchange, routingKey,
   redelivered, properties, headers, payload + `payloadEncoding`, fingerprint) are
-  written by `message-io.ts` via `dialog.showSaveDialog` as **NDJSON** (one per line)
-  or **JSON** array, chosen by file extension. Reuses the shared `ExportResult` type.
-  Only **ready** messages are captured (like purge). Drives via the new
-  `stub-save-dialog` driver command (native dialogs can't be clicked).
+  written by `message-io.ts` (`saveMessagesToFile`) via `dialog.showSaveDialog` as
+  **NDJSON** (one per line) or **JSON** array, chosen by file extension. Reuses the
+  shared `ExportResult` type. Only **ready** messages are captured (like purge).
+  Drives via the new `stub-save-dialog` driver command (native dialogs can't be
+  clicked). **Single message**: the row context menu + the detail-pane buttons also
+  offer **Copy as JSON/NDJSON** (clipboard, `store.copyMessage`) and **Export
+  Message…** (`store.exportMessage` → `messages:save` IPC). These work on the
+  already-peeked record (`lib/message-format.ts` `toExportRecord` → the shared
+  `ExportedMessage`), so no broker round-trip — `messages:save` just writes the
+  caller-supplied records via the same `saveMessagesToFile`.
 - **Create / delete queues** (`management-api.ts` `createQueue`/`deleteQueue`, UI via
   the Queues-group context menu + overview **New Queue** button, and the queue context
   menu → "Delete Queue…"): both are **management-plane** (HTTP `PUT`/`DELETE` on

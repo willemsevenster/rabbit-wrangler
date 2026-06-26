@@ -14,6 +14,7 @@ function menuFor(m: PeekedMessage): MenuItem[] {
   } catch {
     prettyJson = null
   }
+  const { copyMessage, exportMessage } = useAppStore.getState()
   return [
     { label: 'Copy Payload', icon: 'copy', onClick: () => window.api.copyText(m.payload) },
     {
@@ -22,13 +23,16 @@ function menuFor(m: PeekedMessage): MenuItem[] {
       disabled: !prettyJson,
       onClick: () => prettyJson && window.api.copyText(prettyJson)
     },
-    { separator: true },
     {
       label: 'Copy Routing Key',
       icon: 'copy',
       disabled: !m.routingKey,
       onClick: () => window.api.copyText(m.routingKey)
-    }
+    },
+    { separator: true },
+    { label: 'Copy Message as JSON', icon: 'json', onClick: () => copyMessage(m, 'json') },
+    { label: 'Copy Message as NDJSON', icon: 'json', onClick: () => copyMessage(m, 'ndjson') },
+    { label: 'Export Message…', icon: 'save', onClick: () => void exportMessage(m) }
   ]
 }
 

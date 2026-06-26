@@ -2,7 +2,6 @@ import { eventBus } from '../event-bus'
 import { ManagementApi } from '../rabbitmq/management-api'
 import { MessagePeeker } from '../rabbitmq/message-peeker'
 import { deleteMessage, exportMessages, moveMessage, moveMessages } from '../rabbitmq/operations'
-import type { ExportedMessage } from '../rabbitmq/operations'
 import { connectAmqp, type AmqpConnection } from '../rabbitmq/amqp'
 import type {
   BindingInfo,
@@ -18,6 +17,7 @@ import type {
   DeleteMessageRequest,
   DeleteQueueRequest,
   ExchangeInfo,
+  ExportedMessage,
   ExportMessagesRequest,
   HealthResult,
   MoveMessageRequest,

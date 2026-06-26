@@ -1,5 +1,6 @@
 import type {
   DeleteMessageRequest,
+  ExportedMessage,
   ExportMessagesRequest,
   MoveMessageRequest,
   MoveMessagesRequest,
@@ -170,19 +171,6 @@ export async function deleteMessage(
     channel.ack(msg)
     return { ok: true, affected: 1 }
   })
-}
-
-/** A queue message serialized for file export (mirrors PeekedMessage's payload
- * handling; `payloadEncoding` matches the publish contract for round-tripping). */
-export interface ExportedMessage {
-  exchange: string
-  routingKey: string
-  redelivered: boolean
-  properties: Record<string, unknown>
-  headers: Record<string, unknown>
-  payload: string
-  payloadEncoding: 'string' | 'base64'
-  fingerprint: string
 }
 
 /**

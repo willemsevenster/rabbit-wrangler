@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { EventSocket } from '../lib/event-socket'
 import { DEFAULT_DLQ_SUFFIXES } from '../lib/dlq'
+import { toExportRecord } from '../lib/message-format'
 import type { StreamEvent, UpdateStatusPayload } from '@shared/ipc'
 import type {
   BindingInfo,
@@ -236,6 +237,10 @@ interface AppState {
   deleteMessage(req: DeleteMessageRequest): Promise<OperationResult>
   /** Export a queue's ready messages to a file (non-destructive); reports via toast. */
   exportMessages(queue: string, connectionId?: string): Promise<void>
+  /** Copy one peeked message to the clipboard as pretty JSON or single-line NDJSON. */
+  copyMessage(message: PeekedMessage, format: 'json' | 'ndjson'): void
+  /** Export one peeked message to a file; reports via toast. */
+  exportMessage(message: PeekedMessage): Promise<void>
 
   refreshExchanges(connectionId?: string): Promise<void>
   deleteExchange(name: string, connectionId?: string): Promise<OperationResult>
@@ -970,6 +975,25 @@ export const useAppStore = create<AppState>((set, get) => ({
     // close), so a stale "was open" flag would orphan a peeker with no tab.
     if (get().tabs.some((t) => t.id === queueTabId(cid, queue))) {
       void window.api.startPeek(cid, queue)
+    }
+  },
+
+  copyMessage(message, format) {
+    const record = toExportRecord(message)
+    const text = format === 'json' ? JSON.stringify(record, null, 2) : JSON.stringify(record)
+    window.api.copyText(text)
+    get().addToast('success', `Copied message as ${format.toUpperCase()}.`)
+  },
+
+  async exportMessage(message) {
+    const result = await window.api.saveMessages({
+      defaultName: `${message.queue}-message`,
+      messages: [toExportRecord(message)]
+    })
+    if (result.ok) {
+      get().addToast('success', `Exported message to ${result.path}`)
+    } else if (!result.canceled) {
+      get().addToast('error', `Export failed: ${result.error ?? 'unknown error'}`)
     }
   },
 
