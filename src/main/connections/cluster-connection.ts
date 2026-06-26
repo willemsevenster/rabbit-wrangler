@@ -32,12 +32,16 @@ import type {
   MoveMessagesRequest,
   NodeInfo,
   OperationResult,
+  PermissionInfo,
   PolicyInfo,
   PublishMessageRequest,
   QueueInfo,
   CreateShovelRequest,
+  SetPermissionRequest,
+  SetTopicPermissionRequest,
   ShovelInfo,
   ShovelSupport,
+  TopicPermissionInfo,
   UserInfo,
   VhostInfo
 } from '@shared/types'
@@ -239,6 +243,30 @@ export class ClusterConnection {
 
   async deleteVhost(name: string): Promise<OperationResult> {
     return this.api.deleteVhost(name)
+  }
+
+  async listPermissions(): Promise<PermissionInfo[]> {
+    return this.api.listPermissions()
+  }
+
+  async setPermission(req: SetPermissionRequest): Promise<OperationResult> {
+    return this.api.setPermission(req)
+  }
+
+  async deletePermission(vhost: string, user: string): Promise<OperationResult> {
+    return this.api.deletePermission(vhost, user)
+  }
+
+  async listTopicPermissions(): Promise<TopicPermissionInfo[]> {
+    return this.api.listTopicPermissions()
+  }
+
+  async setTopicPermission(req: SetTopicPermissionRequest): Promise<OperationResult> {
+    return this.api.setTopicPermission(req)
+  }
+
+  async deleteTopicPermission(vhost: string, user: string): Promise<OperationResult> {
+    return this.api.deleteTopicPermission(vhost, user)
   }
 
   async getShovelSupport(): Promise<ShovelSupport> {

@@ -41,12 +41,16 @@ import type {
   OperationResult,
   PeekedMessage,
   PolicyInfo,
+  PermissionInfo,
   PublishMessageRequest,
   QueueInfo,
   SafeConnectionConfig,
   SaveMessagesRequest,
+  SetPermissionRequest,
+  SetTopicPermissionRequest,
   ShovelInfo,
   ShovelSupport,
+  TopicPermissionInfo,
   UserInfo,
   VhostInfo
 } from './types'
@@ -71,6 +75,12 @@ export const IPC = {
   listVhosts: 'admin:vhosts:list',
   createVhost: 'admin:vhosts:create',
   deleteVhost: 'admin:vhosts:delete',
+  listPermissions: 'admin:permissions:list',
+  setPermission: 'admin:permissions:set',
+  deletePermission: 'admin:permissions:delete',
+  listTopicPermissions: 'admin:topic-permissions:list',
+  setTopicPermission: 'admin:topic-permissions:set',
+  deleteTopicPermission: 'admin:topic-permissions:delete',
 
   // policies (RabbitMQ management HTTP API, vhost-scoped)
   listPolicies: 'policies:list',
@@ -168,6 +178,22 @@ export interface RabbitApi {
   createVhost(request: CreateVhostRequest): Promise<OperationResult>
   /** Delete a virtual host (and everything in it) by name. */
   deleteVhost(connectionId: string, name: string): Promise<OperationResult>
+  /** List all (user, vhost) permissions (cluster-wide). */
+  listPermissions(connectionId: string): Promise<PermissionInfo[]>
+  /** Set a user's configure/write/read permissions on a vhost. */
+  setPermission(request: SetPermissionRequest): Promise<OperationResult>
+  /** Remove a user's permissions on a vhost. */
+  deletePermission(connectionId: string, vhost: string, user: string): Promise<OperationResult>
+  /** List all (user, vhost, exchange) topic permissions. */
+  listTopicPermissions(connectionId: string): Promise<TopicPermissionInfo[]>
+  /** Set a user's topic (write/read) permissions for an exchange on a vhost. */
+  setTopicPermission(request: SetTopicPermissionRequest): Promise<OperationResult>
+  /** Remove a user's topic permissions on a vhost (all exchanges). */
+  deleteTopicPermission(
+    connectionId: string,
+    vhost: string,
+    user: string
+  ): Promise<OperationResult>
 
   /** List the vhost's policies. */
   listPolicies(connectionId: string): Promise<PolicyInfo[]>

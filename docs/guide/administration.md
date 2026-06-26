@@ -1,8 +1,8 @@
 # Administration
 
 Right-click a connected broker and choose **Administration** to open its admin tab —
-the identity and access surface for the whole cluster. It has **Users** and **Virtual
-hosts** sections (a **Permissions** section is on the way).
+the identity and access surface for the whole cluster, with **Users**, **Virtual hosts**
+and **Permissions** sections.
 
 ::: warning Requires the administrator tag
 Administration needs a broker user with the **administrator** tag. If you're connected
@@ -46,4 +46,38 @@ type**, and current **message** count.
 Deleting a virtual host **permanently removes every queue, exchange, binding and message
 in it** — it can't be undone. You're always asked to confirm, with an extra warning when
 it's the vhost the current connection targets.
+:::
+
+## Permissions
+
+The **Permissions** section controls what each user can do on each virtual host — the
+join of Users × Virtual hosts.
+
+### Standard permissions
+
+Every (user, vhost) pair has three **regex** permissions: **configure** (declare/delete
+queues & exchanges), **write** (publish / bind), and **read** (consume / get). `.*` means
+**all**, blank means **none**.
+
+- **Set Permission** / **Edit** open a dialog where you pick a **user** and **virtual
+  host** (from the cluster's lists) and set the three patterns. The **Full** and **None**
+  buttons fill all three at once.
+- A user only sees a vhost once it has permissions there — this is how you grant a new
+  user access.
+- **Remove** revokes the user's permissions on that vhost.
+
+### Topic permissions
+
+For **topic exchanges**, you can additionally restrict publish/consume by routing-key
+pattern. Each entry is a (user, vhost, **exchange**) with **write** and **read** regexes,
+layered on top of the standard permissions.
+
+- **Set Topic Permission** / **Edit** take a user, vhost, the topic exchange name, and the
+  write/read patterns.
+- **Remove** clears a user's topic permissions for a vhost (the management API clears all
+  exchanges for that user+vhost at once).
+
+::: warning Don't lock yourself out
+Removing your own user's permissions on the vhost this connection targets can cut off your
+access — you'll be warned before it happens.
 :::

@@ -1,13 +1,15 @@
 import { useAppStore, type EditorTab, type AdminSection } from '../store/app-store'
 import { UsersSection } from './UsersSection'
 import { VhostsSection } from './VhostsSection'
+import { PermissionsSection } from './PermissionsSection'
 
 type AdminTab = Extract<EditorTab, { kind: 'admin' }>
 
-/** Sections of the Administration tab. Grows as later PRs land Permissions. */
+/** Sections of the Administration tab. */
 const SECTIONS: { key: AdminSection; label: string; icon: string }[] = [
   { key: 'users', label: 'Users', icon: 'codicon-person' },
-  { key: 'vhosts', label: 'Virtual hosts', icon: 'codicon-server-environment' }
+  { key: 'vhosts', label: 'Virtual hosts', icon: 'codicon-server-environment' },
+  { key: 'permissions', label: 'Permissions', icon: 'codicon-key' }
 ]
 
 /**
@@ -95,6 +97,7 @@ export function AdministrationView({ tab }: { tab: AdminTab }) {
             {error && <div className="modal__error" style={{ marginBottom: 12 }}>{error}</div>}
             {tab.section === 'users' && <UsersSection tab={tab} />}
             {tab.section === 'vhosts' && <VhostsSection tab={tab} />}
+            {tab.section === 'permissions' && <PermissionsSection tab={tab} />}
           </div>
         </>
       )}

@@ -271,6 +271,45 @@ export interface VhostInfo {
   messages?: number
 }
 
+/** A user's permissions on a vhost (`GET /permissions`). Each field is a regex:
+ * `.*` = full, `` = none. */
+export interface PermissionInfo {
+  vhost: string
+  user: string
+  configure: string
+  write: string
+  read: string
+}
+
+/** Set a user's permissions on a vhost (`PUT /permissions/{vhost}/{user}`). */
+export interface SetPermissionRequest {
+  connectionId: string
+  vhost: string
+  user: string
+  configure: string
+  write: string
+  read: string
+}
+
+/** A user's topic permissions on an exchange in a vhost (`GET /topic-permissions`). */
+export interface TopicPermissionInfo {
+  vhost: string
+  user: string
+  exchange: string
+  write: string
+  read: string
+}
+
+/** Set a user's topic permissions for an exchange (`PUT /topic-permissions/{vhost}/{user}`). */
+export interface SetTopicPermissionRequest {
+  connectionId: string
+  vhost: string
+  user: string
+  exchange: string
+  write: string
+  read: string
+}
+
 /** Create or update a virtual host (`PUT /vhosts/{name}`). */
 export interface CreateVhostRequest {
   connectionId: string

@@ -16,6 +16,8 @@ import { PolicyDialog } from './components/PolicyDialog'
 import { ShovelDialog } from './components/ShovelDialog'
 import { UserDialog } from './components/UserDialog'
 import { VhostDialog } from './components/VhostDialog'
+import { PermissionDialog } from './components/PermissionDialog'
+import { TopicPermissionDialog } from './components/TopicPermissionDialog'
 import { MenuBar } from './components/MenuBar'
 import { Resizer } from './components/Resizer'
 import { UpdateButton } from './components/UpdateButton'
@@ -41,6 +43,8 @@ function App() {
   const shovelDialog = useAppStore((s) => s.shovelDialog)
   const userDialog = useAppStore((s) => s.userDialog)
   const vhostDialog = useAppStore((s) => s.vhostDialog)
+  const permissionDialog = useAppStore((s) => s.permissionDialog)
+  const topicPermissionDialog = useAppStore((s) => s.topicPermissionDialog)
   const importDialog = useAppStore((s) => s.importDialog)
   const sidebarWidth = useAppStore((s) => s.sidebarWidth)
   const sidebarVisible = useAppStore((s) => s.sidebarVisible)
@@ -86,6 +90,8 @@ function App() {
       {shovelDialog && <ShovelDialog />}
       {userDialog && <UserDialog />}
       {vhostDialog && <VhostDialog />}
+      {permissionDialog && <PermissionDialog />}
+      {topicPermissionDialog && <TopicPermissionDialog />}
       <ConfirmDialog />
       <AboutDialog />
       <SettingsDialog />

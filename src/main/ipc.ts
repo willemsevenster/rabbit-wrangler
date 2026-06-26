@@ -35,7 +35,9 @@ import type {
   MoveMessageRequest,
   MoveMessagesRequest,
   PublishMessageRequest,
-  SaveMessagesRequest
+  SaveMessagesRequest,
+  SetPermissionRequest,
+  SetTopicPermissionRequest
 } from '@shared/types'
 
 /**
@@ -132,6 +134,32 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle(IPC.deleteVhost, (_e, connectionId: string, name: string) =>
     connectionManager.require(connectionId).deleteVhost(name)
+  )
+
+  ipcMain.handle(IPC.listPermissions, (_e, connectionId: string) =>
+    connectionManager.require(connectionId).listPermissions()
+  )
+
+  ipcMain.handle(IPC.setPermission, (_e, req: SetPermissionRequest) =>
+    connectionManager.require(req.connectionId).setPermission(req)
+  )
+
+  ipcMain.handle(IPC.deletePermission, (_e, connectionId: string, vhost: string, user: string) =>
+    connectionManager.require(connectionId).deletePermission(vhost, user)
+  )
+
+  ipcMain.handle(IPC.listTopicPermissions, (_e, connectionId: string) =>
+    connectionManager.require(connectionId).listTopicPermissions()
+  )
+
+  ipcMain.handle(IPC.setTopicPermission, (_e, req: SetTopicPermissionRequest) =>
+    connectionManager.require(req.connectionId).setTopicPermission(req)
+  )
+
+  ipcMain.handle(
+    IPC.deleteTopicPermission,
+    (_e, connectionId: string, vhost: string, user: string) =>
+      connectionManager.require(connectionId).deleteTopicPermission(vhost, user)
   )
 
   ipcMain.handle(IPC.getShovelSupport, (_e, connectionId: string) =>

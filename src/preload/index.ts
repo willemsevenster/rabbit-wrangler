@@ -18,7 +18,9 @@ import type {
   MoveMessageRequest,
   MoveMessagesRequest,
   PublishMessageRequest,
-  SaveMessagesRequest
+  SaveMessagesRequest,
+  SetPermissionRequest,
+  SetTopicPermissionRequest
 } from '@shared/types'
 
 /**
@@ -49,6 +51,16 @@ const api: RabbitApi = {
   createVhost: (request: CreateVhostRequest) => ipcRenderer.invoke(IPC.createVhost, request),
   deleteVhost: (connectionId: string, name: string) =>
     ipcRenderer.invoke(IPC.deleteVhost, connectionId, name),
+  listPermissions: (connectionId: string) => ipcRenderer.invoke(IPC.listPermissions, connectionId),
+  setPermission: (request: SetPermissionRequest) => ipcRenderer.invoke(IPC.setPermission, request),
+  deletePermission: (connectionId: string, vhost: string, user: string) =>
+    ipcRenderer.invoke(IPC.deletePermission, connectionId, vhost, user),
+  listTopicPermissions: (connectionId: string) =>
+    ipcRenderer.invoke(IPC.listTopicPermissions, connectionId),
+  setTopicPermission: (request: SetTopicPermissionRequest) =>
+    ipcRenderer.invoke(IPC.setTopicPermission, request),
+  deleteTopicPermission: (connectionId: string, vhost: string, user: string) =>
+    ipcRenderer.invoke(IPC.deleteTopicPermission, connectionId, vhost, user),
 
   listPolicies: (connectionId: string) => ipcRenderer.invoke(IPC.listPolicies, connectionId),
   createPolicy: (request: CreatePolicyRequest) => ipcRenderer.invoke(IPC.createPolicy, request),
