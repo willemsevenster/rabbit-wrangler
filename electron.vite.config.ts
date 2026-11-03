@@ -13,6 +13,13 @@ export default defineConfig({
   },
   preload: {
     plugins: [externalizeDepsPlugin()],
+    // The window runs with `sandbox: true`, and a sandboxed preload must be a
+    // single CommonJS file (no ESM, no node_modules requires — only `electron`).
+    build: {
+      rolldownOptions: {
+        output: { format: 'cjs', entryFileNames: '[name].cjs' }
+      }
+    },
     resolve: {
       alias: {
         '@shared': resolve('src/shared')

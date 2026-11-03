@@ -16,8 +16,42 @@ export function buildAmqpUrl(config: ConnectionConfig): string {
   return `${scheme}://${auth}@${config.host}:${config.amqpPort}/${vhost}`
 }
 
-export function connectAmqp(config: ConnectionConfig): Promise<AmqpConnection> {
-  return amqp.connect(buildAmqpUrl(config))
+/** Budget for opening an AMQP connection, TCP + AMQP/TLS handshake included. */
+const CONNECT_TIMEOUT_MS = 15_000
+
+/**
+ * Open an AMQP connection, giving up after `timeoutMs`. Without a bound, an
+ * endpoint that accepts TCP but never completes the handshake would stall
+ * peek/move — and dispose(), which waits for a connect in flight — indefinitely.
+ * A connection that lands after the deadline is closed, not leaked.
+ */
+export function connectAmqp(
+  config: ConnectionConfig,
+  timeoutMs = CONNECT_TIMEOUT_MS
+): Promise<AmqpConnection> {
+  return new Promise((resolve, reject) => {
+    let timedOut = false
+    const timer = setTimeout(() => {
+      timedOut = true
+      reject(
+        new Error(
+          `AMQP connection to ${config.host}:${config.amqpPort} timed out after ${timeoutMs / 1000}s.`
+        )
+      )
+    }, timeoutMs)
+    amqp
+      // Also bounds the socket connect itself, so the attempt doesn't linger.
+      .connect(buildAmqpUrl(config), { timeout: timeoutMs })
+      .then((conn) => {
+        clearTimeout(timer)
+        if (timedOut) void conn.close().catch(() => undefined)
+        else resolve(conn)
+      })
+      .catch((err: unknown) => {
+        clearTimeout(timer)
+        if (!timedOut) reject(err)
+      })
+  })
 }
 
 /** Default time to wait for the AMQP port to accept a TCP connection. */

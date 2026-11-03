@@ -5,7 +5,7 @@ to set up, the branching model, and what we expect in a pull request.
 
 ## Prerequisites
 
-- **Node.js 20+**
+- **Node.js 22.12+** (required by Electron 45)
 - **[pnpm](https://pnpm.io/)** — this project uses pnpm, not npm/yarn.
 - A **RabbitMQ** broker with the **management plugin** enabled (HTTP API on port
   `15672`) for manual testing.

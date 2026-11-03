@@ -1,6 +1,8 @@
+import { randomUUID } from 'node:crypto'
 import type { ConsumeMessage } from 'amqplib'
 import { eventBus } from '../event-bus'
 import { fingerprintOf } from './fingerprint'
+import { encodePayload } from './payload'
 import type { AmqpChannel, AmqpConnection } from './amqp'
 import type { PeekedMessage } from '@shared/types'
 
@@ -36,7 +38,13 @@ const MAX_FINGERPRINTS = 10_000
 export class MessagePeeker {
   private channel: AmqpChannel | null = null
   private consumerTag: string | null = null
+  /** Set by stop(); a start() still in flight checks it and tears itself down. */
+  private stopped = false
   private counter = 0
+  /** Distinguishes this peeker's message ids from an earlier one on the same queue
+   * (e.g. after a reconnect) — delivery tags and the counter restart per channel,
+   * but the renderer keeps its buffer, so ids must stay unique across sessions. */
+  private readonly session = randomUUID().slice(0, 8)
   /** Fingerprints already surfaced to the UI (insertion-ordered for eviction). */
   private readonly seen = new Set<string>()
   private readonly pending = new Set<ReturnType<typeof setTimeout>>()
@@ -44,25 +52,50 @@ export class MessagePeeker {
   constructor(
     private readonly connectionId: string,
     private readonly queue: string,
-    private readonly conn: AmqpConnection
+    private readonly conn: AmqpConnection,
+    /** Called once if the broker closes our channel (queue deleted, connection
+     * lost, …) so the owner can forget this peeker and a later start() works. */
+    private readonly onClosed: () => void = () => undefined
   ) {}
 
   async start(): Promise<void> {
     if (this.channel) return
     const channel = await this.conn.createChannel()
-    await channel.prefetch(PREFETCH_WINDOW)
     this.channel = channel
-
-    const { consumerTag } = await channel.consume(
-      this.queue,
-      (msg) => this.handle(msg),
-      { noAck: false }
-    )
-    this.consumerTag = consumerTag
+    // An unhandled channel 'error' would throw in the main process. The broker
+    // closing our channel just ends this peek; 'close' always follows 'error'.
+    channel.on('error', () => undefined)
+    channel.on('close', () => {
+      if (this.channel !== channel) return // already stopped by us
+      this.clearTimers()
+      this.channel = null
+      this.consumerTag = null
+      this.onClosed()
+    })
+    try {
+      await channel.prefetch(PREFETCH_WINDOW)
+      const { consumerTag } = await channel.consume(this.queue, (msg) => this.handle(msg), {
+        noAck: false
+      })
+      this.consumerTag = consumerTag
+    } catch (err) {
+      await this.stop()
+      throw err
+    }
+    // stop() ran while we were starting: it couldn't cancel a consumer that
+    // didn't exist yet, so release the channel (and its held messages) now.
+    if (this.stopped) await this.stop()
   }
 
   private handle(msg: ConsumeMessage | null): void {
-    if (!msg || !this.channel) return
+    if (!this.channel) return
+    if (!msg) {
+      // The broker cancelled our consumer (e.g. the queue was deleted elsewhere):
+      // this peek is over, so release the channel and let the owner forget us.
+      void this.stop()
+      this.onClosed()
+      return
+    }
 
     const fingerprint = fingerprintOf(msg)
     const isNew = !this.seen.has(fingerprint)
@@ -88,16 +121,16 @@ export class MessagePeeker {
   }
 
   private emit(msg: ConsumeMessage, fingerprint: string): void {
-    const isBinary = !isUtf8(msg.content)
+    const { payload, isBinary } = encodePayload(msg.content)
     const peeked: PeekedMessage = {
-      id: `${this.connectionId}:${this.queue}:${msg.fields.deliveryTag}:${this.counter++}`,
+      id: `${this.connectionId}:${this.queue}:${this.session}:${msg.fields.deliveryTag}:${this.counter++}`,
       fingerprint,
       connectionId: this.connectionId,
       queue: this.queue,
       exchange: msg.fields.exchange,
       routingKey: msg.fields.routingKey,
       redelivered: msg.fields.redelivered,
-      payload: isBinary ? msg.content.toString('base64') : msg.content.toString('utf8'),
+      payload,
       isBinary,
       properties: extractProperties(msg),
       headers: (msg.properties.headers as Record<string, unknown>) ?? {},
@@ -115,28 +148,32 @@ export class MessagePeeker {
   }
 
   async stop(): Promise<void> {
-    for (const timer of this.pending) clearTimeout(timer)
-    this.pending.clear()
-    if (this.channel && this.consumerTag) {
+    this.stopped = true
+    this.clearTimers()
+    const channel = this.channel
+    const consumerTag = this.consumerTag
+    this.channel = null
+    this.consumerTag = null
+    this.seen.clear()
+    // Close whenever a channel exists — even mid-start with no consumer yet —
+    // so the broker requeues everything it delivered to us.
+    if (channel) {
       try {
-        await this.channel.cancel(this.consumerTag)
-        await this.channel.close()
+        if (consumerTag) await channel.cancel(consumerTag)
+        await channel.close()
       } catch {
         // channel may already be gone; ignore
       }
     }
-    this.channel = null
-    this.consumerTag = null
-    this.seen.clear()
+  }
+
+  private clearTimers(): void {
+    for (const timer of this.pending) clearTimeout(timer)
+    this.pending.clear()
   }
 }
 
 function extractProperties(msg: ConsumeMessage): Record<string, unknown> {
   const { headers: _headers, ...rest } = msg.properties
   return rest as Record<string, unknown>
-}
-
-/** Best-effort check that a buffer is valid UTF-8 (so we don't mangle binaries). */
-function isUtf8(buf: Buffer): boolean {
-  return Buffer.compare(Buffer.from(buf.toString('utf8'), 'utf8'), buf) === 0
 }
