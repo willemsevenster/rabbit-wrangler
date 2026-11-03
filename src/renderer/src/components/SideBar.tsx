@@ -77,14 +77,13 @@ export function SideBar() {
   })
   const isVisible = (id: string | null): boolean => id != null && visible.some((n) => n.id === id)
   const selectedConnNode = selectedConnectionId ? connNodeId(selectedConnectionId) : null
-  const fallbackId = (isVisible(selectedConnNode) ? selectedConnNode : null) ?? visible[0]?.id ?? null
+  const fallbackId =
+    (isVisible(selectedConnNode) ? selectedConnNode : null) ?? visible[0]?.id ?? null
   const effectiveFocusedId = isVisible(focusedId) ? focusedId : fallbackId
 
   function focusRow(id: string): void {
     setFocusedId(id)
-    treeRef.current
-      ?.querySelector<HTMLElement>(`[data-tree-id="${CSS.escape(id)}"]`)
-      ?.focus()
+    treeRef.current?.querySelector<HTMLElement>(`[data-tree-id="${CSS.escape(id)}"]`)?.focus()
   }
 
   function onKeyDown(e: ReactKeyboardEvent<HTMLDivElement>): void {
@@ -470,7 +469,11 @@ function ConnectionChildren({
     )
   }
   if (state !== 'connected') {
-    return <div className="tree__empty" style={{ paddingLeft: 30 }}>Loading…</div>
+    return (
+      <div className="tree__empty" style={{ paddingLeft: 30 }}>
+        Loading…
+      </div>
+    )
   }
 
   return (
@@ -485,7 +488,9 @@ function ConnectionChildren({
         openMenu={openMenu}
       >
         {queues.length === 0 ? (
-          <div className="tree__empty" style={{ paddingLeft: 46 }}>No queues.</div>
+          <div className="tree__empty" style={{ paddingLeft: 46 }}>
+            No queues.
+          </div>
         ) : (
           queues.map((q) => (
             <QueueNode key={q.name} connectionId={connectionId} queue={q} openMenu={openMenu} />
@@ -502,7 +507,9 @@ function ConnectionChildren({
         openMenu={openMenu}
       >
         {exchanges.length === 0 ? (
-          <div className="tree__empty" style={{ paddingLeft: 46 }}>No exchanges.</div>
+          <div className="tree__empty" style={{ paddingLeft: 46 }}>
+            No exchanges.
+          </div>
         ) : (
           exchanges.map((x) => (
             <ExchangeNode

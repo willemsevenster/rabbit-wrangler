@@ -224,7 +224,9 @@ function SearchModal() {
           {!hasQueueTabs ? (
             <div className="placeholder">Open a queue tab to search its peeked messages.</div>
           ) : shown.length === 0 ? (
-            <div className="placeholder">{error ? 'Fix the expression to see matches.' : 'No matching messages.'}</div>
+            <div className="placeholder">
+              {error ? 'Fix the expression to see matches.' : 'No matching messages.'}
+            </div>
           ) : (
             <table className="msg-table">
               <thead>

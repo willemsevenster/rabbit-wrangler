@@ -220,7 +220,11 @@ function SettingsModal() {
                 onChange={(e) => setNewSuffix(e.target.value)}
                 onKeyDown={onSuffixKey}
               />
-              <button className="btn btn--sm btn--secondary" onClick={addSuffix} disabled={!newSuffix.trim()}>
+              <button
+                className="btn btn--sm btn--secondary"
+                onClick={addSuffix}
+                disabled={!newSuffix.trim()}
+              >
                 Add
               </button>
               <button

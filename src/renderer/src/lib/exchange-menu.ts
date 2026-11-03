@@ -15,8 +15,14 @@ function exchangeSnapshot(x: ExchangeInfo) {
 
 /** Context menu for an exchange, shared by the tree and the detail view. */
 export function buildExchangeMenu(connectionId: string, x: ExchangeInfo): MenuItem[] {
-  const { openExchangeTab, openPublishDialog, openBindingDialog, deleteExchange, confirm, addToast } =
-    useAppStore.getState()
+  const {
+    openExchangeTab,
+    openPublishDialog,
+    openBindingDialog,
+    deleteExchange,
+    confirm,
+    addToast
+  } = useAppStore.getState()
   const isDefault = x.name === ''
   // Built-in exchanges (default + amq.*) can't be deleted.
   const isBuiltIn = isDefault || x.name.startsWith('amq.')

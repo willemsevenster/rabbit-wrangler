@@ -454,7 +454,9 @@ const PEEK_PANE_MIN = 120
 const PEEK_PANE_MAX = 700
 const clampPaneHeight = (h: number): number =>
   Math.min(PEEK_PANE_MAX, Math.max(PEEK_PANE_MIN, Math.round(h)))
-const initialPeekPaneHeight = clampPaneHeight(Number(localStorage.getItem('rw.peekPaneHeight')) || 260)
+const initialPeekPaneHeight = clampPaneHeight(
+  Number(localStorage.getItem('rw.peekPaneHeight')) || 260
+)
 const initialSearchPaneHeight = clampPaneHeight(
   Number(localStorage.getItem('rw.searchPaneHeight')) || 300
 )
@@ -463,7 +465,9 @@ const DETAIL_META_MIN = 160
 const DETAIL_META_MAX = 640
 const clampMetaWidth = (w: number): number =>
   Math.min(DETAIL_META_MAX, Math.max(DETAIL_META_MIN, Math.round(w)))
-const initialDetailMetaWidth = clampMetaWidth(Number(localStorage.getItem('rw.detailMetaWidth')) || 320)
+const initialDetailMetaWidth = clampMetaWidth(
+  Number(localStorage.getItem('rw.detailMetaWidth')) || 320
+)
 const initialSearchDetailMetaWidth = clampMetaWidth(
   Number(localStorage.getItem('rw.searchDetailMetaWidth')) || 320
 )
@@ -752,7 +756,10 @@ export const useAppStore = create<AppState>((set, get) => ({
       // window, and old + new copies would duplicate rows.
       const rt = await window.api.getConnectionRuntime(id).catch(() => null)
       if (!rt || rt.transport === prevTransport) restoreBuffers()
-      get().addToast('error', `Could not switch mode: ${e instanceof Error ? e.message : String(e)}`)
+      get().addToast(
+        'error',
+        `Could not switch mode: ${e instanceof Error ? e.message : String(e)}`
+      )
     }
   },
 
@@ -856,9 +863,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     try {
       const bindings = await window.api.listExchangeBindings(connectionId, exchange)
       set({
-        tabs: get().tabs.map((t) =>
-          t.id === id && t.kind === 'exchange' ? { ...t, bindings } : t
-        )
+        tabs: get().tabs.map((t) => (t.id === id && t.kind === 'exchange' ? { ...t, bindings } : t))
       })
     } catch {
       // leave bindings empty
@@ -876,7 +881,14 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({
       tabs: [
         ...get().tabs,
-        { id, kind: 'connections', connectionId, title: `${connName} - Connections`, clientConnections: [], consumers: [] }
+        {
+          id,
+          kind: 'connections',
+          connectionId,
+          title: `${connName} - Connections`,
+          clientConnections: [],
+          consumers: []
+        }
       ],
       activeTabId: id
     })
@@ -903,7 +915,10 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
     const connName = get().connections.find((c) => c.id === connectionId)?.name ?? connectionId
     set({
-      tabs: [...get().tabs, { id, kind: 'policies', connectionId, title: `${connName} - Policies`, policies: [] }],
+      tabs: [
+        ...get().tabs,
+        { id, kind: 'policies', connectionId, title: `${connName} - Policies`, policies: [] }
+      ],
       activeTabId: id
     })
     await get().refreshTab(id)
@@ -949,7 +964,14 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({
       tabs: [
         ...get().tabs,
-        { id, kind: 'shovels', connectionId, title: `${connName} - Shovels`, support: null, shovels: [] }
+        {
+          id,
+          kind: 'shovels',
+          connectionId,
+          title: `${connName} - Shovels`,
+          support: null,
+          shovels: []
+        }
       ],
       activeTabId: id
     })
@@ -1370,7 +1392,10 @@ export const useAppStore = create<AppState>((set, get) => ({
     const name = get().connections.find((c) => c.id === connectionId)?.name ?? 'broker'
     const result = await window.api.exportDefinitions(connectionId)
     if (result.ok) {
-      get().addToast('success', `Exported definitions for "${name}" (${result.count ?? 0} objects) to ${result.path}`)
+      get().addToast(
+        'success',
+        `Exported definitions for "${name}" (${result.count ?? 0} objects) to ${result.path}`
+      )
     } else if (!result.canceled) {
       get().addToast('error', `Export definitions failed: ${result.error ?? 'unknown error'}`)
     }
@@ -1383,7 +1408,10 @@ export const useAppStore = create<AppState>((set, get) => ({
     const preview = await window.api.previewImportDefinitions(connectionId)
     if (preview.canceled) return
     if (!preview.ok || !preview.token || !preview.summary) {
-      get().addToast('error', `Could not read definitions file: ${preview.error ?? 'unknown error'}`)
+      get().addToast(
+        'error',
+        `Could not read definitions file: ${preview.error ?? 'unknown error'}`
+      )
       return
     }
     const s = preview.summary
@@ -1553,8 +1581,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     // Export streams to disk, but every message stays unacked (held from other
     // consumers) until the export finishes — make that a deliberate choice on a
     // big queue.
-    const ready =
-      get().queuesByConn[cid]?.find((q) => q.name === queue)?.messagesReady ?? 0
+    const ready = get().queuesByConn[cid]?.find((q) => q.name === queue)?.messagesReady ?? 0
     if (ready > LARGE_EXPORT_THRESHOLD) {
       const ok = await get().confirm({
         title: 'Export a large queue',
@@ -1606,7 +1633,9 @@ export const useAppStore = create<AppState>((set, get) => ({
     const cid = connectionId ?? get().selectedConnectionId
     if (!cid) return
     try {
-      set({ exchangesByConn: { ...get().exchangesByConn, [cid]: await window.api.listExchanges(cid) } })
+      set({
+        exchangesByConn: { ...get().exchangesByConn, [cid]: await window.api.listExchanges(cid) }
+      })
     } catch {
       set({ exchangesByConn: { ...get().exchangesByConn, [cid]: [] } })
     }
@@ -1918,7 +1947,8 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   async exportConnections() {
     const r = await window.api.exportConnections()
-    if (r.ok) get().addToast('success', `Exported ${r.count} connection${r.count === 1 ? '' : 's'}.`)
+    if (r.ok)
+      get().addToast('success', `Exported ${r.count} connection${r.count === 1 ? '' : 's'}.`)
     else if (!r.canceled) get().addToast('error', `Export failed: ${r.error ?? 'unknown error'}`)
   },
 
@@ -1969,9 +1999,7 @@ function ipcError(err: unknown): string {
 /** Reset a queue tab's accumulated context (peeks/unread/selection). */
 function clearQueueTab(tabs: EditorTab[], tabId: string): EditorTab[] {
   return tabs.map((t) =>
-    t.id === tabId && t.kind === 'queue'
-      ? { ...t, unread: 0, selectedMessageId: null }
-      : t
+    t.id === tabId && t.kind === 'queue' ? { ...t, unread: 0, selectedMessageId: null } : t
   )
 }
 
@@ -2014,7 +2042,12 @@ function clearBuffers(
 function rememberMoveTarget(
   set: (partial: Partial<AppState>) => void,
   get: () => AppState,
-  req: { connectionId: string; sourceQueue: string; targetExchange: string; targetRoutingKey: string }
+  req: {
+    connectionId: string
+    sourceQueue: string
+    targetExchange: string
+    targetRoutingKey: string
+  }
 ): void {
   const targets = {
     ...get().lastMoveTargets,

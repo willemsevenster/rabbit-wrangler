@@ -9,7 +9,7 @@ Rabbit Wrangler can create and delete queues, move messages between queues, and 
 3. Add any **Arguments** (x-args) you need — for example `x-dead-letter-exchange` (String) or `x-message-ttl` (Number). Pick the right value **type** so numbers are sent as numbers.
 4. Click **Create queue**.
 
-A new queue is automatically bound to the default exchange by its name, so you can immediately use it as a **move/redrive target** (see below). Re-creating a queue with the exact same settings is harmless; trying to re-create it with *different* settings is rejected by the broker.
+A new queue is automatically bound to the default exchange by its name, so you can immediately use it as a **move/redrive target** (see below). Re-creating a queue with the exact same settings is harmless; trying to re-create it with _different_ settings is rejected by the broker.
 
 ## Move a whole queue
 
@@ -88,4 +88,4 @@ To empty a queue but keep it, use **Purge** instead.
 
 The **Confirm before destructive actions** setting controls whether **purge** and **single-message delete** ask you to confirm first. Leave it on for safety; turn it off if you do these operations often and don't want the extra step.
 
-**Deleting a whole queue is always confirmed** through its own dialog — which also carries the *only if empty / only if unused* safety guards — regardless of this setting. See [Settings](./settings).
+**Deleting a whole queue is always confirmed** through its own dialog — which also carries the _only if empty / only if unused_ safety guards — regardless of this setting. See [Settings](./settings).

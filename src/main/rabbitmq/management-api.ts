@@ -808,7 +808,11 @@ export class ManagementApi {
  * (older brokers) or a string array (newer), into a clean string array. */
 function normalizeTags(tags: string[] | string | undefined): string[] {
   if (Array.isArray(tags)) return tags.map((t) => String(t).trim()).filter(Boolean)
-  if (typeof tags === 'string') return tags.split(',').map((t) => t.trim()).filter(Boolean)
+  if (typeof tags === 'string')
+    return tags
+      .split(',')
+      .map((t) => t.trim())
+      .filter(Boolean)
   return []
 }
 

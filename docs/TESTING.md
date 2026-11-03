@@ -33,16 +33,16 @@ node scripts/seed-broker.mjs --rate 20           # live traffic until Ctrl-C
 node scripts/seed-broker.mjs --clean             # tear it all down
 ```
 
-| Flag | Meaning |
-|------|---------|
-| `--messages, -m <n>` | total messages for a one-shot seed (default 60) |
-| `--stress <n>` | also publish `n` edge-case payloads to `rw.demo.stress` |
-| `--seed <n>` | seed the RNG → byte-for-byte reproducible data |
-| `--rate, -r <n>` | live mode: ~`n` msgs/sec until Ctrl-C |
-| `--durable` | persist queues/messages across broker restarts |
-| `--prefix <name>` | namespace for everything (default `rw.demo`) |
-| `--url <amqp-url>` | broker URL (default `$RABBIT_URL` or `guest@localhost:5672`) |
-| `--clean` | delete the sample topology and exit |
+| Flag                 | Meaning                                                      |
+| -------------------- | ------------------------------------------------------------ |
+| `--messages, -m <n>` | total messages for a one-shot seed (default 60)              |
+| `--stress <n>`       | also publish `n` edge-case payloads to `rw.demo.stress`      |
+| `--seed <n>`         | seed the RNG → byte-for-byte reproducible data               |
+| `--rate, -r <n>`     | live mode: ~`n` msgs/sec until Ctrl-C                        |
+| `--durable`          | persist queues/messages across broker restarts               |
+| `--prefix <name>`    | namespace for everything (default `rw.demo`)                 |
+| `--url <amqp-url>`   | broker URL (default `$RABBIT_URL` or `guest@localhost:5672`) |
+| `--clean`            | delete the sample topology and exit                          |
 
 ## 3. One command to a ready, seeded env
 
@@ -84,7 +84,7 @@ Messages are deliberately varied to exercise the UI:
   lines, occasional binary blobs.
 - **Properties:** ~70% carry a `messageId` (the rest exercise the body-hash
   fingerprint), plus mixed `correlationId`, `timestamp`, `appId`, and `x-*` headers.
-- **DLQ x-death is real.** RabbitMQ *strips* a client-supplied `x-death`, so the
+- **DLQ x-death is real.** RabbitMQ _strips_ a client-supplied `x-death`, so the
   seeder dead-letters for real (a TTL-0 feeder queue → the `.dlq`), giving each DLQ
   message an authentic broker `x-death` for the app's DLQ detail breakout.
 - **`--stress`** publishes awkward payloads: a huge array, deeply nested JSON,

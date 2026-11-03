@@ -190,11 +190,7 @@ export interface RabbitApi {
   /** Set a user's topic (write/read) permissions for an exchange on a vhost. */
   setTopicPermission(request: SetTopicPermissionRequest): Promise<OperationResult>
   /** Remove a user's topic permissions on a vhost (all exchanges). */
-  deleteTopicPermission(
-    connectionId: string,
-    vhost: string,
-    user: string
-  ): Promise<OperationResult>
+  deleteTopicPermission(connectionId: string, vhost: string, user: string): Promise<OperationResult>
 
   /** List the vhost's policies. */
   listPolicies(connectionId: string): Promise<PolicyInfo[]>
@@ -310,13 +306,7 @@ export interface UpdatePrefs {
 }
 
 /** Auto-update lifecycle, pushed from the main-process updater. */
-export type UpdateState =
-  | 'checking'
-  | 'available'
-  | 'none'
-  | 'downloading'
-  | 'downloaded'
-  | 'error'
+export type UpdateState = 'checking' | 'available' | 'none' | 'downloading' | 'downloaded' | 'error'
 
 export interface UpdateStatusPayload {
   state: UpdateState

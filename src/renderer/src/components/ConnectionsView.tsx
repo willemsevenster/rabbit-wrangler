@@ -64,7 +64,11 @@ export function ConnectionsView({ tab }: { tab: ConnectionsTab }) {
                   <td>{c.vhost}</td>
                   <td>
                     {c.protocol}
-                    {c.tls && <span className="badge" style={{ marginLeft: 6 }}>TLS</span>}
+                    {c.tls && (
+                      <span className="badge" style={{ marginLeft: 6 }}>
+                        TLS
+                      </span>
+                    )}
                   </td>
                   <td className="num">{c.channels}</td>
                   <td>{c.state}</td>
@@ -113,11 +117,7 @@ export function ConnectionsView({ tab }: { tab: ConnectionsTab }) {
                   <td>{c.ackRequired ? 'manual' : 'auto'}</td>
                   <td className="num">{c.prefetchCount === 0 ? 'unlimited' : c.prefetchCount}</td>
                   <td>
-                    {c.active ? (
-                      'yes'
-                    ) : (
-                      <span style={{ color: 'var(--warning)' }}>paused</span>
-                    )}
+                    {c.active ? 'yes' : <span style={{ color: 'var(--warning)' }}>paused</span>}
                   </td>
                 </tr>
               ))}

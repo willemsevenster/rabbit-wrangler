@@ -63,15 +63,11 @@ export async function readImportFile(): Promise<ImportResult> {
   try {
     const raw = await fs.readFile(filePaths[0], 'utf8')
     const parsed: unknown = JSON.parse(raw)
-    const arr = Array.isArray(parsed)
-      ? parsed
-      : (parsed as { connections?: unknown })?.connections
+    const arr = Array.isArray(parsed) ? parsed : (parsed as { connections?: unknown })?.connections
     if (!Array.isArray(arr)) {
       return { ok: false, error: 'File does not contain a connections array.' }
     }
-    const connections = arr
-      .map(normalize)
-      .filter((c): c is SafeConnectionConfig => c !== null)
+    const connections = arr.map(normalize).filter((c): c is SafeConnectionConfig => c !== null)
     if (connections.length === 0) {
       return { ok: false, error: 'No valid connections found in the file.' }
     }

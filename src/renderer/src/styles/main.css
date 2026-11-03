@@ -164,7 +164,9 @@ select:-webkit-autofill {
   -webkit-text-fill-color: var(--input-fg);
   caret-color: var(--input-fg);
   border-color: var(--input-border);
-  transition: background-color 600000s 0s, color 600000s 0s;
+  transition:
+    background-color 600000s 0s,
+    color 600000s 0s;
 }
 
 code {
