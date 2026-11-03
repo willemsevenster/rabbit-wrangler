@@ -16,6 +16,10 @@ Choose **Light** or **Dark**. On first run, Rabbit Wrangler follows your operati
 
 Sets how many messages each queue tab keeps (between **10** and **9,999**, default **1,000**). When a tab reaches the limit, its oldest messages drop off to make room. See [Peeking at messages](./peeking-messages).
 
+### Peek window
+
+Sets how many messages at the **head** of a queue each peek can see (between **1** and **1,000**, default **20**). Raise it to look deeper into a large dead-letter queue. While a queue is being peeked, that many messages are held unacknowledged and then put back, so a very large window means more messages are briefly in flight. Changing it re-reads every open queue tab. See [Peeking at messages](./peeking-messages).
+
 ### Confirm before destructive actions
 
 When on, **purge** and **delete** ask you to confirm before they run. Turn it off to skip the prompt if you do these operations often. See [Moving & purging](./moving-and-purging).

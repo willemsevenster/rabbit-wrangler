@@ -255,8 +255,9 @@ export interface RabbitApi {
   /** Remove a specific binding (by its properties key). */
   deleteBinding(request: DeleteBindingRequest): Promise<OperationResult>
 
-  /** Begin streaming live (NACK-and-requeue) peeks of `queue` over the event socket. */
-  startPeek(connectionId: string, queue: string): Promise<void>
+  /** Begin streaming live (NACK-and-requeue) peeks of `queue` over the event socket,
+   * holding the head `window` messages in view (default `PEEK_WINDOW.default`). */
+  startPeek(connectionId: string, queue: string, window?: number): Promise<void>
   stopPeek(connectionId: string, queue: string): Promise<void>
   moveMessages(request: MoveMessagesRequest): Promise<OperationResult>
   /** Move one peeked message (by fingerprint) to a target exchange/routing key. */

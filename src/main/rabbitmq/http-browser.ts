@@ -21,10 +21,11 @@ import type { PeekedMessage } from '@shared/types'
  *   - Same head-window + fingerprint de-dup caveats as the AMQP peeker.
  */
 
-/** How many head messages to request per poll — the visible "head window". */
-const BROWSE_WINDOW = 20
-/** How often to re-poll the queue head over HTTP. */
+/** Minimum interval between re-polls of the queue head over HTTP. */
 const POLL_INTERVAL_MS = 2500
+/** Per-message share of the poll interval, so a large window isn't re-fetched in
+ * full every 2.5 s (20 → 2.5 s, 500 → 12.5 s). */
+const POLL_MS_PER_MESSAGE = 25
 /** Bound on remembered fingerprints so a long browse can't grow unbounded. */
 const MAX_FINGERPRINTS = 10_000
 
@@ -40,13 +41,16 @@ export class HttpBrowser {
   constructor(
     private readonly connectionId: string,
     private readonly queue: string,
-    private readonly api: ManagementApi
+    private readonly api: ManagementApi,
+    /** How many head messages to request per poll — the visible "head window". */
+    private readonly window: number
   ) {}
 
   async start(): Promise<void> {
     if (this.timer) return
     await this.poll() // surface the current head immediately
-    this.timer = setInterval(() => void this.poll(), POLL_INTERVAL_MS)
+    const interval = Math.max(POLL_INTERVAL_MS, this.window * POLL_MS_PER_MESSAGE)
+    this.timer = setInterval(() => void this.poll(), interval)
   }
 
   private async poll(): Promise<void> {
@@ -54,7 +58,7 @@ export class HttpBrowser {
     if (this.inFlight) return
     this.inFlight = true
     try {
-      const messages = await this.api.browseMessages(this.queue, BROWSE_WINDOW)
+      const messages = await this.api.browseMessages(this.queue, this.window)
       for (const raw of messages) {
         const fingerprint = fingerprintFor(raw)
         if (this.seen.has(fingerprint)) continue

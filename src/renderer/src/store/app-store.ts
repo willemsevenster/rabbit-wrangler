@@ -41,6 +41,7 @@ import type {
   QueueInfo,
   SafeConnectionConfig
 } from '@shared/types'
+import { clampPeekWindow, PEEK_WINDOW } from '@shared/types'
 
 /** Last move destination chosen for a source queue, keyed by `${connId}:${queue}`. */
 interface MoveTarget {
@@ -225,6 +226,8 @@ interface AppState {
   searchOpen: boolean
   /** Max peeked messages retained per queue tab (oldest dropped past this). */
   maxMessages: number
+  /** How many head messages each queue peek holds in view (AMQP prefetch / HTTP count). */
+  peekWindow: number
   /** Live peeked messages per queue tab id, newest first. Kept OUT of `tabs` so a
    *  peek only re-renders that tab's table — not the tab strip, search, menus. */
   peeksByTab: Record<string, PeekedMessage[]>
@@ -381,6 +384,8 @@ interface AppState {
   openSearch(): void
   closeSearch(): void
   setMaxMessages(n: number): void
+  /** Change the peek window; re-peeks every open queue tab so it takes effect now. */
+  setPeekWindow(n: number): void
   setDlqSuffixes(suffixes: string[]): void
   setConfirmDestructive(on: boolean): void
   setAutoConnectOnLaunch(on: boolean): void
@@ -472,6 +477,11 @@ const initialMaxMessages = clampMaxMessages(
   Number(localStorage.getItem(MAX_MESSAGES_KEY)) || MAX_MESSAGES_DEFAULT
 )
 
+const PEEK_WINDOW_KEY = 'rw.peekWindow'
+const initialPeekWindow = clampPeekWindow(
+  Number(localStorage.getItem(PEEK_WINDOW_KEY)) || PEEK_WINDOW.default
+)
+
 const DLQ_SUFFIXES_KEY = 'rw.dlqSuffixes'
 function loadDlqSuffixes(): string[] {
   try {
@@ -555,6 +565,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   settingsOpen: false,
   searchOpen: false,
   maxMessages: initialMaxMessages,
+  peekWindow: initialPeekWindow,
   peeksByTab: {},
   peekErrors: {},
   dlqSuffixes: loadDlqSuffixes(),
@@ -1773,6 +1784,16 @@ export const useAppStore = create<AppState>((set, get) => ({
     })
   },
 
+  setPeekWindow(n) {
+    const peekWindow = clampPeekWindow(n)
+    if (peekWindow === get().peekWindow) return
+    localStorage.setItem(PEEK_WINDOW_KEY, String(peekWindow))
+    set({ peekWindow })
+    // A live peek's prefetch is fixed, so restart each open queue tab's peek with the
+    // new window (Refresh also clears its buffer, so rows aren't surfaced twice).
+    for (const t of get().tabs) if (t.kind === 'queue') void get().refreshTab(t.id)
+  },
+
   setDlqSuffixes(suffixes) {
     // Normalize: trim, drop blanks, de-dupe (case-insensitive); fall back to defaults.
     const seen = new Set<string>()
@@ -1924,7 +1945,7 @@ async function startTabPeek(connectionId: string, queue: string): Promise<void> 
   const tid = queueTabId(connectionId, queue)
   setPeekError(tid, null)
   try {
-    await window.api.startPeek(connectionId, queue)
+    await window.api.startPeek(connectionId, queue, useAppStore.getState().peekWindow)
   } catch (err) {
     if (useAppStore.getState().tabs.some((t) => t.id === tid)) setPeekError(tid, ipcError(err))
   }

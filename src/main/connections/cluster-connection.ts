@@ -46,6 +46,7 @@ import type {
   UserInfo,
   VhostInfo
 } from '@shared/types'
+import { clampPeekWindow, PEEK_WINDOW } from '@shared/types'
 
 /** One queue browser — either the live AMQP peeker or the polled HTTP browser.
  * Both surface `peek` events; only `stop()` is needed by ClusterConnection. */
@@ -88,10 +89,10 @@ export class ClusterConnection {
    * run strictly in call order, so e.g. close+reopen of a tab while its first
    * peek is still starting stops that peek and then starts a fresh one. */
   private readonly peekOps = new Map<string, Promise<void>>()
-  /** Queues the UI wants peeked (startPeek..stopPeek), independent of whether a
-   * browser is alive right now — what to resume after the AMQP connection drops
-   * (closing the connection tears the peekers' channels down first). */
-  private readonly wantedPeeks = new Set<string>()
+  /** Queues the UI wants peeked (startPeek..stopPeek) → their peek window, independent
+   * of whether a browser is alive right now — what to resume after the AMQP connection
+   * drops (closing the connection tears the peekers' channels down first). */
+  private readonly wantedPeeks = new Map<string, number>()
   private resumeTimer: ReturnType<typeof setTimeout> | null = null
   /** Consecutive failed resume attempts, for the retry backoff. */
   private resumeAttempts = 0
@@ -182,7 +183,7 @@ export class ClusterConnection {
       // (e.g. deleted meanwhile) just isn't peeked — it must not abort the switch
       // and leave the others half-switched with the IPC call reporting failure.
       await Promise.all(
-        [...this.wantedPeeks].map((queue) =>
+        [...this.wantedPeeks.keys()].map((queue) =>
           this.startPeek(queue, { onlyIfWanted: true }).catch(() => undefined)
         )
       )
@@ -277,7 +278,7 @@ export class ClusterConnection {
   private async resumePeeks(): Promise<void> {
     const dropped: string[] = []
     let transientError: string | null = null
-    for (const queue of [...this.wantedPeeks]) {
+    for (const queue of [...this.wantedPeeks.keys()]) {
       // Re-check each time: a tab may have closed (stopPeek), or we may have been
       // disposed / switched to HTTP browse, while an earlier resume was awaiting.
       if (this.disposed || this.transport !== 'amqp') return
@@ -477,13 +478,20 @@ export class ClusterConnection {
   }
 
   /** Start peeking a queue (no-op if already live). `onlyIfWanted` is for resume:
-   * skip it if a stopPeek queued ahead of us means the tab has since closed. */
-  startPeek(queue: string, opts: { onlyIfWanted?: boolean } = {}): Promise<void> {
+   * skip it if a stopPeek queued ahead of us means the tab has since closed. A
+   * restart without a `window` (resume, transport switch) keeps the last one. */
+  startPeek(
+    queue: string,
+    opts: { onlyIfWanted?: boolean; window?: number } = {}
+  ): Promise<void> {
     return this.serialize(queue, async () => {
       if (opts.onlyIfWanted && !this.wantedPeeks.has(queue)) return
-      this.wantedPeeks.add(queue)
+      const window = clampPeekWindow(
+        opts.window ?? this.wantedPeeks.get(queue) ?? PEEK_WINDOW.default
+      )
+      this.wantedPeeks.set(queue, window)
       if (this.peekers.has(queue)) return
-      await this.openBrowser(queue)
+      await this.openBrowser(queue, window)
     })
   }
 
@@ -500,12 +508,12 @@ export class ClusterConnection {
     return result
   }
 
-  private async openBrowser(queue: string): Promise<void> {
+  private async openBrowser(queue: string, window: number): Promise<void> {
     // HTTP mode polls the management API; AMQP mode opens a live nack/requeue consumer.
     const browser: QueueBrowser =
       this.transport === 'http'
-        ? new HttpBrowser(this.config.id, queue, this.api)
-        : new MessagePeeker(this.config.id, queue, await this.amqpConnection(), () => {
+        ? new HttpBrowser(this.config.id, queue, this.api, window)
+        : new MessagePeeker(this.config.id, queue, await this.amqpConnection(), window, () => {
             // Broker closed the channel (queue deleted, ...): forget it so a later
             // startPeek can open a fresh one.
             if (this.peekers.get(queue) === browser) this.peekers.delete(queue)
