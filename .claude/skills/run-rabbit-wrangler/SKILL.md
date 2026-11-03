@@ -14,7 +14,7 @@ on **Windows** (PowerShell + Git bash); see Gotchas for the headless-Linux tweak
 
 ## Prerequisites
 
-- Node 20+ and pnpm (this repo uses pnpm — see the user's standing preference).
+- Node 22.12+ (required by Electron 45) and pnpm (this repo uses pnpm — see the user's standing preference).
 - `pnpm install` — also runs the allow-listed build scripts in
   `pnpm-workspace.yaml` (Electron ≥ 45 fetches its binary lazily on first launch) and installs
   `playwright-core`, which the driver uses.
