@@ -56,6 +56,13 @@ const VALID_PROPERTIES = new Set([
  * Message-level work (peek, move) goes over AMQP instead — see message-peeker
  * and operations.
  */
+/** Default budget for one management API call — a broker that silently drops
+ * packets would otherwise leave `connect()` "connecting" (and block the stats
+ * poller's in-flight guard) for minutes. */
+const REQUEST_TIMEOUT_MS = 10_000
+/** Definitions export/import can legitimately take a while on big vhosts. */
+const LONG_REQUEST_TIMEOUT_MS = 120_000
+
 export class ManagementApi {
   private readonly baseUrl: string
   private readonly authHeader: string
@@ -74,7 +81,11 @@ export class ManagementApi {
     return encodeURIComponent(this.vhost)
   }
 
-  private async request<T>(path: string, init?: RequestInit): Promise<T> {
+  private async request<T>(
+    path: string,
+    init?: RequestInit,
+    timeoutMs = REQUEST_TIMEOUT_MS
+  ): Promise<T> {
     const method = init?.method ?? 'GET'
     const url = `${this.baseUrl}${path}`
 
@@ -82,6 +93,7 @@ export class ManagementApi {
     try {
       res = await fetch(url, {
         ...init,
+        signal: AbortSignal.timeout(timeoutMs),
         headers: {
           authorization: this.authHeader,
           'content-type': 'application/json',
@@ -89,6 +101,7 @@ export class ManagementApi {
         }
       })
     } catch (err) {
+      if (isTimeout(err)) throw new Error(describeTimeout(method, url, timeoutMs))
       // Network-level failure (host down, wrong port, DNS, TLS) — fetch rejects
       // before any HTTP status. Dig the OS error code out of the cause for a hint.
       throw new Error(describeNetworkError(err, method, url))
@@ -97,8 +110,15 @@ export class ManagementApi {
     if (!res.ok) {
       throw new Error(await describeHttpError(res, method, path))
     }
-    // Some endpoints (purge) return 204 with no body.
-    const text = await res.text()
+    // Some endpoints (purge) return 204 with no body. The timeout also covers
+    // reading the body.
+    let text: string
+    try {
+      text = await res.text()
+    } catch (err) {
+      if (isTimeout(err)) throw new Error(describeTimeout(method, url, timeoutMs))
+      throw err
+    }
     return (text ? JSON.parse(text) : undefined) as T
   }
 
@@ -644,6 +664,7 @@ export class ManagementApi {
     let res: Response
     try {
       res = await fetch(url, {
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
         headers: { authorization: this.authHeader, 'content-type': 'application/json' }
       })
     } catch {
@@ -734,17 +755,22 @@ export class ManagementApi {
    * The vhost-scoped endpoint excludes users/permissions, so no credentials leak.
    * Requires the broker user's `administrator` tag. */
   async getDefinitions(): Promise<Record<string, unknown>> {
-    return this.request<Record<string, unknown>>(`/definitions/${this.vhostSegment()}`)
+    return this.request<Record<string, unknown>>(
+      `/definitions/${this.vhostSegment()}`,
+      undefined,
+      LONG_REQUEST_TIMEOUT_MS
+    )
   }
 
   /** Apply a definitions document to this vhost (creates/updates; never deletes).
    * Idempotent and additive; requires the `administrator` tag. */
   async importDefinitions(defs: unknown): Promise<OperationResult> {
     try {
-      await this.request<void>(`/definitions/${this.vhostSegment()}`, {
-        method: 'POST',
-        body: JSON.stringify(defs)
-      })
+      await this.request<void>(
+        `/definitions/${this.vhostSegment()}`,
+        { method: 'POST', body: JSON.stringify(defs) },
+        LONG_REQUEST_TIMEOUT_MS
+      )
       return { ok: true, affected: 1 }
     } catch (err) {
       return { ok: false, affected: 0, error: err instanceof Error ? err.message : String(err) }
@@ -807,6 +833,18 @@ function hintForCode(code: string): string {
     default:
       return ''
   }
+}
+
+/** True for the rejection `AbortSignal.timeout()` produces. */
+function isTimeout(err: unknown): boolean {
+  return err instanceof Error && err.name === 'TimeoutError'
+}
+
+function describeTimeout(method: string, url: string, timeoutMs: number): string {
+  return (
+    `The RabbitMQ management API did not answer within ${timeoutMs / 1000}s ` +
+    `(${method} ${url}) — the host may be unreachable or a firewall may be dropping traffic.`
+  )
 }
 
 /** Build a detailed message for a fetch() that rejected before any HTTP response. */

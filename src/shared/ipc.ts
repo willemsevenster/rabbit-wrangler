@@ -133,7 +133,7 @@ export const IPC = {
   saveMessages: 'messages:save',
 
   // event stream bootstrap
-  getEventStreamPort: 'events:port',
+  getEventStreamEndpoint: 'events:endpoint',
 
   // ui preferences the main process needs before the renderer runs
   persistTheme: 'ui:persist-theme',
@@ -271,8 +271,9 @@ export interface RabbitApi {
   /** Remember the chosen theme so the next launch's window opens without a flash. */
   persistTheme(theme: 'light' | 'dark'): Promise<void>
 
-  /** Port of the localhost WebSocket carrying the live event stream. */
-  getEventStreamPort(): Promise<number>
+  /** Port + per-launch auth token of the localhost WebSocket carrying the live
+   *  event stream (the token is required to connect). */
+  getEventStreamEndpoint(): Promise<EventStreamEndpoint>
 
   /** Quit the whole application. */
   quitApp(): Promise<void>
@@ -293,6 +294,12 @@ export interface RabbitApi {
   /** Write text to the system clipboard. Goes through main: Electron 45 removed
    *  the `clipboard` module from renderer/preload processes. */
   copyText(text: string): Promise<void>
+}
+
+/** Where (and with what token) the renderer connects to the event WebSocket. */
+export interface EventStreamEndpoint {
+  port: number
+  token: string
 }
 
 /** User-tunable auto-update preferences (persisted in the main process). */

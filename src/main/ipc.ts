@@ -243,12 +243,17 @@ export function registerIpcHandlers(): void {
   )
 
   ipcMain.handle(IPC.exportMessages, (_e, req: ExportMessagesRequest) =>
-    saveMessagesToFile(req.queue, () => connectionManager.require(req.connectionId).exportMessages(req))
+    saveMessagesToFile(req.queue, (sink) =>
+      connectionManager.require(req.connectionId).exportMessages(req, sink)
+    )
   )
 
   // Save renderer-supplied records (e.g. one peeked message) — no broker needed.
   ipcMain.handle(IPC.saveMessages, (_e, req: SaveMessagesRequest) =>
-    saveMessagesToFile(req.defaultName, () => Promise.resolve(req.messages))
+    saveMessagesToFile(req.defaultName, async (sink) => {
+      for (const m of req.messages) await sink(m)
+      return req.messages.length
+    })
   )
 
   ipcMain.handle(IPC.listExchanges, (_e, connectionId: string) =>
@@ -295,7 +300,7 @@ export function registerIpcHandlers(): void {
     }
   })
 
-  ipcMain.handle(IPC.getEventStreamPort, () => eventStreamServer.getPort())
+  ipcMain.handle(IPC.getEventStreamEndpoint, () => eventStreamServer.getEndpoint())
 
   ipcMain.handle(IPC.quitApp, () => app.quit())
 

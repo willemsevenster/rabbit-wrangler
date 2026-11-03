@@ -68,8 +68,6 @@ export type EditorTab =
       connectionId: string
       queue: string
       title: string
-      /** Live peeked messages for THIS tab, newest first. */
-      peeks: PeekedMessage[]
       /** Row selected in this tab's message table (persists across tab switches). */
       selectedMessageId: string | null
       /** New messages received while this tab was in the background. */
@@ -227,6 +225,9 @@ interface AppState {
   searchOpen: boolean
   /** Max peeked messages retained per queue tab (oldest dropped past this). */
   maxMessages: number
+  /** Live peeked messages per queue tab id, newest first. Kept OUT of `tabs` so a
+   *  peek only re-renders that tab's table — not the tab strip, search, menus. */
+  peeksByTab: Record<string, PeekedMessage[]>
   /** Name suffixes that mark a queue as a dead-letter queue (user-customizable). */
   dlqSuffixes: string[]
   /** Whether purge/delete prompt for confirmation first. */
@@ -460,6 +461,8 @@ const initialSearchDetailMetaWidth = clampMetaWidth(
   Number(localStorage.getItem('rw.searchDetailMetaWidth')) || 320
 )
 
+/** Ready-message count above which a queue export asks for confirmation first. */
+const LARGE_EXPORT_THRESHOLD = 10_000
 const MAX_MESSAGES_KEY = 'rw.maxMessages'
 const clampMaxMessages = (n: number): number =>
   Math.min(MAX_MESSAGES_MAX, Math.max(MAX_MESSAGES_MIN, Math.round(n)))
@@ -550,6 +553,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   settingsOpen: false,
   searchOpen: false,
   maxMessages: initialMaxMessages,
+  peeksByTab: {},
   dlqSuffixes: loadDlqSuffixes(),
   confirmDestructive: initialConfirmDestructive,
   autoConnectOnLaunch: initialAutoConnect,
@@ -572,7 +576,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       .catch(() => {
         /* keep the default (false) if the pref can't be read */
       })
-    socket = new EventSocket((event) => applyStreamEvent(set, get, event))
+    socket = new EventSocket((events) => applyStreamEvents(set, get, events))
     await socket.connect()
     await get().refreshConnections()
     // Optionally reconnect every saved cluster on launch (last one ends up selected).
@@ -702,9 +706,10 @@ export const useAppStore = create<AppState>((set, get) => ({
         // it; the restarted browser re-surfaces the head window.
         tabs: get().tabs.map((t) =>
           t.kind === 'queue' && t.connectionId === id
-            ? { ...t, peeks: [], unread: 0, selectedMessageId: null }
+            ? { ...t, unread: 0, selectedMessageId: null }
             : t
-        )
+        ),
+        peeksByTab: clearBuffers(get, (t) => t.connectionId === id)
       })
       get().addToast(
         'success',
@@ -741,11 +746,14 @@ export const useAppStore = create<AppState>((set, get) => ({
       connectionId,
       queue,
       title: `${connName} - ${queue}`,
-      peeks: [],
       selectedMessageId: null,
       unread: 0
     }
-    set({ tabs: [...get().tabs, tab], activeTabId: id })
+    set({
+      tabs: [...get().tabs, tab],
+      activeTabId: id,
+      peeksByTab: { ...get().peeksByTab, [id]: [] }
+    })
     void window.api.startPeek(connectionId, queue)
   },
 
@@ -766,14 +774,19 @@ export const useAppStore = create<AppState>((set, get) => ({
         connectionId,
         queue: q.name,
         title: `${connName} - ${q.name}`,
-        peeks: [],
         selectedMessageId: null,
         unread: 0
       })
       toPeek.push(q.name)
     }
     if (newTabs.length === 0) return
-    set({ tabs: [...get().tabs, ...newTabs], activeTabId: newTabs[newTabs.length - 1].id })
+    const buffers = { ...get().peeksByTab }
+    for (const t of newTabs) buffers[t.id] = []
+    set({
+      tabs: [...get().tabs, ...newTabs],
+      activeTabId: newTabs[newTabs.length - 1].id,
+      peeksByTab: buffers
+    })
     for (const name of toPeek) void window.api.startPeek(connectionId, name)
   },
 
@@ -1162,11 +1175,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       // Clear this tab's context and re-peek from scratch: stopping the peeker
       // resets the broker-side de-dup set so the current head window re-surfaces.
       set({
-        tabs: get().tabs.map((t) =>
-          t.id === id && t.kind === 'queue'
-            ? { ...t, peeks: [], unread: 0, selectedMessageId: null }
-            : t
-        )
+        tabs: clearQueueTab(get().tabs, id),
+        peeksByTab: { ...get().peeksByTab, [id]: [] }
       })
       await window.api.stopPeek(tab.connectionId, tab.queue)
       await window.api.startPeek(tab.connectionId, tab.queue)
@@ -1501,6 +1511,21 @@ export const useAppStore = create<AppState>((set, get) => ({
   async exportMessages(queue, connectionId) {
     const cid = connectionId ?? get().selectedConnectionId
     if (!cid) return
+    // Export streams to disk, but every message stays unacked (held from other
+    // consumers) until the export finishes — make that a deliberate choice on a
+    // big queue.
+    const ready =
+      get().queuesByConn[cid]?.find((q) => q.name === queue)?.messagesReady ?? 0
+    if (ready > LARGE_EXPORT_THRESHOLD) {
+      const ok = await get().confirm({
+        title: 'Export a large queue',
+        message:
+          `"${queue}" has ${ready.toLocaleString()} ready messages. They are all held ` +
+          `unacked (invisible to other consumers) until the export finishes. Continue?`,
+        confirmLabel: 'Export'
+      })
+      if (!ok) return
+    }
     // Export stops the peeker (main side) to read held messages.
     const result = await window.api.exportMessages({ connectionId: cid, queue })
     if (result.ok) {
@@ -1714,8 +1739,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     // Trim any over-cap buffers immediately so lowering the limit takes effect now.
     set({
       maxMessages: max,
-      tabs: get().tabs.map((t) =>
-        t.kind === 'queue' && t.peeks.length > max ? { ...t, peeks: t.peeks.slice(0, max) } : t
+      peeksByTab: Object.fromEntries(
+        Object.entries(get().peeksByTab).map(([id, peeks]) => [id, peeks.slice(0, max)])
       )
     })
   },
@@ -1868,9 +1893,19 @@ function stopTabPeek(tab: EditorTab): void {
 function clearQueueTab(tabs: EditorTab[], tabId: string): EditorTab[] {
   return tabs.map((t) =>
     t.id === tabId && t.kind === 'queue'
-      ? { ...t, peeks: [], unread: 0, selectedMessageId: null }
+      ? { ...t, unread: 0, selectedMessageId: null }
       : t
   )
+}
+
+/** Empty the peek buffers of every open queue tab matching `match`. */
+function clearBuffers(
+  get: () => AppState,
+  match: (tab: EditorTab) => boolean
+): Record<string, PeekedMessage[]> {
+  const buffers = { ...get().peeksByTab }
+  for (const t of get().tabs) if (t.kind === 'queue' && match(t)) buffers[t.id] = []
+  return buffers
 }
 
 /** Persist the chosen move destination for a source queue, for default values. */
@@ -1903,7 +1938,7 @@ function afterSourceMutated(
 ): void {
   const tid = queueTabId(connectionId, sourceQueue)
   if (get().tabs.some((t) => t.id === tid)) {
-    set({ tabs: clearQueueTab(get().tabs, tid) })
+    set({ tabs: clearQueueTab(get().tabs, tid), peeksByTab: { ...get().peeksByTab, [tid]: [] } })
     void window.api.startPeek(connectionId, sourceQueue)
   }
 }
@@ -1927,7 +1962,56 @@ function closeTabsFor(
   })
 }
 
-/** Reducer for events arriving over the WebSocket. */
+/**
+ * Apply one animation frame's worth of WebSocket events. Peeks are folded in
+ * together — one `peeksByTab` update for the whole batch, and `tabs` touched
+ * only when a BACKGROUND tab's unread count actually changes — so a busy queue
+ * doesn't re-render the tab strip/search/menus once per message.
+ */
+function applyStreamEvents(
+  set: (partial: Partial<AppState>) => void,
+  get: () => AppState,
+  events: StreamEvent[]
+): void {
+  const arrivals = new Map<string, PeekedMessage[]>()
+  for (const event of events) {
+    if (event.type !== 'peek') {
+      applyStreamEvent(set, get, event)
+      continue
+    }
+    const tid = queueTabId(event.payload.connectionId, event.payload.queue)
+    const list = arrivals.get(tid)
+    if (list) list.push(event.payload)
+    else arrivals.set(tid, [event.payload])
+  }
+  if (arrivals.size === 0) return
+
+  const { tabs, activeTabId, maxMessages, peeksByTab } = get()
+  const open = new Set(tabs.filter((t) => t.kind === 'queue').map((t) => t.id))
+  // Rebuild from open tabs only, which also drops buffers of closed tabs.
+  const buffers: Record<string, PeekedMessage[]> = {}
+  for (const id of open) buffers[id] = peeksByTab[id] ?? []
+  const unreadBump = new Map<string, number>()
+  for (const [tid, msgs] of arrivals) {
+    if (!open.has(tid)) continue // tab closed while the peek was in flight
+    buffers[tid] = [...msgs.reverse(), ...buffers[tid]].slice(0, maxMessages)
+    if (tid !== activeTabId) unreadBump.set(tid, msgs.length)
+  }
+  set({
+    peeksByTab: buffers,
+    ...(unreadBump.size > 0
+      ? {
+          tabs: tabs.map((t) =>
+            t.kind === 'queue' && unreadBump.has(t.id)
+              ? { ...t, unread: t.unread + (unreadBump.get(t.id) ?? 0) }
+              : t
+          )
+        }
+      : {})
+  })
+}
+
+/** Reducer for a single non-peek event arriving over the WebSocket. */
 function applyStreamEvent(
   set: (partial: Partial<AppState>) => void,
   get: () => AppState,
@@ -1937,22 +2021,9 @@ function applyStreamEvent(
     case 'connection-status':
       set({ statuses: { ...get().statuses, [event.payload.connectionId]: event.payload } })
       break
-    case 'peek': {
-      const { tabs, activeTabId } = get()
-      const tid = queueTabId(event.payload.connectionId, event.payload.queue)
-      if (!tabs.some((t) => t.id === tid)) break
-      set({
-        tabs: tabs.map((t) => {
-          if (t.id !== tid || t.kind !== 'queue') return t
-          return {
-            ...t,
-            peeks: [event.payload, ...t.peeks].slice(0, get().maxMessages),
-            unread: t.id === activeTabId ? t.unread : t.unread + 1
-          }
-        })
-      })
+    case 'peek':
+      // Batched in applyStreamEvents; never reaches here.
       break
-    }
     case 'queue-stats':
       set({
         queuesByConn: {

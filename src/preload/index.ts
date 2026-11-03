@@ -1,5 +1,4 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import { electronAPI } from '@electron-toolkit/preload'
 import { IPC, type RabbitApi } from '@shared/ipc'
 import type {
   BrowseMode,
@@ -27,7 +26,7 @@ import type {
  * The renderer's only door into the main process. Every method maps 1:1 to an
  * IPC channel in the contract — the renderer never touches `ipcRenderer`
  * directly. The live event stream is intentionally NOT here; the renderer opens
- * the WebSocket itself using the port from `getEventStreamPort`.
+ * the WebSocket itself using the endpoint from `getEventStreamEndpoint`.
  */
 const api: RabbitApi = {
   listConnections: () => ipcRenderer.invoke(IPC.listConnections),
@@ -121,7 +120,7 @@ const api: RabbitApi = {
 
   persistTheme: (theme: 'light' | 'dark') => ipcRenderer.invoke(IPC.persistTheme, theme),
 
-  getEventStreamPort: () => ipcRenderer.invoke(IPC.getEventStreamPort),
+  getEventStreamEndpoint: () => ipcRenderer.invoke(IPC.getEventStreamEndpoint),
 
   quitApp: () => ipcRenderer.invoke(IPC.quitApp),
 
@@ -136,13 +135,11 @@ const api: RabbitApi = {
 }
 
 if (process.contextIsolated) {
-  contextBridge.exposeInMainWorld('electron', electronAPI)
+  // Only the narrow `window.api` contract — never raw `ipcRenderer`.
   contextBridge.exposeInMainWorld('api', api)
 } else {
   // contextIsolation disabled (not recommended) — attach directly. `window` is
   // not in the node typecheck lib, hence the suppressions on this dead branch.
-  // @ts-expect-error window is defined at runtime in the preload context
-  window.electron = electronAPI
   // @ts-expect-error window is defined at runtime in the preload context
   window.api = api
 }
