@@ -1,3 +1,4 @@
+import log from 'electron-log/main'
 import { eventBus } from '../event-bus'
 import { ManagementApi } from '../rabbitmq/management-api'
 import { MessagePeeker } from '../rabbitmq/message-peeker'
@@ -516,6 +517,7 @@ export class ClusterConnection {
       // e.g. the queue doesn't exist — don't leave a dead browser registered. Only
       // a terminal failure stops wanting the queue; a connection failure keeps it
       // so a resume can pick it up.
+      log.warn(`[${this.config.name}] peek of "${queue}" failed to start:`, err)
       if (this.peekers.get(queue) === browser) this.peekers.delete(queue)
       if (isTerminalPeekError(err)) this.wantedPeeks.delete(queue)
       await browser.stop().catch(() => undefined)
