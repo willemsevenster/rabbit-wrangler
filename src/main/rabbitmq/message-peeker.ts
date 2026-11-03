@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import type { ConsumeMessage } from 'amqplib'
 import { eventBus } from '../event-bus'
 import { fingerprintOf } from './fingerprint'
@@ -40,6 +41,10 @@ export class MessagePeeker {
   /** Set by stop(); a start() still in flight checks it and tears itself down. */
   private stopped = false
   private counter = 0
+  /** Distinguishes this peeker's message ids from an earlier one on the same queue
+   * (e.g. after a reconnect) — delivery tags and the counter restart per channel,
+   * but the renderer keeps its buffer, so ids must stay unique across sessions. */
+  private readonly session = randomUUID().slice(0, 8)
   /** Fingerprints already surfaced to the UI (insertion-ordered for eviction). */
   private readonly seen = new Set<string>()
   private readonly pending = new Set<ReturnType<typeof setTimeout>>()
@@ -118,7 +123,7 @@ export class MessagePeeker {
   private emit(msg: ConsumeMessage, fingerprint: string): void {
     const { payload, isBinary } = encodePayload(msg.content)
     const peeked: PeekedMessage = {
-      id: `${this.connectionId}:${this.queue}:${msg.fields.deliveryTag}:${this.counter++}`,
+      id: `${this.connectionId}:${this.queue}:${this.session}:${msg.fields.deliveryTag}:${this.counter++}`,
       fingerprint,
       connectionId: this.connectionId,
       queue: this.queue,

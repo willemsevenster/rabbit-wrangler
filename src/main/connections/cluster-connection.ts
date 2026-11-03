@@ -64,6 +64,17 @@ const HTTP_ONLY_ERROR =
 const STATS_POLL_INTERVAL_MS = 4000
 /** Delay before re-opening AMQP and resuming peeks after the connection drops. */
 const PEEK_RESUME_DELAY_MS = 2000
+/** Cap for the resume retry backoff while the broker stays unreachable. */
+const PEEK_RESUME_MAX_DELAY_MS = 30_000
+
+/** A peek failure that retrying can't fix — the queue is gone or inaccessible
+ * (AMQP 404 NOT_FOUND / 403 ACCESS_REFUSED), as opposed to a connection problem. */
+function isTerminalPeekError(err: unknown): boolean {
+  const code = (err as { code?: unknown } | null)?.code
+  if (code === 404 || code === 403) return true
+  const msg = err instanceof Error ? err.message : String(err)
+  return /NOT_FOUND|ACCESS_REFUSED/.test(msg)
+}
 
 export class ClusterConnection {
   readonly api: ManagementApi
@@ -80,6 +91,8 @@ export class ClusterConnection {
    * (closing the connection tears the peekers' channels down first). */
   private readonly wantedPeeks = new Set<string>()
   private resumeTimer: ReturnType<typeof setTimeout> | null = null
+  /** Consecutive failed resume attempts, for the retry backoff. */
+  private resumeAttempts = 0
   private disposed = false
   private statsTimer: ReturnType<typeof setInterval> | null = null
   /** User preference for how to browse messages (persisted on the config). */
@@ -225,33 +238,55 @@ export class ClusterConnection {
     for (const [queue, p] of this.peekers) {
       if (p instanceof MessagePeeker) this.peekers.delete(queue)
     }
+    this.resumeAttempts = 0
+    this.scheduleResume()
+  }
+
+  /** Retry resuming the wanted peeks, backing off while the broker is unreachable. */
+  private scheduleResume(): void {
     if (this.disposed || this.transport !== 'amqp' || this.wantedPeeks.size === 0) return
     if (this.resumeTimer) clearTimeout(this.resumeTimer)
+    const delay = Math.min(
+      PEEK_RESUME_DELAY_MS * 2 ** this.resumeAttempts,
+      PEEK_RESUME_MAX_DELAY_MS
+    )
     this.resumeTimer = setTimeout(() => {
       this.resumeTimer = null
       void this.resumePeeks()
-    }, PEEK_RESUME_DELAY_MS)
+    }, delay)
   }
 
   private async resumePeeks(): Promise<void> {
-    if (this.disposed || this.transport !== 'amqp') return
-    const failed: string[] = []
-    let lastError = ''
+    const dropped: string[] = []
+    let transientError: string | null = null
     for (const queue of [...this.wantedPeeks]) {
+      // Re-check each time: a tab may have closed (stopPeek), or we may have been
+      // disposed / switched to HTTP browse, while an earlier resume was awaiting.
+      if (this.disposed || this.transport !== 'amqp') return
+      if (!this.wantedPeeks.has(queue)) continue
       try {
         await this.startPeek(queue)
       } catch (err) {
-        // e.g. the queue was deleted meanwhile — stop wanting it.
-        this.wantedPeeks.delete(queue)
-        failed.push(queue)
-        lastError = err instanceof Error ? err.message : String(err)
+        const reason = err instanceof Error ? err.message : String(err)
+        if (isTerminalPeekError(err)) {
+          dropped.push(queue) // queue deleted meanwhile — startPeek stopped wanting it
+        } else {
+          // Broker still unreachable: keep every wanted queue and retry later.
+          transientError = reason
+          break
+        }
       }
     }
-    if (failed.length > 0) {
-      this.setState(
-        'error',
-        `AMQP connection lost; could not resume peeking ${failed.join(', ')}: ${lastError}`
-      )
+    if (this.disposed || this.transport !== 'amqp') return
+    if (transientError !== null) {
+      this.resumeAttempts++
+      this.setState('error', `AMQP connection lost; retrying to resume peeking: ${transientError}`)
+      this.scheduleResume()
+      return
+    }
+    this.resumeAttempts = 0
+    if (dropped.length > 0) {
+      this.setState('error', `Stopped peeking ${dropped.join(', ')}: the queue no longer exists.`)
     } else if (this.state === 'error') {
       // Clear the error the dropped connection reported, now that peeks are back.
       this.setState('connected')
@@ -425,9 +460,11 @@ export class ClusterConnection {
 
   async startPeek(queue: string): Promise<void> {
     this.wantedPeeks.add(queue)
-    if (this.peekers.has(queue)) return
+    // In-flight first: the browser is registered before start() settles, so a
+    // concurrent caller must share that start (and its failure), not see "done".
     const inFlight = this.peeksStarting.get(queue)
     if (inFlight) return inFlight
+    if (this.peekers.has(queue)) return
     const starting = this.openBrowser(queue).finally(() => this.peeksStarting.delete(queue))
     this.peeksStarting.set(queue, starting)
     return starting
@@ -447,9 +484,11 @@ export class ClusterConnection {
     try {
       await browser.start()
     } catch (err) {
-      // e.g. the queue doesn't exist — don't leave a dead browser registered.
+      // e.g. the queue doesn't exist — don't leave a dead browser registered. Only
+      // a terminal failure stops wanting the queue; a connection failure keeps it
+      // so a resume can pick it up.
       if (this.peekers.get(queue) === browser) this.peekers.delete(queue)
-      this.wantedPeeks.delete(queue)
+      if (isTerminalPeekError(err)) this.wantedPeeks.delete(queue)
       await browser.stop().catch(() => undefined)
       throw err
     }

@@ -1,5 +1,7 @@
 import { dialog } from 'electron'
-import { createWriteStream, promises as fs, type WriteStream } from 'node:fs'
+import { randomBytes } from 'node:crypto'
+import { once } from 'node:events'
+import { createWriteStream, promises as fs } from 'node:fs'
 import type { ExportResult, ExportedMessage } from '@shared/types'
 
 /** Pushes records into the file as they are produced; resolves the count written. */
@@ -13,8 +15,9 @@ export type MessageProducer = (sink: (record: ExportedMessage) => Promise<void>)
  * and stream-friendly for large queues.
  *
  * Records are written as `produce` yields them (with backpressure), never
- * collected in memory, so exporting a very large queue stays flat. On failure the
- * partial file is removed.
+ * collected in memory, so exporting a very large queue stays flat. They go to a
+ * temporary sibling file that replaces the destination only once everything
+ * succeeded — a failed export never truncates or deletes an existing file.
  */
 export async function saveMessagesToFile(
   defaultName: string,
@@ -32,39 +35,42 @@ export async function saveMessagesToFile(
   if (canceled || !filePath) return { ok: false, canceled: true }
 
   const asJson = filePath.toLowerCase().endsWith('.json')
-  const out = createWriteStream(filePath, { encoding: 'utf8' })
+  const tmpPath = `${filePath}.${randomBytes(4).toString('hex')}.partial`
+  const out = createWriteStream(tmpPath, { encoding: 'utf8' })
+  // One listener for the stream's whole lifetime (open, writes, finish): an
+  // unhandled 'error' would throw in the main process. Every await below races
+  // against it, so a failure surfaces through this function's result.
+  const failed = new Promise<never>((_, reject) => out.on('error', reject))
+  failed.catch(() => undefined) // observed via the races below
+
+  const write = async (chunk: string): Promise<void> => {
+    if (!out.write(chunk)) await Promise.race([once(out, 'drain'), failed])
+  }
+
   try {
     let first = true
-    if (asJson) await write(out, '[')
-    const count = await produce(async (record) => {
-      if (asJson) {
-        // Indent each record so the file reads like JSON.stringify(array, null, 2).
-        const body = JSON.stringify(record, null, 2).replace(/\n/g, '\n  ')
-        await write(out, `${first ? '' : ','}\n  ${body}`)
-      } else {
-        await write(out, JSON.stringify(record) + '\n')
-      }
-      first = false
-    })
-    if (asJson) await write(out, first ? ']' : '\n]')
-    await new Promise<void>((resolve, reject) =>
-      out.end((err?: Error | null) => (err ? reject(err) : resolve()))
-    )
+    if (asJson) await write('[')
+    const count = await Promise.race([
+      produce(async (record) => {
+        if (asJson) {
+          // Indent each record so the file reads like JSON.stringify(array, null, 2).
+          const body = JSON.stringify(record, null, 2).replace(/\n/g, '\n  ')
+          await write(`${first ? '' : ','}\n  ${body}`)
+        } else {
+          await write(JSON.stringify(record) + '\n')
+        }
+        first = false
+      }),
+      failed
+    ])
+    if (asJson) await write(first ? ']' : '\n]')
+    out.end()
+    await Promise.race([once(out, 'finish'), failed])
+    await fs.rename(tmpPath, filePath)
     return { ok: true, path: filePath, count }
   } catch (e) {
     out.destroy()
-    await fs.rm(filePath, { force: true }).catch(() => undefined)
+    await fs.rm(tmpPath, { force: true }).catch(() => undefined)
     return { ok: false, error: e instanceof Error ? e.message : String(e) }
   }
-}
-
-/** Write a chunk, waiting for 'drain' when the stream's buffer is full. */
-function write(out: WriteStream, chunk: string): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const onError = (err: Error): void => reject(err)
-    out.once('error', onError)
-    const flushed = out.write(chunk, () => out.off('error', onError))
-    if (flushed) resolve()
-    else out.once('drain', () => resolve())
-  })
 }

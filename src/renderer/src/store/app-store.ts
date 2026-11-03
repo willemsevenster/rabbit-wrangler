@@ -799,7 +799,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     const activeAlive = remaining.some((t) => t.id === activeTabId)
     set({
       tabs: remaining,
-      activeTabId: activeAlive ? activeTabId : (remaining[remaining.length - 1]?.id ?? null)
+      activeTabId: activeAlive ? activeTabId : (remaining[remaining.length - 1]?.id ?? null),
+      peeksByTab: buffersFor(get, remaining)
     })
   },
 
@@ -1126,12 +1127,12 @@ export const useAppStore = create<AppState>((set, get) => ({
       const neighbor = remaining[idx] ?? remaining[idx - 1] ?? null
       nextActive = neighbor ? neighbor.id : null
     }
-    set({ tabs: remaining, activeTabId: nextActive })
+    set({ tabs: remaining, activeTabId: nextActive, peeksByTab: buffersFor(get, remaining) })
   },
 
   closeAllTabs() {
     for (const t of get().tabs) stopTabPeek(t)
-    set({ tabs: [], activeTabId: null })
+    set({ tabs: [], activeTabId: null, peeksByTab: {} })
   },
 
   closeTabsToRight(id) {
@@ -1143,7 +1144,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({
       tabs: remaining,
       // If the active tab was one of those closed, fall back to the anchor tab.
-      activeTabId: remaining.some((t) => t.id === activeTabId) ? activeTabId : id
+      activeTabId: remaining.some((t) => t.id === activeTabId) ? activeTabId : id,
+      peeksByTab: buffersFor(get, remaining)
     })
   },
 
@@ -1415,7 +1417,8 @@ export const useAppStore = create<AppState>((set, get) => ({
               : q
           )
         },
-        tabs: clearQueueTab(get().tabs, queueTabId(cid, queue))
+        tabs: clearQueueTab(get().tabs, queueTabId(cid, queue)),
+        peeksByTab: clearBuffers(get, (t) => t.id === queueTabId(cid, queue))
       })
     }
     // Resume the live peek of the now-empty queue if its tab is open.
@@ -1898,6 +1901,14 @@ function clearQueueTab(tabs: EditorTab[], tabId: string): EditorTab[] {
   )
 }
 
+/** The peek buffers of just these (remaining) tabs — drops closed tabs' payloads. */
+function buffersFor(get: () => AppState, tabs: EditorTab[]): Record<string, PeekedMessage[]> {
+  const all = get().peeksByTab
+  const kept: Record<string, PeekedMessage[]> = {}
+  for (const t of tabs) if (t.kind === 'queue' && all[t.id]) kept[t.id] = all[t.id]
+  return kept
+}
+
 /** Empty the peek buffers of every open queue tab matching `match`. */
 function clearBuffers(
   get: () => AppState,
@@ -1958,7 +1969,8 @@ function closeTabsFor(
   const activeAlive = remaining.some((t) => t.id === activeTabId)
   set({
     tabs: remaining,
-    activeTabId: activeAlive ? activeTabId : (remaining[remaining.length - 1]?.id ?? null)
+    activeTabId: activeAlive ? activeTabId : (remaining[remaining.length - 1]?.id ?? null),
+    peeksByTab: buffersFor(get, remaining)
   })
 }
 

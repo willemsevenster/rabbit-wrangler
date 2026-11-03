@@ -18,7 +18,9 @@ export class EventSocket {
   private closed = false
   private readonly reconnectMs = 1000
   private queue: StreamEvent[] = []
-  private flushScheduled = false
+  /** The pending flush's paired frame + timer; whichever fires first cancels the other. */
+  private pendingFrame: number | null = null
+  private pendingTimer: ReturnType<typeof setTimeout> | null = null
 
   constructor(private readonly onEvents: (events: StreamEvent[]) => void) {}
 
@@ -46,18 +48,21 @@ export class EventSocket {
 
   private enqueue(event: StreamEvent): void {
     this.queue.push(event)
-    if (this.flushScheduled) return
-    this.flushScheduled = true
-    // rAF pauses in a hidden window; fall back to a timer so events still drain.
-    const flush = (): void => {
-      if (!this.flushScheduled) return
-      this.flushScheduled = false
-      const batch = this.queue
-      this.queue = []
-      this.onEvents(batch)
-    }
-    requestAnimationFrame(flush)
-    setTimeout(flush, 100)
+    if (this.pendingTimer !== null) return
+    // rAF pauses in a hidden window; the timer is the fallback so events still
+    // drain. Cancelling the loser keeps hidden-window frames from piling up.
+    this.pendingFrame = requestAnimationFrame(() => this.flush())
+    this.pendingTimer = setTimeout(() => this.flush(), 100)
+  }
+
+  private flush(): void {
+    if (this.pendingFrame !== null) cancelAnimationFrame(this.pendingFrame)
+    if (this.pendingTimer !== null) clearTimeout(this.pendingTimer)
+    this.pendingFrame = null
+    this.pendingTimer = null
+    const batch = this.queue
+    this.queue = []
+    if (batch.length > 0) this.onEvents(batch)
   }
 
   close(): void {

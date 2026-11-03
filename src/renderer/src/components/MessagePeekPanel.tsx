@@ -68,6 +68,12 @@ export function MessagePeekPanel({ tab }: { tab: QueueTab }) {
   const rows = virtualizer.getVirtualItems()
   const padTop = rows.length > 0 ? rows[0].start : 0
   const padBottom = rows.length > 0 ? virtualizer.getTotalSize() - rows[rows.length - 1].end : 0
+  // The roving tab stop is the selected row (or row 0). When virtualization has
+  // scrolled it out of the DOM, the scroll wrapper itself takes the tab stop so
+  // keyboard users can still reach the table's arrow/Home/End handling.
+  const tabStopRendered = rows.some(({ index }) =>
+    selectedId == null ? index === 0 : peeks[index].id === selectedId
+  )
 
   const openMoveDialog = useAppStore((s) => s.openMoveDialog)
   const deleteMessage = useAppStore((s) => s.deleteMessage)
@@ -173,7 +179,12 @@ export function MessagePeekPanel({ tab }: { tab: QueueTab }) {
         {canMutate ? 'live · de-duplicated · non-destructive' : 'HTTP browse · polled · read-only'}
       </div>
 
-      <div className="peek__table-wrap" ref={scrollRef} onKeyDown={onTableKeyDown}>
+      <div
+        className="peek__table-wrap"
+        ref={scrollRef}
+        tabIndex={peeks.length > 0 && !tabStopRendered ? 0 : -1}
+        onKeyDown={onTableKeyDown}
+      >
         <table className="msg-table">
           <thead>
             <tr>
