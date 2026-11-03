@@ -752,7 +752,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({
       tabs: [...get().tabs, tab],
       activeTabId: id,
-      peeksByTab: { ...get().peeksByTab, [id]: [] }
+      peeksByTab: { ...get().peeksByTab, [id]: freshBuffer(id) }
     })
     void window.api.startPeek(connectionId, queue)
   },
@@ -781,7 +781,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
     if (newTabs.length === 0) return
     const buffers = { ...get().peeksByTab }
-    for (const t of newTabs) buffers[t.id] = []
+    for (const t of newTabs) buffers[t.id] = freshBuffer(t.id)
     set({
       tabs: [...get().tabs, ...newTabs],
       activeTabId: newTabs[newTabs.length - 1].id,
@@ -1178,7 +1178,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       // resets the broker-side de-dup set so the current head window re-surfaces.
       set({
         tabs: clearQueueTab(get().tabs, id),
-        peeksByTab: { ...get().peeksByTab, [id]: [] }
+        peeksByTab: { ...get().peeksByTab, [id]: freshBuffer(id) }
       })
       await window.api.stopPeek(tab.connectionId, tab.queue)
       await window.api.startPeek(tab.connectionId, tab.queue)
@@ -1901,6 +1901,21 @@ function clearQueueTab(tabs: EditorTab[], tabId: string): EditorTab[] {
   )
 }
 
+/**
+ * When each queue tab's buffer was last reset (purge, refresh, move/delete,
+ * reopen, browse-mode switch). Peeks can sit in EventSocket's per-frame queue —
+ * or still be in flight from the old peeker — when the buffer is cleared; any
+ * peek observed before the reset is stale (e.g. a just-purged message) and is
+ * dropped by the reducer instead of being put back.
+ */
+const bufferResetAt = new Map<string, number>()
+
+/** A new, empty peek buffer for a tab, recording the reset time. */
+function freshBuffer(tabId: string): PeekedMessage[] {
+  bufferResetAt.set(tabId, Date.now())
+  return []
+}
+
 /** The peek buffers of just these (remaining) tabs — drops closed tabs' payloads. */
 function buffersFor(get: () => AppState, tabs: EditorTab[]): Record<string, PeekedMessage[]> {
   const all = get().peeksByTab
@@ -1915,7 +1930,9 @@ function clearBuffers(
   match: (tab: EditorTab) => boolean
 ): Record<string, PeekedMessage[]> {
   const buffers = { ...get().peeksByTab }
-  for (const t of get().tabs) if (t.kind === 'queue' && match(t)) buffers[t.id] = []
+  for (const t of get().tabs) {
+    if (t.kind === 'queue' && match(t)) buffers[t.id] = freshBuffer(t.id)
+  }
   return buffers
 }
 
@@ -1949,7 +1966,10 @@ function afterSourceMutated(
 ): void {
   const tid = queueTabId(connectionId, sourceQueue)
   if (get().tabs.some((t) => t.id === tid)) {
-    set({ tabs: clearQueueTab(get().tabs, tid), peeksByTab: { ...get().peeksByTab, [tid]: [] } })
+    set({
+      tabs: clearQueueTab(get().tabs, tid),
+      peeksByTab: { ...get().peeksByTab, [tid]: freshBuffer(tid) }
+    })
     void window.api.startPeek(connectionId, sourceQueue)
   }
 }
@@ -1992,6 +2012,8 @@ function applyStreamEvents(
       continue
     }
     const tid = queueTabId(event.payload.connectionId, event.payload.queue)
+    // Observed before this tab's buffer was last reset → stale, drop it.
+    if (event.payload.observedAt < (bufferResetAt.get(tid) ?? 0)) continue
     const list = arrivals.get(tid)
     if (list) list.push(event.payload)
     else arrivals.set(tid, [event.payload])

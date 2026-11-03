@@ -83,9 +83,10 @@ export class ClusterConnection {
   private amqpOpening: Promise<AmqpConnection> | null = null
   private state: ConnectionState = 'disconnected'
   private readonly peekers = new Map<string, QueueBrowser>()
-  /** Peeks still starting, keyed by queue — so a second startPeek (or a stopPeek)
-   * for the same queue waits on the first instead of racing it. */
-  private readonly peeksStarting = new Map<string, Promise<void>>()
+  /** Tail of each queue's start/stop chain. Peek starts and stops for one queue
+   * run strictly in call order, so e.g. close+reopen of a tab while its first
+   * peek is still starting stops that peek and then starts a fresh one. */
+  private readonly peekOps = new Map<string, Promise<void>>()
   /** Queues the UI wants peeked (startPeek..stopPeek), independent of whether a
    * browser is alive right now — what to resume after the AMQP connection drops
    * (closing the connection tears the peekers' channels down first). */
@@ -265,7 +266,7 @@ export class ClusterConnection {
       if (this.disposed || this.transport !== 'amqp') return
       if (!this.wantedPeeks.has(queue)) continue
       try {
-        await this.startPeek(queue)
+        await this.startPeek(queue, { onlyIfWanted: true })
       } catch (err) {
         const reason = err instanceof Error ? err.message : String(err)
         if (isTerminalPeekError(err)) {
@@ -458,16 +459,28 @@ export class ClusterConnection {
     return this.api.deleteQueue(req)
   }
 
-  async startPeek(queue: string): Promise<void> {
-    this.wantedPeeks.add(queue)
-    // In-flight first: the browser is registered before start() settles, so a
-    // concurrent caller must share that start (and its failure), not see "done".
-    const inFlight = this.peeksStarting.get(queue)
-    if (inFlight) return inFlight
-    if (this.peekers.has(queue)) return
-    const starting = this.openBrowser(queue).finally(() => this.peeksStarting.delete(queue))
-    this.peeksStarting.set(queue, starting)
-    return starting
+  /** Start peeking a queue (no-op if already live). `onlyIfWanted` is for resume:
+   * skip it if a stopPeek queued ahead of us means the tab has since closed. */
+  startPeek(queue: string, opts: { onlyIfWanted?: boolean } = {}): Promise<void> {
+    return this.serialize(queue, async () => {
+      if (opts.onlyIfWanted && !this.wantedPeeks.has(queue)) return
+      this.wantedPeeks.add(queue)
+      if (this.peekers.has(queue)) return
+      await this.openBrowser(queue)
+    })
+  }
+
+  /** Run `op` after every earlier start/stop for this queue has settled; the
+   * caller gets `op`'s own result (and failure). */
+  private serialize(queue: string, op: () => Promise<void>): Promise<void> {
+    const previous = this.peekOps.get(queue) ?? Promise.resolve()
+    const result = previous.then(op)
+    const tail = result.catch(() => undefined)
+    this.peekOps.set(queue, tail)
+    void tail.then(() => {
+      if (this.peekOps.get(queue) === tail) this.peekOps.delete(queue)
+    })
+    return result
   }
 
   private async openBrowser(queue: string): Promise<void> {
@@ -494,14 +507,15 @@ export class ClusterConnection {
     }
   }
 
-  async stopPeek(queue: string): Promise<void> {
-    this.wantedPeeks.delete(queue)
-    // Let a start in flight finish first, so we stop the browser it registers.
-    await this.peeksStarting.get(queue)?.catch(() => undefined)
-    const peeker = this.peekers.get(queue)
-    if (!peeker) return
-    this.peekers.delete(queue)
-    await peeker.stop()
+  stopPeek(queue: string): Promise<void> {
+    // Queued behind any start in flight, so we stop the browser it registers.
+    return this.serialize(queue, async () => {
+      this.wantedPeeks.delete(queue)
+      const peeker = this.peekers.get(queue)
+      if (!peeker) return
+      this.peekers.delete(queue)
+      await peeker.stop()
+    })
   }
 
   async moveMessages(req: MoveMessagesRequest): Promise<OperationResult> {
@@ -546,7 +560,7 @@ export class ClusterConnection {
       clearTimeout(this.resumeTimer)
       this.resumeTimer = null
     }
-    await Promise.all([...this.peeksStarting.values()].map((p) => p.catch(() => undefined)))
+    await Promise.all(this.peekOps.values())
     await Promise.all([...this.peekers.values()].map((p) => p.stop()))
     this.peekers.clear()
     // A connect still in flight would otherwise outlive us — wait for it, then close.
