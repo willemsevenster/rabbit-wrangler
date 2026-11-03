@@ -15,25 +15,31 @@ const store = new Store<PersistedShape>({
   defaults: { connections: {} }
 })
 
-function encrypt(plain: string): string {
+// Uses the async safeStorage API (the sync one is deprecated). It initializes
+// lazily on first use after `app` is ready — every caller runs from an IPC
+// handler, so that always holds. Blobs written by the old sync `encryptString`
+// decrypt fine with `decryptStringAsync`, so existing files need no migration.
+async function encrypt(plain: string): Promise<string> {
   if (!plain) return ''
-  if (!safeStorage.isEncryptionAvailable()) {
+  if (!(await safeStorage.isAsyncEncryptionAvailable())) {
     // Fall back to plain text only if the OS vault is unavailable (e.g. CI).
     return Buffer.from(plain, 'utf8').toString('base64')
   }
-  return safeStorage.encryptString(plain).toString('base64')
+  return (await safeStorage.encryptStringAsync(plain)).toString('base64')
 }
 
-function decrypt(blob: string): string {
-  if (!blob) return ''
+/** `shouldReEncrypt` is set when the OS key was rotated or upgraded. */
+async function decrypt(blob: string): Promise<{ plain: string; shouldReEncrypt: boolean }> {
+  if (!blob) return { plain: '', shouldReEncrypt: false }
   const buf = Buffer.from(blob, 'base64')
-  if (!safeStorage.isEncryptionAvailable()) {
-    return buf.toString('utf8')
+  if (!(await safeStorage.isAsyncEncryptionAvailable())) {
+    return { plain: buf.toString('utf8'), shouldReEncrypt: false }
   }
   try {
-    return safeStorage.decryptString(buf)
+    const { result, shouldReEncrypt } = await safeStorage.decryptStringAsync(buf)
+    return { plain: result, shouldReEncrypt }
   } catch {
-    return ''
+    return { plain: '', shouldReEncrypt: false }
   }
 }
 
@@ -48,14 +54,18 @@ export const configStore = {
   },
 
   /** Full config including the decrypted password — main-process use only. */
-  get(id: string): ConnectionConfig | undefined {
+  async get(id: string): Promise<ConnectionConfig | undefined> {
     const stored = store.get('connections')[id]
     if (!stored) return undefined
     const { encryptedPassword, ...rest } = stored
-    return { ...rest, password: decrypt(encryptedPassword) }
+    const { plain, shouldReEncrypt } = await decrypt(encryptedPassword)
+    if (shouldReEncrypt && plain) {
+      store.set(`connections.${id}.encryptedPassword`, await encrypt(plain))
+    }
+    return { ...rest, password: plain }
   },
 
-  save(config: ConnectionConfig): SafeConnectionConfig {
+  async save(config: ConnectionConfig): Promise<SafeConnectionConfig> {
     const { password, ...rest } = config
     // An empty password on save means "keep the existing one" — the renderer never
     // receives the plaintext, so editing a connection leaves the field blank. Only
@@ -63,7 +73,9 @@ export const configStore = {
     // connection has no prior record, so a blank password is stored as blank.)
     const existing = store.get('connections')[config.id]
     const encryptedPassword =
-      password === '' && existing?.encryptedPassword ? existing.encryptedPassword : encrypt(password)
+      password === '' && existing?.encryptedPassword
+        ? existing.encryptedPassword
+        : await encrypt(password)
     const stored: StoredConnection = { ...rest, encryptedPassword }
     store.set(`connections.${config.id}`, stored)
     return strip(stored)

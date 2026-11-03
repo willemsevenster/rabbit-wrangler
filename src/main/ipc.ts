@@ -68,10 +68,11 @@ export function registerIpcHandlers(): void {
     connectionManager.require(connectionId).runtime()
   )
 
-  ipcMain.handle(IPC.setBrowseMode, (_e, connectionId: string, mode: BrowseMode) => {
+  ipcMain.handle(IPC.setBrowseMode, async (_e, connectionId: string, mode: BrowseMode) => {
     // Persist the preference so it survives reconnect/restart, then apply it live.
-    const cfg = configStore.get(connectionId)
-    if (cfg) configStore.save({ ...cfg, browseMode: mode })
+    // A blank password keeps the stored blob, so this never decrypts it.
+    const cfg = configStore.list().find((c) => c.id === connectionId)
+    if (cfg) await configStore.save({ ...cfg, password: '', browseMode: mode })
     return connectionManager.require(connectionId).applyBrowseMode(mode)
   })
 

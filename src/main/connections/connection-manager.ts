@@ -11,7 +11,7 @@ class ConnectionManager {
 
   /** Connects (or reconnects) using the stored, decrypted config. */
   async connect(id: string): Promise<void> {
-    const config = configStore.get(id)
+    const config = await configStore.get(id)
     if (!config) throw new Error(`No saved connection with id ${id}`)
 
     await this.disconnect(id)
