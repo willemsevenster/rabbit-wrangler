@@ -79,3 +79,23 @@ jobs:
         run: pnpm exec electron-builder --linux --publish always
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # electron-builder uploads both platforms into one DRAFT release. Publish it only
+  # once both jobs are done, so no installed app sees a release with half its
+  # assets. Notes are generated only if the draft has none (hand-written notes win).
+  publish:
+    needs: [windows, linux]
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_REPO: ${{ github.repository }}
+      TAG: ${{ github.ref_name }}
+    steps:
+      - name: Publish the draft release
+        run: |
+          body=$(gh release view "$TAG" --json body --jq .body)
+          if [ -z "$body" ]; then
+            body=$(gh api "repos/$GH_REPO/releases/generate-notes" -f tag_name="$TAG" --jq .body)
+          fi
+          gh release edit "$TAG" --draft=false --latest \
+            --title "Rabbit Wrangler ${TAG#v}" --notes "$body"

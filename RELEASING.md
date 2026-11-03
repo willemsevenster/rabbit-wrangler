@@ -35,7 +35,15 @@ The workflow then, on `windows-latest` + `ubuntu-latest`:
   (Linux) with `electron-builder --publish always` (the Linux job installs the
   `rpm` tool first, which `.rpm` packaging needs),
 - uploads them plus the update metadata (`latest.yml`, `latest-linux.yml`, and
-  `*.blockmap` for differential downloads) to a new GitHub Release for the tag.
+  `*.blockmap` for differential downloads) to a **draft** GitHub Release for the tag,
+- then a final `publish` job — which runs only after **both** platforms succeed —
+  publishes that draft as **Latest**, titled `Rabbit Wrangler <version>`. If the
+  draft has no notes it gets GitHub's generated notes (since `main` only sees the
+  squashed release commit, these are thin — edit the release afterwards with the
+  real changelog from the release PR).
+
+If either build fails, the release stays a **draft** — no installed app sees it.
+Fix, then delete the draft (and the tag) and re-tag.
 
 Existing installs detect the new version on next launch (or via **Help → Check
 for Updates…**) and offer to download + restart.
