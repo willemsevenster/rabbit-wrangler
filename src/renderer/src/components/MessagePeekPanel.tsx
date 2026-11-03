@@ -51,6 +51,8 @@ function menuFor(m: PeekedMessage): MenuItem[] {
  */
 export function MessagePeekPanel({ tab }: { tab: QueueTab }) {
   const peeks = useAppStore((s) => s.peeksByTab[tab.id] ?? NO_PEEKS)
+  const peekError = useAppStore((s) => s.peekErrors[tab.id])
+  const refreshTab = useAppStore((s) => s.refreshTab)
   const selectedId = tab.selectedMessageId
   const paneHeight = useAppStore((s) => s.peekPaneHeight)
   const setPaneHeight = useAppStore((s) => s.setPeekPaneHeight)
@@ -230,7 +232,22 @@ export function MessagePeekPanel({ tab }: { tab: QueueTab }) {
             )}
           </tbody>
         </table>
-        {peeks.length === 0 && <div className="placeholder">Waiting for messages…</div>}
+        {peeks.length === 0 &&
+          (peekError ? (
+            <div className="notice peek__error" role="alert">
+              <p>
+                <i className="codicon codicon-warning" />
+                Couldn&apos;t start peeking this queue: {peekError}
+              </p>
+              <p>
+                <button className="btn" onClick={() => void refreshTab(tab.id)}>
+                  Retry
+                </button>
+              </p>
+            </div>
+          ) : (
+            <div className="placeholder">Waiting for messages…</div>
+          ))}
       </div>
 
       <div

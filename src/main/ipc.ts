@@ -222,8 +222,8 @@ export function registerIpcHandlers(): void {
     connectionManager.require(req.connectionId).deleteQueue(req)
   )
 
-  ipcMain.handle(IPC.startPeek, (_e, connectionId: string, queue: string) =>
-    connectionManager.require(connectionId).startPeek(queue)
+  ipcMain.handle(IPC.startPeek, (_e, connectionId: string, queue: string, window?: number) =>
+    connectionManager.require(connectionId).startPeek(queue, { window })
   )
 
   ipcMain.handle(IPC.stopPeek, (_e, connectionId: string, queue: string) =>

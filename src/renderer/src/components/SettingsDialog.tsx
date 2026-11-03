@@ -2,6 +2,7 @@ import { useEffect, useState, type KeyboardEvent as ReactKeyboardEvent } from 'r
 import { useAppStore } from '../store/app-store'
 import { DEFAULT_DLQ_SUFFIXES } from '../lib/dlq'
 import { openManual } from '../lib/help'
+import { PEEK_WINDOW } from '@shared/types'
 import type { UpdateStatusPayload } from '@shared/ipc'
 
 /** One-line summary of the current update status for the Settings → Updates row. */
@@ -42,6 +43,8 @@ function SettingsModal() {
   const setTheme = useAppStore((s) => s.setTheme)
   const maxMessages = useAppStore((s) => s.maxMessages)
   const setMaxMessages = useAppStore((s) => s.setMaxMessages)
+  const peekWindow = useAppStore((s) => s.peekWindow)
+  const setPeekWindow = useAppStore((s) => s.setPeekWindow)
   const dlqSuffixes = useAppStore((s) => s.dlqSuffixes)
   const setDlqSuffixes = useAppStore((s) => s.setDlqSuffixes)
   const confirmDestructive = useAppStore((s) => s.confirmDestructive)
@@ -57,6 +60,7 @@ function SettingsModal() {
 
   // Local input buffers so partial typing isn't clobbered by clamping on every keystroke.
   const [maxInput, setMaxInput] = useState(String(maxMessages))
+  const [windowInput, setWindowInput] = useState(String(peekWindow))
   const [newSuffix, setNewSuffix] = useState('')
 
   useEffect(() => {
@@ -72,6 +76,11 @@ function SettingsModal() {
     setMaxMessages(Number.isFinite(n) && n > 0 ? n : maxMessages)
     // Reflect the clamped value the store settled on.
     setMaxInput(String(useAppStore.getState().maxMessages))
+  }
+
+  function commitWindow(): void {
+    setPeekWindow(Number(windowInput))
+    setWindowInput(String(useAppStore.getState().peekWindow))
   }
 
   function addSuffix(): void {
@@ -151,6 +160,25 @@ function SettingsModal() {
             </div>
             <p className="settings__hint">
               Per queue tab. Oldest messages drop off once the cap is reached (10–9,999).
+            </p>
+            <div className="field field--row">
+              <label htmlFor="set-window">Peek window</label>
+              <input
+                id="set-window"
+                type="number"
+                min={PEEK_WINDOW.min}
+                max={PEEK_WINDOW.max}
+                value={windowInput}
+                onChange={(e) => setWindowInput(e.target.value)}
+                onBlur={commitWindow}
+                onKeyDown={(e) => e.key === 'Enter' && commitWindow()}
+                style={{ width: 96 }}
+              />
+            </div>
+            <p className="settings__hint">
+              How many messages at the head of a queue each peek can see (1–1,000). A larger window
+              shows more of a deep dead-letter queue, but holds that many messages unacked while
+              peeking. Changing it re-peeks open queue tabs.
             </p>
             <label className="field--check">
               <input

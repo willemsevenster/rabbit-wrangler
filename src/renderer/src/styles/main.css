@@ -682,6 +682,11 @@ body.resizing {
   margin-right: 4px;
 }
 
+/* A queue tab whose live peek failed to start. */
+.peek__error {
+  margin: 12px;
+}
+
 /* ---------- shovels ---------- */
 .shovel-unsupported {
   background: var(--input-bg);

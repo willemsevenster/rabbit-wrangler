@@ -1,4 +1,3 @@
-import net from 'node:net'
 import amqp from 'amqplib'
 import type { ConnectionConfig } from '@shared/types'
 
@@ -54,32 +53,27 @@ export function connectAmqp(
   })
 }
 
-/** Default time to wait for the AMQP port to accept a TCP connection. */
-const PROBE_TIMEOUT_MS = 2500
+/** Budget for the connect-time AMQP probe (a full handshake, so a little longer than a TCP connect). */
+const PROBE_TIMEOUT_MS = 5000
 
 /**
- * Is the broker's AMQP port reachable? A plain TCP connect (no AMQP/TLS
- * handshake) — enough to tell "the port accepts connections" from "a firewall is
- * blocking 5672". When this is false we force the HTTP browse path. A TLS broker
- * still accepts the TCP connection, so we don't do the TLS handshake here.
+ * Can we actually speak AMQP to the broker? A full AMQP connect followed by a
+ * graceful `connection.close` — not a bare TCP connect, because a port-forward,
+ * load balancer or unrelated service on the port accepts TCP even when no broker
+ * answers behind it. A TCP-only probe then picked the AMQP transport and every
+ * peek failed; now any failure (refused, timeout, not AMQP, bad credentials or
+ * vhost, TLS) falls back to HTTP browse. The clean close also matters:
+ * `kubectl port-forward` can exit when a forwarded connection is cut mid-handshake.
  */
-export function probeAmqpReachable(
+export async function probeAmqpReachable(
   config: ConnectionConfig,
   timeoutMs = PROBE_TIMEOUT_MS
 ): Promise<boolean> {
-  return new Promise((resolve) => {
-    const socket = new net.Socket()
-    let settled = false
-    const finish = (ok: boolean): void => {
-      if (settled) return
-      settled = true
-      socket.destroy()
-      resolve(ok)
-    }
-    socket.setTimeout(timeoutMs)
-    socket.once('connect', () => finish(true))
-    socket.once('timeout', () => finish(false))
-    socket.once('error', () => finish(false))
-    socket.connect(config.amqpPort, config.host)
-  })
+  try {
+    const conn = await connectAmqp(config, timeoutMs)
+    await conn.close().catch(() => undefined)
+    return true
+  } catch {
+    return false
+  }
 }
