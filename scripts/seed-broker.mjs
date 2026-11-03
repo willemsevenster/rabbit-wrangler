@@ -231,17 +231,35 @@ function stressPayload(i) {
       name: 'large.json',
       ct: 'application/json',
       body: JSON.stringify(
-        { note: 'large array', items: Array.from({ length: 5000 }, (_, k) => ({ k, name: `item-${k}`, active: k % 2 === 0 })) },
+        {
+          note: 'large array',
+          items: Array.from({ length: 5000 }, (_, k) => ({
+            k,
+            name: `item-${k}`,
+            active: k % 2 === 0
+          }))
+        },
         null,
         2
       )
     }),
-    () => ({ name: 'deeply-nested.json', ct: 'application/json', body: JSON.stringify(nest(40), null, 2) }),
+    () => ({
+      name: 'deeply-nested.json',
+      ct: 'application/json',
+      body: JSON.stringify(nest(40), null, 2)
+    }),
     () => ({
       name: 'unicode.json',
       ct: 'application/json',
       body: JSON.stringify(
-        { emoji: '🐰🚀✅🔥🎉', cjk: '日本語テスト · 中文测试 · 한국어', rtl: 'مرحبا بالعالم', math: '∑∫√π≠≈∞', combining: 'é à', zalgo: 'Z̸̧͕a̷l̷g̵o̶' },
+        {
+          emoji: '🐰🚀✅🔥🎉',
+          cjk: '日本語テスト · 中文测试 · 한국어',
+          rtl: 'مرحبا بالعالم',
+          math: '∑∫√π≠≈∞',
+          combining: 'é à',
+          zalgo: 'Z̸̧͕a̷l̷g̵o̶'
+        },
         null,
         2
       )
@@ -249,13 +267,25 @@ function stressPayload(i) {
     () => ({
       name: 'minified-huge.json',
       ct: 'application/json',
-      body: JSON.stringify({ rows: Array.from({ length: 3000 }, (_, k) => ({ k, v: Math.round(rng.next() * 1e6) })) })
+      body: JSON.stringify({
+        rows: Array.from({ length: 3000 }, (_, k) => ({ k, v: Math.round(rng.next() * 1e6) }))
+      })
     }),
     () => ({ name: 'long-single-line.txt', ct: 'text/plain', body: 'lorem-ipsum-'.repeat(2000) }),
     () => ({
       name: 'escapes.json',
       ct: 'application/json',
-      body: JSON.stringify({ quotes: 'He said "hi"', tab: 'a\tb', newline: 'line1\nline2', backslash: 'a\\b\\c', unicodeEscape: 'é☃' }, null, 2)
+      body: JSON.stringify(
+        {
+          quotes: 'He said "hi"',
+          tab: 'a\tb',
+          newline: 'line1\nline2',
+          backslash: 'a\\b\\c',
+          unicodeEscape: 'é☃'
+        },
+        null,
+        2
+      )
     })
   ]
   const c = cases[i % cases.length]()
@@ -420,7 +450,8 @@ if (args.clean) {
 } else if (args.rate && args.rate > 0) {
   await seedLive(args.rate)
 } else {
-  const total = Number.isFinite(args.messages) && args.messages >= 0 ? Math.floor(args.messages) : 60
+  const total =
+    Number.isFinite(args.messages) && args.messages >= 0 ? Math.floor(args.messages) : 60
   const stress = Number.isFinite(args.stress) && args.stress > 0 ? Math.floor(args.stress) : 0
   await seedOnce(total, stress)
 }

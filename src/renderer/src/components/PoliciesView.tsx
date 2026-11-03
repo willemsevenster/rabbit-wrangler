@@ -33,10 +33,7 @@ export function PoliciesView({ tab }: { tab: PoliciesTab }) {
           {tab.title}
         </h2>
         <span className="spacer" />
-        <button
-          className="btn btn--sm"
-          onClick={() => openPolicyDialog(tab.connectionId)}
-        >
+        <button className="btn btn--sm" onClick={() => openPolicyDialog(tab.connectionId)}>
           <span className="codicon codicon-add" />
           Add Policy
         </button>

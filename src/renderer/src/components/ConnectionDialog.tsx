@@ -137,7 +137,12 @@ export function ConnectionDialog() {
             </div>
           </div>
           <div className="field--check">
-            <input id="tls" type="checkbox" checked={tls} onChange={(e) => setTls(e.target.checked)} />
+            <input
+              id="tls"
+              type="checkbox"
+              checked={tls}
+              onChange={(e) => setTls(e.target.checked)}
+            />
             <label htmlFor="tls">Use TLS (amqps / https)</label>
           </div>
           <div className="field">

@@ -49,9 +49,7 @@ import type {
 export function registerIpcHandlers(): void {
   ipcMain.handle(IPC.listConnections, () => configStore.list())
 
-  ipcMain.handle(IPC.saveConnection, (_e, config: ConnectionConfig) =>
-    configStore.save(config)
-  )
+  ipcMain.handle(IPC.saveConnection, (_e, config: ConnectionConfig) => configStore.save(config))
 
   ipcMain.handle(IPC.deleteConnection, async (_e, id: string) => {
     await connectionManager.disconnect(id)
@@ -101,7 +99,11 @@ export function registerIpcHandlers(): void {
     try {
       const defs = takePendingDefinitions(token)
       if (defs === undefined) {
-        return { ok: false, affected: 0, error: 'Import session expired — please choose the file again.' }
+        return {
+          ok: false,
+          affected: 0,
+          error: 'Import session expired — please choose the file again.'
+        }
       }
       return connectionManager.require(connectionId).importDefinitions(defs)
     } catch (e) {

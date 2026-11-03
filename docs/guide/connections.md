@@ -140,6 +140,7 @@ you — enable them on the broker with:
 ```sh
 rabbitmq-plugins enable rabbitmq_shovel rabbitmq_shovel_management
 ```
+
 :::
 
 ## Client connections & consumers

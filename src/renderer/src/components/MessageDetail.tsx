@@ -1,7 +1,13 @@
 import { useRef, type MouseEvent } from 'react'
 import { MonacoViewer } from './MonacoViewer'
 import { useAppStore } from '../store/app-store'
-import { byteSize, deathRecords, detectLanguage, formatBytes, propertyRows } from '../lib/message-format'
+import {
+  byteSize,
+  deathRecords,
+  detectLanguage,
+  formatBytes,
+  propertyRows
+} from '../lib/message-format'
 import type { PeekedMessage } from '@shared/types'
 
 /**
@@ -58,7 +64,11 @@ export function MessageDetail({
             className="btn btn--sm btn--secondary"
             onClick={onMove}
             disabled={!canMutate}
-            title={canMutate ? 'Move this message' : 'Moving needs AMQP (unavailable in HTTP browse mode)'}
+            title={
+              canMutate
+                ? 'Move this message'
+                : 'Moving needs AMQP (unavailable in HTTP browse mode)'
+            }
           >
             <span className="codicon codicon-arrow-right" />
             Move
@@ -83,7 +93,11 @@ export function MessageDetail({
             className="btn btn--sm btn--danger"
             onClick={onDelete}
             disabled={!canMutate}
-            title={canMutate ? 'Delete this message' : 'Deleting needs AMQP (unavailable in HTTP browse mode)'}
+            title={
+              canMutate
+                ? 'Delete this message'
+                : 'Deleting needs AMQP (unavailable in HTTP browse mode)'
+            }
           >
             <span className="codicon codicon-trash" />
             Delete

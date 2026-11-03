@@ -28,7 +28,9 @@ export function PermissionsSection({ tab }: { tab: AdminTab }) {
       title: 'Remove permissions',
       message:
         `Remove "${p.user}" permissions on virtual host "${p.vhost}"?` +
-        (isSelf ? ` This is your own user on the vhost this connection targets — you may lose access.` : ''),
+        (isSelf
+          ? ` This is your own user on the vhost this connection targets — you may lose access.`
+          : ''),
       confirmLabel: 'Remove',
       danger: true
     })

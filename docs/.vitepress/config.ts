@@ -18,7 +18,14 @@ export default defineConfig({
   head: [
     ['link', { rel: 'icon', type: 'image/svg+xml', href: BASE + 'favicon.svg' }],
     ['meta', { name: 'theme-color', content: '#f26d21' }],
-    ['meta', { name: 'keywords', content: 'RabbitMQ, AMQP, dead-letter queue, DLQ, message queue, desktop, Electron, queue management, peek messages' }],
+    [
+      'meta',
+      {
+        name: 'keywords',
+        content:
+          'RabbitMQ, AMQP, dead-letter queue, DLQ, message queue, desktop, Electron, queue management, peek messages'
+      }
+    ],
     ['meta', { property: 'og:type', content: 'website' }],
     ['meta', { property: 'og:title', content: 'Rabbit Wrangler — desktop RabbitMQ operations' }],
     ['meta', { property: 'og:description', content: DESCRIPTION }],

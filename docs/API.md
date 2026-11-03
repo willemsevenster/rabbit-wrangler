@@ -33,49 +33,49 @@ Defined in [`src/shared/ipc.ts`](../src/shared/ipc.ts), bridged in
 
 ### Connection registry & credentials
 
-| Method                                         | IPC channel              | Backed by            | Notes                                                          |
-| ---------------------------------------------- | ------------------------ | -------------------- | -------------------------------------------------------------- |
-| `listConnections(): Promise<SafeConnectionConfig[]>`                  | `connections:list`       | `config-store`       | Returns configs **without** passwords.                         |
-| `saveConnection(config: ConnectionConfig): Promise<SafeConnectionConfig>` | `connections:save`       | `config-store`       | Password encrypted via OS vault (`safeStorage`).               |
-| `deleteConnection(id: string): Promise<void>`                         | `connections:delete`     | registry + store     | Disconnects first, then removes the saved config.              |
-| `connect(id: string): Promise<void>`                                  | `connections:connect`    | `connection-manager` | Verifies the management endpoint (`/whoami`), probes AMQP (full handshake + clean close) to pick the transport; AMQP stays lazy. |
-| `disconnect(id: string): Promise<void>`                               | `connections:disconnect` | `connection-manager` | Disposes peekers + AMQP connection. |
-| `getConnectionRuntime(id: string): Promise<ConnectionRuntime>`        | `connections:runtime`    | `connection-manager` | AMQP availability + effective transport (`amqp`/`http`). |
-| `setBrowseMode(id: string, mode: BrowseMode): Promise<ConnectionRuntime>` | `connections:set-browse-mode` | `connection-manager` | Switch browse mode live (no reconnect); persists the preference. |
+| Method                                                                    | IPC channel                   | Backed by            | Notes                                                                                                                            |
+| ------------------------------------------------------------------------- | ----------------------------- | -------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `listConnections(): Promise<SafeConnectionConfig[]>`                      | `connections:list`            | `config-store`       | Returns configs **without** passwords.                                                                                           |
+| `saveConnection(config: ConnectionConfig): Promise<SafeConnectionConfig>` | `connections:save`            | `config-store`       | Password encrypted via OS vault (`safeStorage`).                                                                                 |
+| `deleteConnection(id: string): Promise<void>`                             | `connections:delete`          | registry + store     | Disconnects first, then removes the saved config.                                                                                |
+| `connect(id: string): Promise<void>`                                      | `connections:connect`         | `connection-manager` | Verifies the management endpoint (`/whoami`), probes AMQP (full handshake + clean close) to pick the transport; AMQP stays lazy. |
+| `disconnect(id: string): Promise<void>`                                   | `connections:disconnect`      | `connection-manager` | Disposes peekers + AMQP connection.                                                                                              |
+| `getConnectionRuntime(id: string): Promise<ConnectionRuntime>`            | `connections:runtime`         | `connection-manager` | AMQP availability + effective transport (`amqp`/`http`).                                                                         |
+| `setBrowseMode(id: string, mode: BrowseMode): Promise<ConnectionRuntime>` | `connections:set-browse-mode` | `connection-manager` | Switch browse mode live (no reconnect); persists the preference.                                                                 |
 
 ### Queues (management plane)
 
-| Method                                             | IPC channel    | Maps to broker call                                 |
-| -------------------------------------------------- | -------------- | --------------------------------------------------- |
-| `listQueues(connectionId: string): Promise<QueueInfo[]>`            | `queues:list`  | `GET /api/queues/{vhost}`                           |
+| Method                                                                      | IPC channel    | Maps to broker call                                 |
+| --------------------------------------------------------------------------- | -------------- | --------------------------------------------------- |
+| `listQueues(connectionId: string): Promise<QueueInfo[]>`                    | `queues:list`  | `GET /api/queues/{vhost}`                           |
 | `purgeQueue(connectionId: string, queue: string): Promise<OperationResult>` | `queues:purge` | `GET …/{name}` (count) + `DELETE …/{name}/contents` |
 
 ### Exchanges (management plane)
 
-| Method                                                        | IPC channel          | Maps to broker call                                 |
-| ------------------------------------------------------------- | -------------------- | --------------------------------------------------- |
-| `listExchanges(connectionId: string): Promise<ExchangeInfo[]>`                 | `exchanges:list`     | `GET /api/exchanges/{vhost}`                        |
+| Method                                                                                 | IPC channel          | Maps to broker call                                 |
+| -------------------------------------------------------------------------------------- | -------------------- | --------------------------------------------------- |
+| `listExchanges(connectionId: string): Promise<ExchangeInfo[]>`                         | `exchanges:list`     | `GET /api/exchanges/{vhost}`                        |
 | `listExchangeBindings(connectionId: string, exchange: string): Promise<BindingInfo[]>` | `exchanges:bindings` | `GET /api/exchanges/{vhost}/{name}/bindings/source` |
 | `deleteExchange(connectionId: string, exchange: string): Promise<OperationResult>`     | `exchanges:delete`   | `DELETE /api/exchanges/{vhost}/{name}`              |
-| `publishMessage(request: PublishMessageRequest): Promise<OperationResult>`            | `exchanges:publish`  | `POST /api/exchanges/{vhost}/{name}/publish`        |
+| `publishMessage(request: PublishMessageRequest): Promise<OperationResult>`             | `exchanges:publish`  | `POST /api/exchanges/{vhost}/{name}/publish`        |
 
 ### Messages (AMQP plane)
 
-| Method                                    | IPC channel          | Behavior                                                                |
-| ----------------------------------------- | -------------------- | ----------------------------------------------------------------------- |
-| `startPeek(connectionId: string, queue: string): Promise<void>`    | `peek:start`         | Starts a NACK-and-requeue consumer; messages stream over the WebSocket. |
-| `stopPeek(connectionId: string, queue: string): Promise<void>`     | `peek:stop`          | Cancels the consumer and releases held messages.                        |
-| `moveMessages(request: MoveMessagesRequest): Promise<OperationResult>`  | `messages:move`      | Confirm-channel drain + republish (see §3).                             |
-| `moveMessage(request: MoveMessageRequest): Promise<OperationResult>`    | `messages:moveOne`   | Move one message, matched by fingerprint (see §3).                      |
+| Method                                                                   | IPC channel          | Behavior                                                                |
+| ------------------------------------------------------------------------ | -------------------- | ----------------------------------------------------------------------- |
+| `startPeek(connectionId: string, queue: string): Promise<void>`          | `peek:start`         | Starts a NACK-and-requeue consumer; messages stream over the WebSocket. |
+| `stopPeek(connectionId: string, queue: string): Promise<void>`           | `peek:stop`          | Cancels the consumer and releases held messages.                        |
+| `moveMessages(request: MoveMessagesRequest): Promise<OperationResult>`   | `messages:move`      | Confirm-channel drain + republish (see §3).                             |
+| `moveMessage(request: MoveMessageRequest): Promise<OperationResult>`     | `messages:moveOne`   | Move one message, matched by fingerprint (see §3).                      |
 | `deleteMessage(request: DeleteMessageRequest): Promise<OperationResult>` | `messages:deleteOne` | Delete one message, matched by fingerprint (see §3).                    |
 
 ### Bootstrap & utilities
 
-| Method                         | IPC channel   | Notes                                                                     |
-| ------------------------------ | ------------- | ------------------------------------------------------------------------- |
-| `getEventStreamEndpoint(): Promise<EventStreamEndpoint>` | `events:endpoint` | `{ port, token }` of the event WebSocket; connect with the `rw-token.<token>` subprotocol. |
-| `quitApp(): Promise<void>`              | `app:quit`    | Quits the application (Connections → Exit menu).                          |
-| `copyText(text: string): Promise<void>` | `clipboard:write-text` | Writes to the system clipboard in main (Electron 45 removed `clipboard` from preload). |
+| Method                                                   | IPC channel            | Notes                                                                                      |
+| -------------------------------------------------------- | ---------------------- | ------------------------------------------------------------------------------------------ |
+| `getEventStreamEndpoint(): Promise<EventStreamEndpoint>` | `events:endpoint`      | `{ port, token }` of the event WebSocket; connect with the `rw-token.<token>` subprotocol. |
+| `quitApp(): Promise<void>`                               | `app:quit`             | Quits the application (Connections → Exit menu).                                           |
+| `copyText(text: string): Promise<void>`                  | `clipboard:write-text` | Writes to the system clipboard in main (Electron 45 removed `clipboard` from preload).     |
 
 ### Event stream (WebSocket push)
 
@@ -98,17 +98,17 @@ addressed as `amq.default`, the default vhost `/` as `%2F`).
 
 ### Queues
 
-| Status | Method | Path                              | Purpose                                                                                                   |
-| ------ | ------ | --------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| ✅     | GET    | `/queues/{vhost}`                 | List queues in a vhost (name, state, depth, consumers).                                                   |
-| ✅     | GET    | `/queues/{vhost}/{name}`          | Single queue — read for the pre-purge count. _(Full detail not yet surfaced.)_                            |
-| ✅     | DELETE | `/queues/{vhost}/{name}/contents` | Purge (delete ready messages).                                                                            |
-| ⭐     | PUT    | `/queues/{vhost}/{name}`          | **Declare/create a queue** (e.g. a move target, a redrive queue).                                         |
-| ⭐     | DELETE | `/queues/{vhost}/{name}`          | **Delete a queue** (not just purge). Supports `if-empty` / `if-unused`.                                   |
+| Status | Method | Path                              | Purpose                                                                                                  |
+| ------ | ------ | --------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| ✅     | GET    | `/queues/{vhost}`                 | List queues in a vhost (name, state, depth, consumers).                                                  |
+| ✅     | GET    | `/queues/{vhost}/{name}`          | Single queue — read for the pre-purge count. _(Full detail not yet surfaced.)_                           |
+| ✅     | DELETE | `/queues/{vhost}/{name}/contents` | Purge (delete ready messages).                                                                           |
+| ⭐     | PUT    | `/queues/{vhost}/{name}`          | **Declare/create a queue** (e.g. a move target, a redrive queue).                                        |
+| ⭐     | DELETE | `/queues/{vhost}/{name}`          | **Delete a queue** (not just purge). Supports `if-empty` / `if-unused`.                                  |
 | ✅     | POST   | `/queues/{vhost}/{name}/get`      | **Pull N messages** (HTTP browse with `ackmode=reject_requeue_true`) — the AMQP-free fallback peek path. |
-| ◻︎      | GET    | `/queues`                         | All queues across vhosts.                                                                                 |
-| ◻︎      | GET    | `/queues/{vhost}/{name}/bindings` | Bindings terminating at a queue.                                                                          |
-| ◻︎      | POST   | `/queues/{vhost}/{name}/actions`  | `sync` / `cancel_sync` (classic mirrored queues).                                                         |
+| ◻︎      | GET    | `/queues`                         | All queues across vhosts.                                                                                |
+| ◻︎      | GET    | `/queues/{vhost}/{name}/bindings` | Bindings terminating at a queue.                                                                         |
+| ◻︎      | POST   | `/queues/{vhost}/{name}/actions`  | `sync` / `cancel_sync` (classic mirrored queues).                                                        |
 
 ### Exchanges
 
@@ -155,25 +155,25 @@ addressed as `amq.default`, the default vhost `/` as `%2F`).
 
 ### Topology, policies & backup
 
-| Status | Method         | Path                                     | Purpose                                                                               |
-| ------ | -------------- | ---------------------------------------- | ------------------------------------------------------------------------------------- |
-| ⭐     | GET            | `/definitions` · `/definitions/{vhost}`  | **Export** all exchanges/queues/bindings/policies as JSON (backup/diff).              |
-| ⭐     | POST           | `/definitions` · `/definitions/{vhost}`  | **Import** definitions (restore/replicate topology).                                  |
-| ⭐     | GET/PUT/DELETE | `/policies/{vhost}[/{name}]`             | Manage DLX / TTL / max-length / quorum policies — directly relevant to DLQ workflows. |
-| ◻︎      | GET/PUT/DELETE | `/operator-policies/{vhost}[/{name}]`    | Operator policies.                                                                    |
-| ✅     | GET/PUT/DELETE | `/parameters/shovel/{vhost}[/{name}]` · `/shovels/{vhost}` | **Dynamic shovels** for large server-side moves (one-shot DLQ drains).    |
-| ◻︎      | GET/PUT/DELETE | `/parameters/{component}/{vhost}/{name}` | Other runtime parameters.                                                             |
-| ◻︎      | GET/PUT/DELETE | `/global-parameters/{name}`              | Global parameters.                                                                    |
+| Status | Method         | Path                                                       | Purpose                                                                               |
+| ------ | -------------- | ---------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| ⭐     | GET            | `/definitions` · `/definitions/{vhost}`                    | **Export** all exchanges/queues/bindings/policies as JSON (backup/diff).              |
+| ⭐     | POST           | `/definitions` · `/definitions/{vhost}`                    | **Import** definitions (restore/replicate topology).                                  |
+| ⭐     | GET/PUT/DELETE | `/policies/{vhost}[/{name}]`                               | Manage DLX / TTL / max-length / quorum policies — directly relevant to DLQ workflows. |
+| ◻︎      | GET/PUT/DELETE | `/operator-policies/{vhost}[/{name}]`                      | Operator policies.                                                                    |
+| ✅     | GET/PUT/DELETE | `/parameters/shovel/{vhost}[/{name}]` · `/shovels/{vhost}` | **Dynamic shovels** for large server-side moves (one-shot DLQ drains).                |
+| ◻︎      | GET/PUT/DELETE | `/parameters/{component}/{vhost}/{name}`                   | Other runtime parameters.                                                             |
+| ◻︎      | GET/PUT/DELETE | `/global-parameters/{name}`                                | Global parameters.                                                                    |
 
 ### Identity & access (admin surface)
 
-| Status | Method         | Path                                                     | Purpose                                    |
-| ------ | -------------- | -------------------------------------------------------- | ------------------------------------------ |
-| ✅     | GET            | `/whoami`                                                | Reachability + auth probe on connect; also surfaces the current user's name + tags (Administration tab gating). |
-| ✅     | GET/PUT/DELETE | `/users[/{name}]`                                        | **Manage users** (Administration → Users): tags + password.    |
-| ✅     | GET/PUT/DELETE | `/vhosts[/{name}]`                                       | **Manage vhosts** (Administration → Virtual hosts): description, default queue type. |
-| ✅     | GET/PUT/DELETE | `/permissions/{vhost}/{user}` · `/topic-permissions/{vhost}/{user}` | **Manage permissions** (Administration → Permissions): configure/write/read + topic. |
-| ◻︎      | GET            | `/extensions`                                            | Installed management extensions.           |
+| Status | Method         | Path                                                                | Purpose                                                                                                         |
+| ------ | -------------- | ------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| ✅     | GET            | `/whoami`                                                           | Reachability + auth probe on connect; also surfaces the current user's name + tags (Administration tab gating). |
+| ✅     | GET/PUT/DELETE | `/users[/{name}]`                                                   | **Manage users** (Administration → Users): tags + password.                                                     |
+| ✅     | GET/PUT/DELETE | `/vhosts[/{name}]`                                                  | **Manage vhosts** (Administration → Virtual hosts): description, default queue type.                            |
+| ✅     | GET/PUT/DELETE | `/permissions/{vhost}/{user}` · `/topic-permissions/{vhost}/{user}` | **Manage permissions** (Administration → Permissions): configure/write/read + topic.                            |
+| ◻︎      | GET            | `/extensions`                                                       | Installed management extensions.                                                                                |
 
 > Full reference: any running broker serves its own at
 > `http://{host}:15672/api/` (and the cli-equivalent docs at
@@ -189,7 +189,7 @@ The AMQP connection is opened lazily — only when the first peek/move runs.
 | Status | Operation                                                                                                   | Where                              | Purpose                                                                                                                                                   |
 | ------ | ----------------------------------------------------------------------------------------------------------- | ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | ✅     | `connect`                                                                                                   | `amqp.ts`                          | One connection per cluster, reused.                                                                                                                       |
-| ✅     | `createChannel` + `prefetch` + `consume` + `nack(requeue:true)`                                             | `message-peeker.ts`                | Non-destructive, de-duplicated peeking (head **peek window** messages, a user setting).                                                                                 |
+| ✅     | `createChannel` + `prefetch` + `consume` + `nack(requeue:true)`                                             | `message-peeker.ts`                | Non-destructive, de-duplicated peeking (head **peek window** messages, a user setting).                                                                   |
 | ✅     | `createConfirmChannel` + `get` + `publish({mandatory})` + `waitForConfirms` + `on('return')` + `ack`/`nack` | `operations.ts`                    | **Move** = drain source one-at-a-time, republish on a confirm channel, ack only after confirm; unroutable target nacks-requeues and aborts (never drops). |
 | ✅     | `get`-scan by fingerprint → `ack` (delete) / republish + `ack` (move)                                       | `operations.ts` + `fingerprint.ts` | **Single-message move/delete** — pull head messages holding non-matches unacked until the fingerprint matches, act on that one, requeue the rest.         |
 | ✅     | `cancel` / `close`                                                                                          | both                               | Tear down peeker channel; release held messages before purge/move.                                                                                        |
@@ -205,35 +205,35 @@ recovery as the marquee workflow.
 
 ### Tier 1 — directly extend the core mission
 
-1. ✅ **Delete & create queues** *(done)* — `PUT /queues/{vhost}/{name}` (Create
+1. ✅ **Delete & create queues** _(done)_ — `PUT /queues/{vhost}/{name}` (Create
    Queue: durable / auto-delete / x-arguments) and `DELETE /queues/{vhost}/{name}`
    (Delete Queue, with optional `if-empty` / `if-unused` guards). Surfaced via the
    Queues-group menu / overview "New Queue" button and the queue context menu.
-2. ✅ **Editable bindings** *(done)* — the exchange view is now read-write:
+2. ✅ **Editable bindings** _(done)_ — the exchange view is now read-write:
    **Add Binding** (`POST /bindings/{vhost}/e/{src}/{q|e}/{dst}`) to a queue or
    exchange and remove bindings (`DELETE /bindings/...` by properties key), plus
    **Create Exchange** (`PUT /exchanges/{vhost}/{name}`). The binding table and
    diagram update on every change.
-3. ✅ **Richer queue detail** *(done)* — `QueueInfo` now carries memory, message /
+3. ✅ **Richer queue detail** _(done)_ — `QueueInfo` now carries memory, message /
    publish / deliver / ack rates and idle-since, surfaced in a queue-tab stats
    strip and extra overview-table columns.
-4. ✅ **Live queue stats** *(done)* — each connected cluster polls `listQueues` in
+4. ✅ **Live queue stats** _(done)_ — each connected cluster polls `listQueues` in
    the main process and pushes the `queue-stats` StreamEvent, so the tree, overview
    and queue tabs update for **every** connection without a manual refresh.
 
 ### Tier 2 — situational awareness for operators
 
-5. ✅ **Cluster overview & node health** *(done)* — `GET /overview` + `GET /nodes`,
+5. ✅ **Cluster overview & node health** _(done)_ — `GET /overview` + `GET /nodes`,
    pushed live via the `cluster-stats` event. A connection's Overview tab shows
    version / totals / cluster rates and per-node memory, disk, fd and uptime, with
    **resource-alarm** badges (memory/disk); the status bar shows the broker version
    and a high-contrast alarm chip when a node is blocked.
-6. ✅ **Connections & consumers, with kill** *(done)* — a per-cluster **Connections**
+6. ✅ **Connections & consumers, with kill** _(done)_ — a per-cluster **Connections**
    tab lists live client connections (`GET /connections`) and consumers
    (`GET /consumers/{vhost}`), with **Force Close** (`DELETE /connections/{name}`) to
    drop a misbehaving client — so you can see who's draining a queue and why a DLQ
    won't move.
-7. ✅ **Deeper health check** *(done)* — a **Check Health** connection action runs
+7. ✅ **Deeper health check** _(done)_ — a **Check Health** connection action runs
    `/aliveness-test/{vhost}` (a real publish+consume round-trip on the vhost,
    beyond `/whoami`'s auth-only check) and reports the result; the connection
    indicator also reflects live health, showing a **degraded** (amber) state when
@@ -241,28 +241,28 @@ recovery as the marquee workflow.
 
 ### Tier 3 — power features
 
-8. ✅ **Export / import definitions** *(done)* — the connection menu's **Export /
+8. ✅ **Export / import definitions** _(done)_ — the connection menu's **Export /
    Import Definitions** back up and restore a vhost's topology (queues, exchanges,
    bindings, policies) via `GET`/`POST /definitions/{vhost}` — for backup,
    environment diffing, and "copy this vhost's setup to staging." Vhost-scoped, so
    exports carry no users/credentials; needs the `administrator` tag.
-9. ✅ **Policy management** *(done)* — a per-cluster **Policies** tab
+9. ✅ **Policy management** _(done)_ — a per-cluster **Policies** tab
    (`GET`/`PUT`/`DELETE /policies/{vhost}`) lists policies and lets you add / edit /
    delete them (name pattern, apply-to, priority + a typed definition editor for
    `message-ttl`, `max-length`, `dead-letter-exchange`, …) — the configuration side
    of the DLQ story. Needs the `administrator` / `policymaker` tag.
-10. ✅ **Message export to file** *(done)* — the queue context menu's **Export
+10. ✅ **Message export to file** _(done)_ — the queue context menu's **Export
     Messages…** drains a queue's ready messages **non-destructively** (AMQP
     `get`-loop holding unacked, requeued on close) and saves them to **NDJSON or
     JSON** — a safety net + audit trail before a move or purge.
-11. ✅ **HTTP browse fallback** *(done)* — when the AMQP port (`5672`) is firewalled
+11. ✅ **HTTP browse fallback** _(done)_ — when the AMQP port (`5672`) is firewalled
     but `15672` is reachable, peeking falls back to `POST /queues/{vhost}/{name}/get`
     (`ackmode=reject_requeue_true`, polled + de-duplicated, still non-destructive).
     AMQP availability is **auto-probed** on connect; a per-connection **Message
     browsing** setting (Auto / HTTP-only) plus a right-click toggle let you choose
     the mode when both work. HTTP browse is read-only — move/delete/export-to-file
     need AMQP and are disabled.
-12. ✅ **Server-side shovel for large moves** *(done)* — the queue menu's **Move via
+12. ✅ **Server-side shovel for large moves** _(done)_ — the queue menu's **Move via
     Server-Side Shovel…** creates a **one-shot dynamic shovel**
     (`PUT /parameters/shovel/{vhost}/{name}`, `src-delete-after: queue-length`,
     `ack-mode: on-confirm`) that drains a backlog **broker-side** then deletes itself,

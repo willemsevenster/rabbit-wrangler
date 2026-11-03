@@ -148,7 +148,11 @@ export function CreateExchangeDialog() {
           </div>
 
           <label className="field--check">
-            <input type="checkbox" checked={durable} onChange={(e) => setDurable(e.target.checked)} />
+            <input
+              type="checkbox"
+              checked={durable}
+              onChange={(e) => setDurable(e.target.checked)}
+            />
             Durable (survives a broker restart)
           </label>
 

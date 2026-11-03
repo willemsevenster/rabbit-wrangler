@@ -1,9 +1,4 @@
-import type {
-  ConnectionStatus,
-  ExchangeInfo,
-  QueueInfo,
-  SafeConnectionConfig
-} from '@shared/types'
+import type { ConnectionStatus, ExchangeInfo, QueueInfo, SafeConnectionConfig } from '@shared/types'
 
 /** A row that is currently visible in the connections tree, in render order. */
 export interface TreeNode {

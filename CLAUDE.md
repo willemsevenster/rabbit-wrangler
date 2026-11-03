@@ -199,8 +199,8 @@ Key behavior below.
 - **Policy management** (`ManagementApi.listPolicies`/`createPolicy`/`deletePolicy`,
   UI: `components/PoliciesView` in a `policies` editor tab + `PolicyDialog`): a
   per-cluster tab (connection menu → **View Policies**, keyed `policiesTabId` =
-  `pol:${connId}`) lists vhost policies (`GET /policies/{vhost}`) with **Add Policy**
-  + per-row **Edit**/**Delete**, fetched on open + Refresh (held on the tab, like
+  `pol:${connId}`) lists vhost policies (`GET /policies/{vhost}`) with **Add Policy** +
+  per-row **Edit**/**Delete**, fetched on open + Refresh (held on the tab, like
   connections). `PolicyDialog` (create + edit) takes name/pattern/apply-to/priority +
   a typed **definition** editor (key/value/type rows, reused from `CreateQueueDialog`)
   for `message-ttl`, `max-length`, `dead-letter-exchange`, etc. Create/edit both
@@ -209,8 +209,8 @@ Key behavior below.
   data). Needs the `administrator`/`policymaker` tag — surfaced error otherwise.
 - **Definitions export/import** (`ManagementApi.getDefinitions`/`importDefinitions`,
   `store/definitions-io.ts`, UI via the connection context menu → "Export/Import
-  Definitions…"): vhost-scoped topology backup/restore over `GET`/`POST
-  /definitions/{vhost}` (queues, exchanges, bindings, policies, parameters — **not**
+  Definitions…"): vhost-scoped topology backup/restore over
+  `GET`/`POST /definitions/{vhost}` (queues, exchanges, bindings, policies, parameters — **not**
   users/permissions, so no credentials leak). **Export** GETs first (so a permission
   error fails before the save dialog), then writes pretty JSON. **Import** is a
   two-step: `previewImportDefinitions` (open dialog → parse → `DefinitionsSummary`
@@ -230,8 +230,8 @@ Key behavior below.
   `buildAmqpUrl(config)`** (the broker connects back to itself with the user's
   creds+vhost) — so it works even in **HTTP browse mode** (it's a management-plane op).
   **Support is probed lazily** (`getShovelSupport` → `GET /shovels/{vhost}`): any
-  non-2xx that isn't 401/403 is treated as "shovel plugins not enabled" and the dialog
-  + tab show the exact `rabbitmq-plugins enable rabbitmq_shovel rabbitmq_shovel_management`
+  non-2xx that isn't 401/403 is treated as "shovel plugins not enabled" and the dialog +
+  tab show the exact `rabbitmq-plugins enable rabbitmq_shovel rabbitmq_shovel_management`
   command (the probe returns 400 **or** 404 depending on version, hence the broad
   check). Needs the `administrator` (or `policymaker` + `monitoring`) tag. The `shovels`
   tab holds `support` + `shovels` (fetched on open/Refresh, like policies); one-shot
@@ -266,8 +266,8 @@ Key behavior below.
   "connected as X", **gates** the tab (a non-admin sees a banner, not a raw 403 — the
   reducer skips `listUsers` when `!isAdministrator`), and powers **self-lockout guards**
   (warn when deleting the connected user / stripping your own `administrator` tag — all
-  admin deletes use `store.confirm`, always-confirm). **Password handling**: `PUT
-  /users/{name}` replaces the whole record, so a tag-only edit sends `keepPassword`
+  admin deletes use `store.confirm`, always-confirm). **Password handling**:
+  `PUT /users/{name}` replaces the whole record, so a tag-only edit sends `keepPassword`
   and `ManagementApi.createUser` **re-reads the existing `password_hash` main-side** (the
   hash never crosses to the renderer; `UserInfo` only carries `hasPassword`). Needs the
   `administrator` tag.
@@ -275,8 +275,8 @@ Key behavior below.
   the connection context menu's **Check Health** runs a real publish+consume
   round-trip on the vhost (beyond `/whoami`'s auth-only probe) and toasts the result
   (`store.checkHealth`). It needs vhost perms, **not** the monitoring tag, so it works
-  on locked-down users. The connection indicator also reflects live health: the tree
-  + status-bar dots derive a **`degraded`** (amber) state via
+  on locked-down users. The connection indicator also reflects live health: the tree +
+  status-bar dots derive a **`degraded`** (amber) state via
   `lib/connection-health.ts` `effectiveConnectionState(state, cluster)` — connected
   but a node resource alarm is active (from the cluster-stats data). `degraded` is a
   renderer-only derived state, **not** a `ConnectionState` contract value.
