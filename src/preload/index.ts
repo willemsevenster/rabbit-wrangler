@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer, clipboard } from 'electron'
+import { contextBridge, ipcRenderer } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
 import { IPC, type RabbitApi } from '@shared/ipc'
 import type {
@@ -132,7 +132,7 @@ const api: RabbitApi = {
   getUpdatePrefs: () => ipcRenderer.invoke(IPC.getUpdatePrefs),
   setAutoDownload: (enabled: boolean) => ipcRenderer.invoke(IPC.setAutoDownload, enabled),
 
-  copyText: (text: string) => clipboard.writeText(text)
+  copyText: (text: string) => ipcRenderer.invoke(IPC.copyText, text)
 }
 
 if (process.contextIsolated) {

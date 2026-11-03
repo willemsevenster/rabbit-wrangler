@@ -1,13 +1,11 @@
 # Allow these dependencies to run install/build scripts (pnpm blocks them by
-# default since v10). Electron downloads its binary here; esbuild installs its
-# native binary; electron-winstaller fetches its Windows installer tooling.
-# Without this, a fresh `pnpm install` leaves Electron with no binary and
-# electron-vite fails to start with "Error: Electron uninstall".
-onlyBuiltDependencies:
-  - electron
-  - electron-winstaller
-  - esbuild
+# default). esbuild installs its native binary; electron-winstaller fetches its
+# Windows installer tooling. Electron (>= 45) has no install script any more —
+# it downloads its binary lazily on first `require('electron')` / `pnpm dev`.
+allowBuilds:
+  electron-winstaller: true
+  esbuild: true
 # Force a patched dompurify everywhere it appears transitively (monaco-editor
 # pulls in an older line with published advisories). Pinned to the latest 3.x.
 overrides:
-  dompurify: ^3.4.9
+  dompurify: ^3.4.17

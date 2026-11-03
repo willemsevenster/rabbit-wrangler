@@ -11,12 +11,14 @@ TypeScript.
 
 ## Commands
 
-This project uses **pnpm** (not npm/yarn). Build scripts for `electron` and
-`esbuild` are allow-listed in `pnpm-workspace.yaml` — pnpm blocks postinstall
-scripts by default, and Electron needs its to download the binary.
+This project uses **pnpm** (not npm/yarn). Build scripts for `esbuild` and
+`electron-winstaller` are allow-listed under `allowBuilds` in
+`pnpm-workspace.yaml` — pnpm blocks postinstall scripts by default. Electron
+(≥ 45) has no install script: it downloads its binary lazily on first use
+(`pnpm dev`, the driver, or `node node_modules/electron/install.js`).
 
 ```sh
-pnpm install         # also downloads the Electron binary via allowed build scripts
+pnpm install         # runs the allow-listed build scripts (esbuild, electron-winstaller)
 pnpm dev             # launch app with HMR (electron-vite dev)
 pnpm build           # typecheck + bundle all three targets to out/
 pnpm typecheck       # both projects: typecheck:node + typecheck:web
@@ -35,7 +37,7 @@ pnpm build:win       # package installer via electron-builder (also :mac / :linu
   `.claude/skills/run-rabbit-wrangler/driver.mjs`.
 - **Docs site** (`docs/`, VitePress) is an **isolated pnpm project** — its own
   `package.json` + `pnpm-lock.yaml` + `pnpm-workspace.yaml`, so VitePress's Vite 5 /
-  esbuild never enters the app's tree (the app caps Vite at 7). Run it via the root
+  esbuild never enters the app's tree (the app is on Vite 8 / Rolldown). Run it via the root
   proxy scripts: `pnpm docs:install` (first time; uses `--ignore-scripts` — esbuild's
   binary ships via its optional dep), then `pnpm docs:dev` / `docs:build` / `docs:preview`.
   ESLint ignores `docs/`. The site auto-deploys to GitHub Pages on push to `main`
@@ -436,16 +438,27 @@ Key behavior below.
   renderer bundles everything.
 - **Dependency version ceilings** (don't blindly `pnpm up --latest` past these —
   the chain breaks):
-  - `vite` is capped at **7.x** by `electron-vite` 5 (its peer is `vite <8`).
-  - `@vitejs/plugin-react` is capped at **5.x** because 6.x requires Vite 8.
-  - `eslint` is capped at **9.x** because `eslint-plugin-react` (latest 7.37)
-    crashes on ESLint 10 (removed context API). Revisit when that plugin ships
-    ESLint 10 support.
+  - `eslint` / `@eslint/js` are capped at **9.x** because `eslint-plugin-react`
+    (latest 7.37, peer `eslint ^9.7`) crashes on ESLint 10 (removed context API).
+    Revisit when that plugin ships ESLint 10 support.
+  - `typescript` is capped at **6.x** because `typescript-eslint` 8 peers on
+    `typescript <6.1`. Revisit for TypeScript 7 when typescript-eslint supports it.
+  - `@types/node` should track the **Node bundled in Electron** (Electron 45 →
+    Node 24), not the latest `@types/node` major.
+  - `@vscode/codicons`'s `latest` dist-tag points at a prerelease (`0.0.46-NN`);
+    stay on the last stable until a real `0.0.46` ships.
   - `amqplib` 2.x ships its **own** types — there is no `@types/amqplib` (adding
     it back will conflict).
-  - pnpm blocks dependency build scripts by default; `electron`, `esbuild`, and
-    `electron-winstaller` are allow-listed in `pnpm-workspace.yaml`. A new dep
-    that needs a postinstall (e.g. a native module) must be added there.
+  - **Electron 45 removed `clipboard` from renderer/preload** — importing it in
+    the preload makes the whole preload fail to load (`window.api` undefined).
+    Clipboard writes go through main (`IPC.copyText`). Run the driver after any
+    Electron major bump: a broken preload still passes typecheck + build.
+  - **monaco-editor ≥ 0.57** has an `exports` map: import workers as
+    `monaco-editor/editor/editor.worker?worker`, not `monaco-editor/esm/vs/...`.
+  - pnpm blocks dependency build scripts by default; `esbuild` and
+    `electron-winstaller` are allow-listed under `allowBuilds` in
+    `pnpm-workspace.yaml`. A new dep that needs a postinstall (e.g. a native
+    module) must be added there.
 - The preload's `contextIsolation: false` fallback branch references `window`,
   which isn't in the node typecheck lib — hence the `@ts-expect-error` lines.
   That branch is dead in this app (isolation is on); don't "fix" it by removing

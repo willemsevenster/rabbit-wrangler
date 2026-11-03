@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain } from 'electron'
+import { app, BrowserWindow, clipboard, ipcMain } from 'electron'
 import { IPC } from '@shared/ipc'
 import {
   checkForUpdates,
@@ -305,4 +305,5 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(IPC.quitAndInstall, () => quitAndInstall())
   ipcMain.handle(IPC.getUpdatePrefs, () => ({ autoDownload: getAutoDownloadUpdates() }))
   ipcMain.handle(IPC.setAutoDownload, (_e, enabled: boolean) => setAutoDownloadUpdates(enabled))
+  ipcMain.handle(IPC.copyText, (_e, text: string) => clipboard.writeText(text))
 }

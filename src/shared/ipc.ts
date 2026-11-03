@@ -145,7 +145,8 @@ export const IPC = {
   downloadUpdate: 'update:download',
   quitAndInstall: 'update:install',
   getUpdatePrefs: 'update:get-prefs',
-  setAutoDownload: 'update:set-auto-download'
+  setAutoDownload: 'update:set-auto-download',
+  copyText: 'clipboard:write-text'
 } as const
 
 /** The API surface the preload exposes on `window.api`. */
@@ -289,8 +290,9 @@ export interface RabbitApi {
   /** Toggle whether available updates download automatically. */
   setAutoDownload(enabled: boolean): Promise<void>
 
-  /** Write text to the system clipboard. Handled in the preload — no IPC. */
-  copyText(text: string): void
+  /** Write text to the system clipboard. Goes through main: Electron 45 removed
+   *  the `clipboard` module from renderer/preload processes. */
+  copyText(text: string): Promise<void>
 }
 
 /** User-tunable auto-update preferences (persisted in the main process). */
