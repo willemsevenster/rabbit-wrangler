@@ -97,25 +97,31 @@ Each connected cluster (`src/main/connections/cluster-connection.ts`) owns
 When adding an operation, decide which plane it belongs to — don't reach for AMQP
 when the management API already exposes it (e.g. purge is an HTTP `DELETE`).
 
-On `connect()` the cluster also **probes the AMQP port** (`probeAmqpReachable`, a
-plain TCP connect in `rabbitmq/amqp.ts`) to pick a **message transport**: `amqp`
-(full peek + move/delete/export) or `http` (read-only browse over the management
-API, for when 5672 is firewalled). Effective transport = `browseMode === 'http' ||
-!amqpReachable ? 'http' : 'amqp'`, surfaced to the renderer on `ConnectionStatus`
+On `connect()` the cluster also **probes AMQP** (`probeAmqpReachable` in
+`rabbitmq/amqp.ts` — a full AMQP connect + graceful close, **not** a bare TCP
+connect, since a port-forward or another service on the port accepts TCP with no
+broker behind it) to pick a **message transport**: `amqp` (full peek +
+move/delete/export) or `http` (read-only browse over the management API, for when
+5672 is firewalled or doesn't answer AMQP). Effective transport = `browseMode ===
+'http' || !amqpReachable ? 'http' : 'amqp'`, surfaced to the renderer on `ConnectionStatus`
 (`transport`/`amqpAvailable`) and via `getConnectionRuntime`. See the HTTP-browse
 Key behavior below.
 
 ### Key behaviors
 
 - **Peeking is non-destructive and de-duplicated** (`rabbitmq/message-peeker.ts`):
-  a dedicated channel consumes (prefetch `PREFETCH_WINDOW`) with manual ack and
+  a dedicated channel consumes (prefetch = the **peek window**, a Settings value
+  `peekWindow`, default 20, clamp 1–1,000 via shared `PEEK_WINDOW`/`clampPeekWindow`,
+  passed on each `startPeek` and remembered per wanted queue in `ClusterConnection`
+  so resume/transport switches keep it) with manual ack and
   `nack(requeue: true)`, so nothing is consumed. Because the broker redelivers
   requeued messages forever, each message is surfaced to the UI **once** — keyed
   by a fingerprint (publisher `messageId`, else a hash of body + routing key +
   correlationId) — and already-seen messages are requeued on a throttle so a
-  static queue doesn't spin in a hot loop. Caveats baked into the file: only the
-  head `PREFETCH_WINDOW` messages are ever visible, and two payload-identical
-  messages without a `messageId` collapse into one row. One peeker per
+  static queue doesn't spin in a hot loop (the seen-requeue delay scales with the
+  window — `max(400ms, window × 20ms)` — capping redelivery at ~50 msg/s). Caveats
+  baked into the file: only the head `window` messages are ever visible, and two
+  payload-identical messages without a `messageId` collapse into one row. One peeker per
   (connection, queue), enforced by `ClusterConnection`. The peek UI
   (`MessagePeekPanel`) is a message **table**; selecting a row opens a
   resizable, persisted-height pane (`peekPaneHeight` in localStorage) with the
@@ -126,8 +132,8 @@ Key behavior below.
 - **HTTP browse mode** (`rabbitmq/http-browser.ts`, roadmap Tier 3 #11): the
   read-only fallback when the AMQP port is firewalled but the management port is
   reachable. `HttpBrowser` polls `POST /queues/{vhost}/{name}/get` (ManagementApi
-  `browseMessages`, `ackmode=reject_requeue_true`, head `BROWSE_WINDOW`) every
-  `POLL_INTERVAL_MS` and emits the **same** `peek` StreamEvent as the AMQP peeker
+  `browseMessages`, `ackmode=reject_requeue_true`, head `window` messages) every
+  `max(POLL_INTERVAL_MS, window × 25ms)` and emits the **same** `peek` StreamEvent as the AMQP peeker
   (de-duped by the shared `fingerprintOf`), so the peek UI is identical — just
   polled, not pushed. `ClusterConnection.startPeek` picks `HttpBrowser` vs
   `MessagePeeker` from `this.transport`; the `peekers` map holds either
@@ -353,7 +359,11 @@ Key behavior below.
   `store/config-store.ts` (electron-store); only currently-connected clusters
   are in the manager.
 - **Credentials**: `config-store.ts` encrypts passwords with the OS vault
-  (`safeStorage`) before persisting. `list()` returns `SafeConnectionConfig`
+  (`safeStorage`) before persisting, via the **async** API
+  (`encryptStringAsync`/`decryptStringAsync` — the sync calls are deprecated
+  since Electron 45; it reads blobs the old sync API wrote, and `get()` re-encrypts
+  when it reports `shouldReEncrypt`). So `get()`/`save()` are **async**; `list()`
+  stays sync and returns `SafeConnectionConfig`
   (no password) — only the main process ever sees plaintext via `get()`. Never
   send full `ConnectionConfig` to the renderer. On **edit** the renderer never
   receives the plaintext, so the dialog's password field starts blank;
@@ -376,7 +386,9 @@ Key behavior below.
   Settings): a store-driven modal (`settingsOpen`) mirroring the About/Confirm
   pattern. Surfaces theme, **max messages to show** (`maxMessages`, default 1000,
   clamp 10–9,999 — the per-tab peek-buffer cap; the `'peek'` reducer slices to it
-  and `setMaxMessages` trims existing buffers), **confirm-before-destructive**
+  and `setMaxMessages` trims existing buffers), **peek window** (`peekWindow`, see
+  peeking above; `setPeekWindow` Refreshes every open queue tab so the new prefetch
+  takes effect), **confirm-before-destructive**
   (`confirmDestructive` → `store.maybeConfirm` wraps purge/delete; off skips the
   prompt — connection-delete stays always-confirmed), **auto-connect on launch**
   (`autoConnectOnLaunch`; `init()` connects every saved cluster), update controls

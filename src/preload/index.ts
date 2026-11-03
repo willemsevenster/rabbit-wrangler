@@ -95,8 +95,8 @@ const api: RabbitApi = {
   createQueue: (request: CreateQueueRequest) => ipcRenderer.invoke(IPC.createQueue, request),
   deleteQueue: (request: DeleteQueueRequest) => ipcRenderer.invoke(IPC.deleteQueue, request),
 
-  startPeek: (connectionId: string, queue: string) =>
-    ipcRenderer.invoke(IPC.startPeek, connectionId, queue),
+  startPeek: (connectionId: string, queue: string, window?: number) =>
+    ipcRenderer.invoke(IPC.startPeek, connectionId, queue, window),
   stopPeek: (connectionId: string, queue: string) =>
     ipcRenderer.invoke(IPC.stopPeek, connectionId, queue),
   moveMessages: (request: MoveMessagesRequest) => ipcRenderer.invoke(IPC.moveMessages, request),

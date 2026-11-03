@@ -113,7 +113,8 @@ port `15672`, user/pass `guest`/`guest`, then peek the `rw.demo.*` queues.
 
 - **Transient by default** — queues/messages vanish on a broker restart unless you
   pass `--durable`. Use `--clean` for an explicit teardown.
-- **Peek shows the head window** — the app surfaces only the first slice of a queue
-  (see the peeker notes in `CLAUDE.md`), so a 5000-message queue won't show every row.
+- **Peek shows the head window** — the app surfaces only the first **peek window**
+  messages of a queue (Settings, default 20, max 1,000; see the peeker notes in
+  `CLAUDE.md`), so a 5000-message queue won't show every row.
 - **Stats lag** — the management API samples queue depths every ~5s, so counts can
   read stale for a moment right after seeding.

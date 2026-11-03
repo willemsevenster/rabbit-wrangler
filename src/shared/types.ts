@@ -105,6 +105,16 @@ export interface QueueInfo {
   idleSince?: string
 }
 
+/** How many head messages a queue peek holds in view at once (the AMQP prefetch /
+ * HTTP browse count). Larger windows see deeper into a queue but hold more
+ * messages unacked while peeking. A user setting; main clamps it too. */
+export const PEEK_WINDOW = { min: 1, max: 1000, default: 20 } as const
+
+export function clampPeekWindow(n: number): number {
+  if (!Number.isFinite(n)) return PEEK_WINDOW.default
+  return Math.min(PEEK_WINDOW.max, Math.max(PEEK_WINDOW.min, Math.round(n)))
+}
+
 /** A single message captured while peeking a queue. */
 export interface PeekedMessage {
   /** Stable id assigned by the peeker (delivery tag + counter). */

@@ -21,17 +21,19 @@ import type { PeekedMessage } from '@shared/types'
  *      into a slow loop instead of pegging the CPU and broker.
  *
  * Caveats (by design — see the "deduplicated live tail" choice):
- *   - Only the head `PREFETCH_WINDOW` messages are ever in view.
+ *   - Only the head `window` messages (the prefetch; a user setting) are ever in view.
  *   - Two payload-identical messages with no `messageId` collapse into one row.
  *   - The in-flight window is briefly held unacked while peeking.
  */
 
-/** How many messages are held in-flight — the visible "head window". */
-const PREFETCH_WINDOW = 20
 /** Requeue delay for a freshly-seen message — keep the feed responsive. */
 const NEW_REQUEUE_DELAY_MS = 30
-/** Requeue delay for an already-seen message — throttle the redelivery loop. */
+/** Minimum requeue delay for an already-seen message — throttle the redelivery loop. */
 const SEEN_REQUEUE_DELAY_MS = 400
+/** Per-held-message share of the seen-requeue delay. Each held message cycles
+ * once per delay, so this caps a static queue's redelivery loop at ~50 msg/s
+ * however large the window (20 → 400 ms, 500 → 10 s). */
+const SEEN_REQUEUE_MS_PER_MESSAGE = 20
 /** Bound on remembered fingerprints so a long peek can't grow unbounded. */
 const MAX_FINGERPRINTS = 10_000
 
@@ -53,6 +55,8 @@ export class MessagePeeker {
     private readonly connectionId: string,
     private readonly queue: string,
     private readonly conn: AmqpConnection,
+    /** How many messages are held in-flight (the prefetch) — the visible "head window". */
+    private readonly window: number,
     /** Called once if the broker closes our channel (queue deleted, connection
      * lost, …) so the owner can forget this peeker and a later start() works. */
     private readonly onClosed: () => void = () => undefined
@@ -73,7 +77,7 @@ export class MessagePeeker {
       this.onClosed()
     })
     try {
-      await channel.prefetch(PREFETCH_WINDOW)
+      await channel.prefetch(this.window)
       const { consumerTag } = await channel.consume(this.queue, (msg) => this.handle(msg), {
         noAck: false
       })
@@ -115,7 +119,9 @@ export class MessagePeeker {
           // channel already closed; ignore
         }
       },
-      isNew ? NEW_REQUEUE_DELAY_MS : SEEN_REQUEUE_DELAY_MS
+      isNew
+        ? NEW_REQUEUE_DELAY_MS
+        : Math.max(SEEN_REQUEUE_DELAY_MS, this.window * SEEN_REQUEUE_MS_PER_MESSAGE)
     )
     this.pending.add(timer)
   }

@@ -39,6 +39,10 @@ Each queue you open gets its own **tab**. A tab keeps peeking **in the backgroun
 
 To start fresh in a tab, use its in-tab **Refresh** — this clears the tab and re-reads from the head of the queue.
 
+## How far into a queue you can see
+
+A peek shows the messages at the **head** of the queue — by default the first **20**. To see deeper into a large queue (for example a dead-letter queue with hundreds of messages), raise the **Peek window** in [Settings](./settings) (up to **1,000**).
+
 ## How many messages are kept
 
 Each tab holds up to the **Max messages to show** limit (default **1,000**). Once a tab reaches that limit, the oldest messages drop off to make room for new ones. You can change the limit in [Settings](./settings).

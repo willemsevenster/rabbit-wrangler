@@ -41,6 +41,7 @@ import type {
   QueueInfo,
   SafeConnectionConfig
 } from '@shared/types'
+import { clampPeekWindow, PEEK_WINDOW } from '@shared/types'
 
 /** Last move destination chosen for a source queue, keyed by `${connId}:${queue}`. */
 interface MoveTarget {
@@ -225,9 +226,13 @@ interface AppState {
   searchOpen: boolean
   /** Max peeked messages retained per queue tab (oldest dropped past this). */
   maxMessages: number
+  /** How many head messages each queue peek holds in view (AMQP prefetch / HTTP count). */
+  peekWindow: number
   /** Live peeked messages per queue tab id, newest first. Kept OUT of `tabs` so a
    *  peek only re-renders that tab's table — not the tab strip, search, menus. */
   peeksByTab: Record<string, PeekedMessage[]>
+  /** Why a queue tab's live peek failed to start, per tab id (shown in the tab). */
+  peekErrors: Record<string, string>
   /** Name suffixes that mark a queue as a dead-letter queue (user-customizable). */
   dlqSuffixes: string[]
   /** Whether purge/delete prompt for confirmation first. */
@@ -379,6 +384,8 @@ interface AppState {
   openSearch(): void
   closeSearch(): void
   setMaxMessages(n: number): void
+  /** Change the peek window; re-peeks every open queue tab so it takes effect now. */
+  setPeekWindow(n: number): void
   setDlqSuffixes(suffixes: string[]): void
   setConfirmDestructive(on: boolean): void
   setAutoConnectOnLaunch(on: boolean): void
@@ -470,6 +477,11 @@ const initialMaxMessages = clampMaxMessages(
   Number(localStorage.getItem(MAX_MESSAGES_KEY)) || MAX_MESSAGES_DEFAULT
 )
 
+const PEEK_WINDOW_KEY = 'rw.peekWindow'
+const initialPeekWindow = clampPeekWindow(
+  Number(localStorage.getItem(PEEK_WINDOW_KEY)) || PEEK_WINDOW.default
+)
+
 const DLQ_SUFFIXES_KEY = 'rw.dlqSuffixes'
 function loadDlqSuffixes(): string[] {
   try {
@@ -553,7 +565,9 @@ export const useAppStore = create<AppState>((set, get) => ({
   settingsOpen: false,
   searchOpen: false,
   maxMessages: initialMaxMessages,
+  peekWindow: initialPeekWindow,
   peeksByTab: {},
+  peekErrors: {},
   dlqSuffixes: loadDlqSuffixes(),
   confirmDestructive: initialConfirmDestructive,
   autoConnectOnLaunch: initialAutoConnect,
@@ -776,7 +790,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       activeTabId: id,
       peeksByTab: { ...get().peeksByTab, [id]: freshBuffer(id) }
     })
-    void window.api.startPeek(connectionId, queue)
+    void startTabPeek(connectionId, queue)
   },
 
   openAllQueueTabs(connectionId) {
@@ -809,7 +823,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       activeTabId: newTabs[newTabs.length - 1].id,
       peeksByTab: buffers
     })
-    for (const name of toPeek) void window.api.startPeek(connectionId, name)
+    for (const name of toPeek) void startTabPeek(connectionId, name)
   },
 
   closeAllQueueTabs(connectionId) {
@@ -1203,7 +1217,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         peeksByTab: { ...get().peeksByTab, [id]: freshBuffer(id) }
       })
       await window.api.stopPeek(tab.connectionId, tab.queue)
-      await window.api.startPeek(tab.connectionId, tab.queue)
+      await startTabPeek(tab.connectionId, tab.queue)
     } else if (tab.kind === 'exchange') {
       await get().refreshExchanges(tab.connectionId)
       try {
@@ -1445,7 +1459,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
     // Resume the live peek of the now-empty queue if its tab is open.
     if (get().tabs.some((t) => t.id === queueTabId(cid, queue))) {
-      void window.api.startPeek(cid, queue)
+      void startTabPeek(cid, queue)
     }
     return result
   },
@@ -1565,7 +1579,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     // have been closed during the export (its peeker shutdown is driven by tab
     // close), so a stale "was open" flag would orphan a peeker with no tab.
     if (get().tabs.some((t) => t.id === queueTabId(cid, queue))) {
-      void window.api.startPeek(cid, queue)
+      void startTabPeek(cid, queue)
     }
   },
 
@@ -1770,6 +1784,16 @@ export const useAppStore = create<AppState>((set, get) => ({
     })
   },
 
+  setPeekWindow(n) {
+    const peekWindow = clampPeekWindow(n)
+    if (peekWindow === get().peekWindow) return
+    localStorage.setItem(PEEK_WINDOW_KEY, String(peekWindow))
+    set({ peekWindow })
+    // A live peek's prefetch is fixed, so restart each open queue tab's peek with the
+    // new window (Refresh also clears its buffer, so rows aren't surfaced twice).
+    for (const t of get().tabs) if (t.kind === 'queue') void get().refreshTab(t.id)
+  },
+
   setDlqSuffixes(suffixes) {
     // Normalize: trim, drop blanks, de-dupe (case-insensitive); fall back to defaults.
     const seen = new Set<string>()
@@ -1914,6 +1938,34 @@ function stopTabPeek(tab: EditorTab): void {
   if (tab.kind === 'queue') void window.api.stopPeek(tab.connectionId, tab.queue)
 }
 
+/** Start a queue tab's live peek. A failure (AMQP unreachable, bad credentials,
+ * TLS mismatch, access refused, …) is recorded in `peekErrors` and shown in the
+ * tab — otherwise the table would just sit on "Waiting for messages…". */
+async function startTabPeek(connectionId: string, queue: string): Promise<void> {
+  const tid = queueTabId(connectionId, queue)
+  setPeekError(tid, null)
+  try {
+    await window.api.startPeek(connectionId, queue, useAppStore.getState().peekWindow)
+  } catch (err) {
+    if (useAppStore.getState().tabs.some((t) => t.id === tid)) setPeekError(tid, ipcError(err))
+  }
+}
+
+function setPeekError(tabId: string, error: string | null): void {
+  const { peekErrors } = useAppStore.getState()
+  if (error === null && !(tabId in peekErrors)) return
+  const next = { ...peekErrors }
+  if (error === null) delete next[tabId]
+  else next[tabId] = error
+  useAppStore.setState({ peekErrors: next })
+}
+
+/** An `ipcRenderer.invoke` rejection, minus Electron's "Error invoking remote method" wrapper. */
+function ipcError(err: unknown): string {
+  const msg = err instanceof Error ? err.message : String(err)
+  return msg.replace(/^Error invoking remote method '[^']*': (?:\w*Error: )?/, '')
+}
+
 /** Reset a queue tab's accumulated context (peeks/unread/selection). */
 function clearQueueTab(tabs: EditorTab[], tabId: string): EditorTab[] {
   return tabs.map((t) =>
@@ -1992,7 +2044,7 @@ function afterSourceMutated(
       tabs: clearQueueTab(get().tabs, tid),
       peeksByTab: { ...get().peeksByTab, [tid]: freshBuffer(tid) }
     })
-    void window.api.startPeek(connectionId, sourceQueue)
+    void startTabPeek(connectionId, sourceQueue)
   }
 }
 
@@ -2042,7 +2094,7 @@ function applyStreamEvents(
   }
   if (arrivals.size === 0) return
 
-  const { tabs, activeTabId, maxMessages, peeksByTab } = get()
+  const { tabs, activeTabId, maxMessages, peeksByTab, peekErrors } = get()
   const open = new Set(tabs.filter((t) => t.kind === 'queue').map((t) => t.id))
   // Rebuild from open tabs only, which also drops buffers of closed tabs.
   const buffers: Record<string, PeekedMessage[]> = {}
@@ -2053,8 +2105,16 @@ function applyStreamEvents(
     buffers[tid] = [...msgs.reverse(), ...buffers[tid]].slice(0, maxMessages)
     if (tid !== activeTabId) unreadBump.set(tid, msgs.length)
   }
+  // A message arriving means the peek is live (e.g. resumed after a failed start).
+  const healed = [...arrivals.keys()].filter((tid) => tid in peekErrors)
+  let errors = peekErrors
+  if (healed.length > 0) {
+    errors = { ...peekErrors }
+    for (const tid of healed) delete errors[tid]
+  }
   set({
     peeksByTab: buffers,
+    peekErrors: errors,
     ...(unreadBump.size > 0
       ? {
           tabs: tabs.map((t) =>
