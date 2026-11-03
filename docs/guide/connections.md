@@ -42,8 +42,10 @@ Rabbit Wrangler reads messages two ways, and picks the best one for each broker:
 
 **How the mode is chosen:**
 
-- On connect, Rabbit Wrangler probes the AMQP port. **If it's unreachable, HTTP
-  browse is used automatically** — there's nothing to configure.
+- On connect, Rabbit Wrangler opens (and cleanly closes) a test AMQP connection.
+  **If that fails — the port is firewalled, a port-forward isn't reaching the
+  broker, or something other than RabbitMQ answers on it — HTTP browse is used
+  automatically**; there's nothing to configure.
 - If the AMQP port **is** reachable, the **Message browsing** setting decides:
   **Auto** uses AMQP (the most capable mode); **HTTP browse only** forces HTTP even
   though AMQP would work.

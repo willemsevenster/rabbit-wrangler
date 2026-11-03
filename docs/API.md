@@ -38,7 +38,7 @@ Defined in [`src/shared/ipc.ts`](../src/shared/ipc.ts), bridged in
 | `listConnections(): Promise<SafeConnectionConfig[]>`                  | `connections:list`       | `config-store`       | Returns configs **without** passwords.                         |
 | `saveConnection(config: ConnectionConfig): Promise<SafeConnectionConfig>` | `connections:save`       | `config-store`       | Password encrypted via OS vault (`safeStorage`).               |
 | `deleteConnection(id: string): Promise<void>`                         | `connections:delete`     | registry + store     | Disconnects first, then removes the saved config.              |
-| `connect(id: string): Promise<void>`                                  | `connections:connect`    | `connection-manager` | Verifies the management endpoint (`/whoami`), probes the AMQP port to pick the transport; AMQP stays lazy. |
+| `connect(id: string): Promise<void>`                                  | `connections:connect`    | `connection-manager` | Verifies the management endpoint (`/whoami`), probes AMQP (full handshake + clean close) to pick the transport; AMQP stays lazy. |
 | `disconnect(id: string): Promise<void>`                               | `connections:disconnect` | `connection-manager` | Disposes peekers + AMQP connection. |
 | `getConnectionRuntime(id: string): Promise<ConnectionRuntime>`        | `connections:runtime`    | `connection-manager` | AMQP availability + effective transport (`amqp`/`http`). |
 | `setBrowseMode(id: string, mode: BrowseMode): Promise<ConnectionRuntime>` | `connections:set-browse-mode` | `connection-manager` | Switch browse mode live (no reconnect); persists the preference. |

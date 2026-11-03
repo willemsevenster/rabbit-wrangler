@@ -97,11 +97,13 @@ Each connected cluster (`src/main/connections/cluster-connection.ts`) owns
 When adding an operation, decide which plane it belongs to — don't reach for AMQP
 when the management API already exposes it (e.g. purge is an HTTP `DELETE`).
 
-On `connect()` the cluster also **probes the AMQP port** (`probeAmqpReachable`, a
-plain TCP connect in `rabbitmq/amqp.ts`) to pick a **message transport**: `amqp`
-(full peek + move/delete/export) or `http` (read-only browse over the management
-API, for when 5672 is firewalled). Effective transport = `browseMode === 'http' ||
-!amqpReachable ? 'http' : 'amqp'`, surfaced to the renderer on `ConnectionStatus`
+On `connect()` the cluster also **probes AMQP** (`probeAmqpReachable` in
+`rabbitmq/amqp.ts` — a full AMQP connect + graceful close, **not** a bare TCP
+connect, since a port-forward or another service on the port accepts TCP with no
+broker behind it) to pick a **message transport**: `amqp` (full peek +
+move/delete/export) or `http` (read-only browse over the management API, for when
+5672 is firewalled or doesn't answer AMQP). Effective transport = `browseMode ===
+'http' || !amqpReachable ? 'http' : 'amqp'`, surfaced to the renderer on `ConnectionStatus`
 (`transport`/`amqpAvailable`) and via `getConnectionRuntime`. See the HTTP-browse
 Key behavior below.
 
