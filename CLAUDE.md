@@ -359,7 +359,11 @@ Key behavior below.
   `store/config-store.ts` (electron-store); only currently-connected clusters
   are in the manager.
 - **Credentials**: `config-store.ts` encrypts passwords with the OS vault
-  (`safeStorage`) before persisting. `list()` returns `SafeConnectionConfig`
+  (`safeStorage`) before persisting, via the **async** API
+  (`encryptStringAsync`/`decryptStringAsync` — the sync calls are deprecated
+  since Electron 45; it reads blobs the old sync API wrote, and `get()` re-encrypts
+  when it reports `shouldReEncrypt`). So `get()`/`save()` are **async**; `list()`
+  stays sync and returns `SafeConnectionConfig`
   (no password) — only the main process ever sees plaintext via `get()`. Never
   send full `ConnectionConfig` to the renderer. On **edit** the renderer never
   receives the plaintext, so the dialog's password field starts blank;
