@@ -2122,3 +2122,10 @@ body.resizing .msg-detail__resizer {
   font-size: 10px;
   font-family: 'Cascadia Code', ui-monospace, monospace;
 }
+
+/* virtualizer padding rows above/below the rendered slice of the peek table */
+.msg-table tbody tr.msg-table__spacer,
+.msg-table tbody tr.msg-table__spacer:hover {
+  cursor: default;
+  background: none;
+}

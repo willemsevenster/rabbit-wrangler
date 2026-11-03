@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import { eventBus } from '../event-bus'
 import { fingerprintOf } from './fingerprint'
 import type { ManagementApi, RawGetMessage } from './management-api'
@@ -31,6 +32,8 @@ export class HttpBrowser {
   private timer: ReturnType<typeof setInterval> | null = null
   private inFlight = false
   private counter = 0
+  /** Keeps ids unique across browser restarts on the same queue (see MessagePeeker). */
+  private readonly session = randomUUID().slice(0, 8)
   /** Fingerprints already surfaced to the UI (insertion-ordered for eviction). */
   private readonly seen = new Set<string>()
 
@@ -71,7 +74,7 @@ export class HttpBrowser {
     const isBinary = raw.payload_encoding === 'base64'
     const { headers, ...properties } = (raw.properties ?? {}) as Record<string, unknown>
     const peeked: PeekedMessage = {
-      id: `${this.connectionId}:${this.queue}:http:${this.counter++}`,
+      id: `${this.connectionId}:${this.queue}:http:${this.session}:${this.counter++}`,
       fingerprint,
       connectionId: this.connectionId,
       queue: this.queue,

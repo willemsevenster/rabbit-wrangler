@@ -57,7 +57,7 @@ rails that destructive RabbitMQ operations deserve.
 
 ### Prerequisites
 
-- **Node.js 20+**
+- **Node.js 22.12+** (required by Electron 45)
 - **[pnpm](https://pnpm.io/)** — this project uses pnpm, not npm/yarn (build
   scripts for `electron`/`esbuild` are allow-listed in `pnpm-workspace.yaml`).
 - A **RabbitMQ** broker with the **management plugin** enabled (HTTP API on port

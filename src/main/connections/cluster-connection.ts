@@ -62,12 +62,39 @@ const HTTP_ONLY_ERROR =
  */
 /** How often connected clusters re-poll queue stats and push them to the UI. */
 const STATS_POLL_INTERVAL_MS = 4000
+/** Delay before re-opening AMQP and resuming peeks after the connection drops. */
+const PEEK_RESUME_DELAY_MS = 2000
+/** Cap for the resume retry backoff while the broker stays unreachable. */
+const PEEK_RESUME_MAX_DELAY_MS = 30_000
+
+/** A peek failure that retrying can't fix — the queue is gone or inaccessible
+ * (AMQP 404 NOT_FOUND / 403 ACCESS_REFUSED), as opposed to a connection problem. */
+function isTerminalPeekError(err: unknown): boolean {
+  const code = (err as { code?: unknown } | null)?.code
+  if (code === 404 || code === 403) return true
+  const msg = err instanceof Error ? err.message : String(err)
+  return /NOT_FOUND|ACCESS_REFUSED/.test(msg)
+}
 
 export class ClusterConnection {
   readonly api: ManagementApi
   private amqp: AmqpConnection | null = null
+  /** In-flight AMQP connect, shared so concurrent callers open ONE connection. */
+  private amqpOpening: Promise<AmqpConnection> | null = null
   private state: ConnectionState = 'disconnected'
   private readonly peekers = new Map<string, QueueBrowser>()
+  /** Tail of each queue's start/stop chain. Peek starts and stops for one queue
+   * run strictly in call order, so e.g. close+reopen of a tab while its first
+   * peek is still starting stops that peek and then starts a fresh one. */
+  private readonly peekOps = new Map<string, Promise<void>>()
+  /** Queues the UI wants peeked (startPeek..stopPeek), independent of whether a
+   * browser is alive right now — what to resume after the AMQP connection drops
+   * (closing the connection tears the peekers' channels down first). */
+  private readonly wantedPeeks = new Set<string>()
+  private resumeTimer: ReturnType<typeof setTimeout> | null = null
+  /** Consecutive failed resume attempts, for the retry backoff. */
+  private resumeAttempts = 0
+  private disposed = false
   private statsTimer: ReturnType<typeof setInterval> | null = null
   /** User preference for how to browse messages (persisted on the config). */
   private browseMode: BrowseMode
@@ -137,11 +164,27 @@ export class ClusterConnection {
     this.browseMode = mode
     const next = this.resolveTransport()
     if (next !== this.transport) {
-      const active = [...this.peekers.keys()]
-      await Promise.all([...this.peekers.values()].map((p) => p.stop()))
-      this.peekers.clear()
+      // Stop the current browsers through each queue's start/stop chain (so we
+      // don't race a start/stop in flight), keeping `wantedPeeks` intact.
+      await Promise.all(
+        [...this.peekers.keys()].map((queue) =>
+          this.serialize(queue, async () => {
+            const browser = this.peekers.get(queue)
+            if (!browser) return
+            this.peekers.delete(queue)
+            await browser.stop()
+          })
+        )
+      )
       this.transport = next
-      for (const queue of active) await this.startPeek(queue)
+      // Restart every wanted queue in the new transport. One that can't restart
+      // (e.g. deleted meanwhile) just isn't peeked — it must not abort the switch
+      // and leave the others half-switched with the IPC call reporting failure.
+      await Promise.all(
+        [...this.wantedPeeks].map((queue) =>
+          this.startPeek(queue, { onlyIfWanted: true }).catch(() => undefined)
+        )
+      )
     }
     // Re-broadcast the (possibly) new transport without changing the actual
     // connection state — never force it to 'connected'.
@@ -185,16 +228,86 @@ export class ClusterConnection {
     this.statsTimer = setInterval(() => void poll(), STATS_POLL_INTERVAL_MS)
   }
 
-  /** Opens (or reuses) the AMQP connection used for message operations. */
-  private async amqpConnection(): Promise<AmqpConnection> {
-    if (this.amqp) return this.amqp
-    const conn = await connectAmqp(this.config)
-    conn.on('close', () => {
-      this.amqp = null
-    })
-    conn.on('error', (err: Error) => this.setState('error', err.message))
-    this.amqp = conn
-    return conn
+  /** Opens (or reuses) the AMQP connection used for message operations. Concurrent
+   * callers (e.g. "open all queue tabs") share one in-flight connect. */
+  private amqpConnection(): Promise<AmqpConnection> {
+    if (this.amqp) return Promise.resolve(this.amqp)
+    if (!this.amqpOpening) {
+      this.amqpOpening = connectAmqp(this.config)
+        .then((conn) => {
+          conn.on('close', () => this.onAmqpClosed(conn))
+          conn.on('error', (err: Error) => this.setState('error', err.message))
+          this.amqp = conn
+          return conn
+        })
+        .finally(() => {
+          this.amqpOpening = null
+        })
+    }
+    return this.amqpOpening
+  }
+
+  /** The AMQP connection dropped: its peekers are dead. Forget them and, unless
+   * we're shutting down, reopen AMQP and resume the wanted peeks shortly after. */
+  private onAmqpClosed(conn: AmqpConnection): void {
+    if (this.amqp !== conn) return
+    this.amqp = null
+    for (const [queue, p] of this.peekers) {
+      if (p instanceof MessagePeeker) this.peekers.delete(queue)
+    }
+    this.resumeAttempts = 0
+    this.scheduleResume()
+  }
+
+  /** Retry resuming the wanted peeks, backing off while the broker is unreachable. */
+  private scheduleResume(): void {
+    if (this.disposed || this.transport !== 'amqp' || this.wantedPeeks.size === 0) return
+    if (this.resumeTimer) clearTimeout(this.resumeTimer)
+    const delay = Math.min(
+      PEEK_RESUME_DELAY_MS * 2 ** this.resumeAttempts,
+      PEEK_RESUME_MAX_DELAY_MS
+    )
+    this.resumeTimer = setTimeout(() => {
+      this.resumeTimer = null
+      void this.resumePeeks()
+    }, delay)
+  }
+
+  private async resumePeeks(): Promise<void> {
+    const dropped: string[] = []
+    let transientError: string | null = null
+    for (const queue of [...this.wantedPeeks]) {
+      // Re-check each time: a tab may have closed (stopPeek), or we may have been
+      // disposed / switched to HTTP browse, while an earlier resume was awaiting.
+      if (this.disposed || this.transport !== 'amqp') return
+      if (!this.wantedPeeks.has(queue)) continue
+      try {
+        await this.startPeek(queue, { onlyIfWanted: true })
+      } catch (err) {
+        const reason = err instanceof Error ? err.message : String(err)
+        if (isTerminalPeekError(err)) {
+          dropped.push(queue) // queue deleted meanwhile — startPeek stopped wanting it
+        } else {
+          // Broker still unreachable: keep every wanted queue and retry later.
+          transientError = reason
+          break
+        }
+      }
+    }
+    if (this.disposed || this.transport !== 'amqp') return
+    if (transientError !== null) {
+      this.resumeAttempts++
+      this.setState('error', `AMQP connection lost; retrying to resume peeking: ${transientError}`)
+      this.scheduleResume()
+      return
+    }
+    this.resumeAttempts = 0
+    if (dropped.length > 0) {
+      this.setState('error', `Stopped peeking ${dropped.join(', ')}: the queue no longer exists.`)
+    } else if (this.state === 'error') {
+      // Clear the error the dropped connection reported, now that peeks are back.
+      this.setState('connected')
+    }
   }
 
   async getOverview(): Promise<ClusterOverview> {
@@ -362,22 +475,63 @@ export class ClusterConnection {
     return this.api.deleteQueue(req)
   }
 
-  async startPeek(queue: string): Promise<void> {
-    if (this.peekers.has(queue)) return
+  /** Start peeking a queue (no-op if already live). `onlyIfWanted` is for resume:
+   * skip it if a stopPeek queued ahead of us means the tab has since closed. */
+  startPeek(queue: string, opts: { onlyIfWanted?: boolean } = {}): Promise<void> {
+    return this.serialize(queue, async () => {
+      if (opts.onlyIfWanted && !this.wantedPeeks.has(queue)) return
+      this.wantedPeeks.add(queue)
+      if (this.peekers.has(queue)) return
+      await this.openBrowser(queue)
+    })
+  }
+
+  /** Run `op` after every earlier start/stop for this queue has settled; the
+   * caller gets `op`'s own result (and failure). */
+  private serialize(queue: string, op: () => Promise<void>): Promise<void> {
+    const previous = this.peekOps.get(queue) ?? Promise.resolve()
+    const result = previous.then(op)
+    const tail = result.catch(() => undefined)
+    this.peekOps.set(queue, tail)
+    void tail.then(() => {
+      if (this.peekOps.get(queue) === tail) this.peekOps.delete(queue)
+    })
+    return result
+  }
+
+  private async openBrowser(queue: string): Promise<void> {
     // HTTP mode polls the management API; AMQP mode opens a live nack/requeue consumer.
     const browser: QueueBrowser =
       this.transport === 'http'
         ? new HttpBrowser(this.config.id, queue, this.api)
-        : new MessagePeeker(this.config.id, queue, await this.amqpConnection())
+        : new MessagePeeker(this.config.id, queue, await this.amqpConnection(), () => {
+            // Broker closed the channel (queue deleted, ...): forget it so a later
+            // startPeek can open a fresh one.
+            if (this.peekers.get(queue) === browser) this.peekers.delete(queue)
+          })
     this.peekers.set(queue, browser)
-    await browser.start()
+    try {
+      await browser.start()
+    } catch (err) {
+      // e.g. the queue doesn't exist — don't leave a dead browser registered. Only
+      // a terminal failure stops wanting the queue; a connection failure keeps it
+      // so a resume can pick it up.
+      if (this.peekers.get(queue) === browser) this.peekers.delete(queue)
+      if (isTerminalPeekError(err)) this.wantedPeeks.delete(queue)
+      await browser.stop().catch(() => undefined)
+      throw err
+    }
   }
 
-  async stopPeek(queue: string): Promise<void> {
-    const peeker = this.peekers.get(queue)
-    if (!peeker) return
-    await peeker.stop()
-    this.peekers.delete(queue)
+  stopPeek(queue: string): Promise<void> {
+    // Queued behind any start in flight, so we stop the browser it registers.
+    return this.serialize(queue, async () => {
+      this.wantedPeeks.delete(queue)
+      const peeker = this.peekers.get(queue)
+      if (!peeker) return
+      this.peekers.delete(queue)
+      await peeker.stop()
+    })
   }
 
   async moveMessages(req: MoveMessagesRequest): Promise<OperationResult> {
@@ -401,21 +555,32 @@ export class ClusterConnection {
     return deleteMessage(await this.amqpConnection(), req)
   }
 
-  async exportMessages(req: ExportMessagesRequest): Promise<ExportedMessage[]> {
+  async exportMessages(
+    req: ExportMessagesRequest,
+    sink: (record: ExportedMessage) => Promise<void>
+  ): Promise<number> {
     // The drain-to-file path is AMQP-only; the UI also hides it in HTTP mode.
     if (this.transport === 'http') throw new Error(HTTP_ONLY_ERROR)
     // Release the peeker so its held messages are ready to be read (like move).
     await this.stopPeek(req.queue)
-    return exportMessages(await this.amqpConnection(), req)
+    return exportMessages(await this.amqpConnection(), req, sink)
   }
 
   async dispose(): Promise<void> {
+    this.disposed = true
     if (this.statsTimer) {
       clearInterval(this.statsTimer)
       this.statsTimer = null
     }
+    if (this.resumeTimer) {
+      clearTimeout(this.resumeTimer)
+      this.resumeTimer = null
+    }
+    await Promise.all(this.peekOps.values())
     await Promise.all([...this.peekers.values()].map((p) => p.stop()))
     this.peekers.clear()
+    // A connect still in flight would otherwise outlive us — wait for it, then close.
+    await this.amqpOpening?.catch(() => undefined)
     if (this.amqp) {
       await this.amqp.close().catch(() => undefined)
       this.amqp = null

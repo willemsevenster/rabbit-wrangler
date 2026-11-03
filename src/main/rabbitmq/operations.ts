@@ -7,10 +7,31 @@ import type {
   OperationResult
 } from '@shared/types'
 import { fingerprintOf } from './fingerprint'
-import type { AmqpConnection } from './amqp'
+import { encodePayload } from './payload'
+import type { AmqpChannel, AmqpConnection } from './amqp'
 
 type ConfirmChannel = Awaited<ReturnType<AmqpConnection['createConfirmChannel']>>
 type GetMsg = Exclude<Awaited<ReturnType<ConfirmChannel['get']>>, false>
+
+/**
+ * Listen for the channel's 'error' event (an unhandled one would throw in the
+ * main process — e.g. publishing to a missing exchange, or `get` on a deleted
+ * queue, makes the broker close the channel). The pending operation rejects on
+ * its own; this keeps the broker's reason so we can report it instead of a
+ * generic "channel closed".
+ */
+function trackChannelError(channel: AmqpChannel | ConfirmChannel): () => string | undefined {
+  let reason: string | undefined
+  channel.on('error', (err: Error) => {
+    reason = err.message
+  })
+  return () => reason
+}
+
+/** Prefer the broker's channel-close reason over the generic rejection. */
+function errorMessage(err: unknown, channelError: () => string | undefined): string {
+  return channelError() ?? (err instanceof Error ? err.message : String(err))
+}
 
 /**
  * Destructive, message-level operations performed over AMQP.
@@ -32,6 +53,7 @@ export async function moveMessages(
   req: MoveMessagesRequest
 ): Promise<OperationResult> {
   const channel = await conn.createConfirmChannel()
+  const channelError = trackChannelError(channel)
   let affected = 0
   let returned = false
   channel.on('return', () => {
@@ -71,7 +93,7 @@ export async function moveMessages(
     }
     return { ok: true, affected }
   } catch (err) {
-    return { ok: false, affected, error: err instanceof Error ? err.message : String(err) }
+    return { ok: false, affected, error: errorMessage(err, channelError) }
   } finally {
     await channel.close().catch(() => undefined)
   }
@@ -94,6 +116,7 @@ async function findAndAct(
   act: (channel: ConfirmChannel, msg: GetMsg) => Promise<OperationResult>
 ): Promise<OperationResult> {
   const channel = await conn.createConfirmChannel()
+  const channelError = trackChannelError(channel)
   const held: GetMsg[] = []
   const requeueHeld = (): void => {
     for (const h of held) {
@@ -123,7 +146,7 @@ async function findAndAct(
     }
   } catch (err) {
     requeueHeld()
-    return { ok: false, affected: 0, error: err instanceof Error ? err.message : String(err) }
+    return { ok: false, affected: 0, error: errorMessage(err, channelError) }
   } finally {
     await channel.close().catch(() => undefined)
   }
@@ -174,54 +197,52 @@ export async function deleteMessage(
 }
 
 /**
- * Read all currently-ready messages from a queue WITHOUT consuming them: each is
- * fetched with manual ack and held unacked; closing the channel requeues every
- * one (the broker requeues unacked on channel close), so the queue is unchanged.
+ * Read all currently-ready messages from a queue WITHOUT consuming them, handing
+ * each record to `sink` as it arrives (so a huge queue is streamed to disk, not
+ * collected in memory). Every message is fetched with manual ack and left
+ * unacked; at the end one `nackAll(requeue)` puts them all back (and the broker
+ * requeues anything still unacked on channel close), so the queue is unchanged.
  * Same non-destructive contract as peek/move — only ready messages are visible,
- * so callers stop the peeker first.
+ * so callers stop the peeker first. Resolves to the number of records exported.
  */
 export async function exportMessages(
   conn: AmqpConnection,
-  req: ExportMessagesRequest
-): Promise<ExportedMessage[]> {
+  req: ExportMessagesRequest,
+  sink: (record: ExportedMessage) => Promise<void> | void
+): Promise<number> {
   const channel = await conn.createChannel()
-  const held: GetMsg[] = []
-  const out: ExportedMessage[] = []
+  const channelError = trackChannelError(channel)
+  let count = 0
   // undefined = export all; 0 = export none; negatives clamp to 0.
   const limit = req.limit === undefined ? Infinity : Math.max(0, req.limit)
   try {
-    while (out.length < limit) {
+    while (count < limit) {
       const msg = await channel.get(req.queue, { noAck: false })
       if (msg === false) break // queue drained of ready messages
-      held.push(msg)
-      const binary = !isUtf8(msg.content)
+      const { payload, isBinary } = encodePayload(msg.content)
       const { headers, ...properties } = msg.properties
-      out.push({
+      await sink({
         exchange: msg.fields.exchange,
         routingKey: msg.fields.routingKey,
         redelivered: msg.fields.redelivered,
         properties: properties as Record<string, unknown>,
         headers: (headers as Record<string, unknown>) ?? {},
-        payload: binary ? msg.content.toString('base64') : msg.content.toString('utf8'),
-        payloadEncoding: binary ? 'base64' : 'string',
+        payload,
+        payloadEncoding: isBinary ? 'base64' : 'string',
         fingerprint: fingerprintOf(msg)
       })
+      count++
     }
-    return out
+    return count
+  } catch (err) {
+    throw new Error(errorMessage(err, channelError))
   } finally {
-    // Requeue everything we held, then close (close also requeues any stragglers).
-    for (const h of held) {
-      try {
-        channel.nack(h, false, true)
-      } catch {
-        // channel closing — broker requeues unacked anyway
-      }
+    // Requeue everything we pulled, then close (close also requeues stragglers).
+    try {
+      channel.nackAll(true)
+    } catch {
+      // channel closing — broker requeues unacked anyway
     }
     await channel.close().catch(() => undefined)
   }
-}
-
-/** Best-effort check that a buffer is valid UTF-8 (so we don't mangle binaries). */
-function isUtf8(buf: Buffer): boolean {
-  return Buffer.compare(Buffer.from(buf.toString('utf8'), 'utf8'), buf) === 0
 }

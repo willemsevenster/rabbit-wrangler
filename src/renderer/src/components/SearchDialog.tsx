@@ -24,6 +24,7 @@ export function SearchDialog() {
 function SearchModal() {
   const close = useAppStore((s) => s.closeSearch)
   const tabs = useAppStore((s) => s.tabs)
+  const peeksByTab = useAppStore((s) => s.peeksByTab)
   const statuses = useAppStore((s) => s.statuses)
   const openMoveDialog = useAppStore((s) => s.openMoveDialog)
   const deleteMessage = useAppStore((s) => s.deleteMessage)
@@ -59,12 +60,13 @@ function SearchModal() {
   }, [close])
 
   // Every peeked message across all open queue tabs, newest first. Haystacks are
-  // precomputed here (depends only on `tabs`) so filtering per keystroke is cheap.
+  // precomputed here (depends only on the peek buffers) so filtering per keystroke
+  // is cheap.
   const rows = useMemo<SearchRow[]>(() => {
     const all: SearchRow[] = []
     for (const t of tabs) {
       if (t.kind !== 'queue') continue
-      for (const m of t.peeks) {
+      for (const m of peeksByTab[t.id] ?? []) {
         const haystack = `${m.payload}\n${m.routingKey}\n${m.exchange}\n${JSON.stringify(
           m.headers
         )}\n${JSON.stringify(m.properties)}`
@@ -79,7 +81,7 @@ function SearchModal() {
     }
     all.sort((a, b) => b.msg.observedAt - a.msg.observedAt)
     return all
-  }, [tabs])
+  }, [tabs, peeksByTab])
 
   const { matches, error } = useMemo<{ matches: SearchRow[]; error: string | null }>(() => {
     const q = query.trim()

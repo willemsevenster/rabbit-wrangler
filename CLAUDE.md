@@ -11,12 +11,14 @@ TypeScript.
 
 ## Commands
 
-This project uses **pnpm** (not npm/yarn). Build scripts for `electron` and
-`esbuild` are allow-listed in `pnpm-workspace.yaml` — pnpm blocks postinstall
-scripts by default, and Electron needs its to download the binary.
+This project uses **pnpm** (not npm/yarn). Build scripts for `esbuild` and
+`electron-winstaller` are allow-listed under `allowBuilds` in
+`pnpm-workspace.yaml` — pnpm blocks postinstall scripts by default. Electron
+(≥ 45) has no install script: it downloads its binary lazily on first use
+(`pnpm dev`, the driver, or `node node_modules/electron/install.js`).
 
 ```sh
-pnpm install         # also downloads the Electron binary via allowed build scripts
+pnpm install         # runs the allow-listed build scripts (esbuild, electron-winstaller)
 pnpm dev             # launch app with HMR (electron-vite dev)
 pnpm build           # typecheck + bundle all three targets to out/
 pnpm typecheck       # both projects: typecheck:node + typecheck:web
@@ -35,7 +37,7 @@ pnpm build:win       # package installer via electron-builder (also :mac / :linu
   `.claude/skills/run-rabbit-wrangler/driver.mjs`.
 - **Docs site** (`docs/`, VitePress) is an **isolated pnpm project** — its own
   `package.json` + `pnpm-lock.yaml` + `pnpm-workspace.yaml`, so VitePress's Vite 5 /
-  esbuild never enters the app's tree (the app caps Vite at 7). Run it via the root
+  esbuild never enters the app's tree (the app is on Vite 8 / Rolldown). Run it via the root
   proxy scripts: `pnpm docs:install` (first time; uses `--ignore-scripts` — esbuild's
   binary ships via its optional dep), then `pnpm docs:dev` / `docs:build` / `docs:preview`.
   ESLint ignores `docs/`. The site auto-deploys to GitHub Pages on push to `main`
@@ -68,11 +70,19 @@ This is the central design decision and spans `src/shared/ipc.ts`,
 2. **WebSocket = the event firehose (server push).** Peeked messages arrive at
    high frequency, so they bypass IPC. Main runs a localhost `WebSocketServer`
    (`websocket-server.ts`) on an **ephemeral 127.0.0.1 port**; the renderer
-   fetches that port via the `events:port` IPC call, then connects. Anything
-   main wants to push is a `StreamEvent` (discriminated union in `ipc.ts`):
-   producers call `eventBus.emitStream(...)`, the WS server is the sole
-   subscriber and broadcasts to clients. In the renderer, `EventSocket` decodes
-   frames and the zustand store's `applyStreamEvent` reducer folds them in.
+   fetches `{ port, token }` via the `events:endpoint` IPC call, then connects
+   presenting the **per-launch token** as a `rw-token.<token>` subprotocol. The
+   server's `verifyClient` rejects a missing/wrong token or a foreign Origin
+   (only `file://` or the dev server's origin), because the stream carries
+   message payloads and any local process — or a browser page — can reach
+   127.0.0.1. Anything main wants to push is a `StreamEvent` (discriminated union
+   in `ipc.ts`): producers call `eventBus.emitStream(...)`, the WS server is the
+   sole subscriber and broadcasts to clients. In the renderer, `EventSocket`
+   decodes frames and delivers them **batched once per animation frame** to the
+   store's `applyStreamEvents`, which folds all of a frame's peeks in with one
+   update. Peek buffers live in `peeksByTab` (keyed by queue tab id), **not** on
+   the tab objects, so a peek re-renders only that tab's (virtualized,
+   `@tanstack/react-virtual`) message table — not the tab strip, menus or search.
 
 ### Two RabbitMQ transports per cluster
 
@@ -427,34 +437,54 @@ Key behavior below.
 - **Path aliases** (`@shared/*`, `@renderer/*`) are declared in **two places** —
   `electron.vite.config.ts` (for bundling) and the tsconfigs (for typecheck).
   Update both or builds and typecheck disagree.
-- **Module format**: the project is **ESM** (`"type": "module"`). Consequences:
-  main uses `import.meta.dirname` (not `__dirname`), and electron-vite emits the
-  preload as **`out/preload/index.mjs`** — the `BrowserWindow` `preload:` path in
-  `src/main/index.ts` must use the `.mjs` extension or Electron won't find it.
+- **Module format**: the project is **ESM** (`"type": "module"`), so main uses
+  `import.meta.dirname` (not `__dirname`). The **preload is the exception**: the
+  window runs with `sandbox: true`, and a sandboxed preload must be a single
+  **CommonJS** file that requires nothing but `electron`. `electron.vite.config.ts`
+  builds it as `format: 'cjs'` → **`out/preload/index.cjs`**, and the
+  `BrowserWindow` `preload:` path in `src/main/index.ts` must match. Don't import
+  npm packages into the preload (they can't be `require`d in the sandbox).
   `externalizeDepsPlugin` keeps `dependencies` external for main/preload (Node
   resolves them at runtime — hence `node-linker=hoisted` in `.npmrc`); the
   renderer bundles everything.
 - **Dependency version ceilings** (don't blindly `pnpm up --latest` past these —
   the chain breaks):
-  - `vite` is capped at **7.x** by `electron-vite` 5 (its peer is `vite <8`).
-  - `@vitejs/plugin-react` is capped at **5.x** because 6.x requires Vite 8.
-  - `eslint` is capped at **9.x** because `eslint-plugin-react` (latest 7.37)
-    crashes on ESLint 10 (removed context API). Revisit when that plugin ships
-    ESLint 10 support.
+  - `eslint` / `@eslint/js` are capped at **9.x** because `eslint-plugin-react`
+    (latest 7.37, peer `eslint ^9.7`) crashes on ESLint 10 (removed context API).
+    Revisit when that plugin ships ESLint 10 support.
+  - `typescript` is capped at **6.x** because `typescript-eslint` 8 peers on
+    `typescript <6.1`. Revisit for TypeScript 7 when typescript-eslint supports it.
+  - `@types/node` should track the **Node bundled in Electron** (Electron 45 →
+    Node 24), not the latest `@types/node` major.
+  - `@vscode/codicons`'s `latest` dist-tag points at a prerelease (`0.0.46-NN`);
+    stay on the last stable until a real `0.0.46` ships.
   - `amqplib` 2.x ships its **own** types — there is no `@types/amqplib` (adding
     it back will conflict).
-  - pnpm blocks dependency build scripts by default; `electron`, `esbuild`, and
-    `electron-winstaller` are allow-listed in `pnpm-workspace.yaml`. A new dep
-    that needs a postinstall (e.g. a native module) must be added there.
+  - **Electron 45 removed `clipboard` from renderer/preload** — importing it in
+    the preload makes the whole preload fail to load (`window.api` undefined).
+    Clipboard writes go through main (`IPC.copyText`). Run the driver after any
+    Electron major bump: a broken preload still passes typecheck + build.
+  - **monaco-editor ≥ 0.57** has an `exports` map: import workers as
+    `monaco-editor/editor/editor.worker?worker`, not `monaco-editor/esm/vs/...`.
+  - pnpm blocks dependency build scripts by default; `esbuild` and
+    `electron-winstaller` are allow-listed under `allowBuilds` in
+    `pnpm-workspace.yaml`. A new dep that needs a postinstall (e.g. a native
+    module) must be added there.
 - The preload's `contextIsolation: false` fallback branch references `window`,
-  which isn't in the node typecheck lib — hence the `@ts-expect-error` lines.
+  which isn't in the node typecheck lib — hence the `@ts-expect-error` line.
   That branch is dead in this app (isolation is on); don't "fix" it by removing
-  the suppressions.
+  the suppression. The preload exposes **only** `window.api` — never raw
+  `ipcRenderer` (the old `window.electron` toolkit bridge was removed).
 - **App icon**: the source of truth is `build/icon.svg`. Regenerate the raster
   with `node_modules/.bin/electron scripts/generate-icon.mjs` → `build/icon.png`
   (512×512; the script uses Electron's offscreen renderer with HW accel disabled
   to dodge `UnknownVizError`). electron-builder derives the platform `.ico`/`.icns`
   from `build/icon.png`; the dev `BrowserWindow` sets `icon` to it directly.
-- **Security**: `contextIsolation` is on; `src/renderer/index.html` sets a CSP
-  that only allows `connect-src` to self and `ws://127.0.0.1:*`. Widen it
-  deliberately if you add outbound calls from the renderer.
+- **Security**: `contextIsolation` and `sandbox` are on; `src/renderer/index.html`
+  sets a CSP that only allows `connect-src` to self and `ws://127.0.0.1:*`. Widen
+  it deliberately if you add outbound calls from the renderer. `window.open`
+  (Help links, Ctrl+click on a link in a Monaco payload) goes through
+  `setWindowOpenHandler`, which passes **only `https:`** URLs to
+  `shell.openExternal` — message payloads are untrusted, so `file://`, UNC and
+  custom-protocol links are dropped — and `will-navigate` blocks the window from
+  navigating away from the app.

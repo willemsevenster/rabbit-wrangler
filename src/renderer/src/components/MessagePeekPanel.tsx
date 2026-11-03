@@ -1,4 +1,5 @@
 import { useRef, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent } from 'react'
+import { useVirtualizer } from '@tanstack/react-virtual'
 import { useAppStore, type EditorTab } from '../store/app-store'
 import { ContextMenu, useContextMenu, type MenuItem } from './ContextMenu'
 import { MessageDetail } from './MessageDetail'
@@ -6,6 +7,10 @@ import { byteSize, formatBytes } from '../lib/message-format'
 import type { PeekedMessage } from '@shared/types'
 
 type QueueTab = Extract<EditorTab, { kind: 'queue' }>
+
+const NO_PEEKS: PeekedMessage[] = []
+/** Estimated row height (px) for the virtualizer; rows are measured once rendered. */
+const ROW_HEIGHT = 25
 
 function menuFor(m: PeekedMessage): MenuItem[] {
   let prettyJson: string | null = null
@@ -39,17 +44,36 @@ function menuFor(m: PeekedMessage): MenuItem[] {
 /**
  * Live tail of messages flowing through one queue tab, shown as a table.
  * Selecting a row opens its details + payload (read-only Monaco) in a resizable
- * pane below. Buffer + selection live on the tab (in the store), so the view
+ * pane below. Buffer (`peeksByTab`) + selection live in the store, so the view
  * keeps its context when you switch tabs and away while it peeks in the background.
+ * Rows are virtualized — only the visible slice of a (up to 9,999-row) buffer is
+ * in the DOM.
  */
 export function MessagePeekPanel({ tab }: { tab: QueueTab }) {
-  const peeks = tab.peeks
+  const peeks = useAppStore((s) => s.peeksByTab[tab.id] ?? NO_PEEKS)
   const selectedId = tab.selectedMessageId
   const paneHeight = useAppStore((s) => s.peekPaneHeight)
   const setPaneHeight = useAppStore((s) => s.setPeekPaneHeight)
   const selectMessage = useAppStore((s) => s.selectTabMessage)
   const { menu, openMenu, close } = useContextMenu()
   const peekRef = useRef<HTMLDivElement>(null)
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const virtualizer = useVirtualizer({
+    count: peeks.length,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: () => ROW_HEIGHT,
+    getItemKey: (i) => peeks[i].id,
+    overscan: 12
+  })
+  const rows = virtualizer.getVirtualItems()
+  const padTop = rows.length > 0 ? rows[0].start : 0
+  const padBottom = rows.length > 0 ? virtualizer.getTotalSize() - rows[rows.length - 1].end : 0
+  // The roving tab stop is the selected row (or row 0). When virtualization has
+  // scrolled it out of the DOM, the scroll wrapper itself takes the tab stop so
+  // keyboard users can still reach the table's arrow/Home/End handling.
+  const tabStopRendered = rows.some(({ index }) =>
+    selectedId == null ? index === 0 : peeks[index].id === selectedId
+  )
 
   const openMoveDialog = useAppStore((s) => s.openMoveDialog)
   const deleteMessage = useAppStore((s) => s.deleteMessage)
@@ -123,9 +147,12 @@ export function MessagePeekPanel({ tab }: { tab: QueueTab }) {
     const m = peeks[next]
     if (!m) return
     setSelectedId(m.id)
-    const el = peekRef.current?.querySelector<HTMLElement>(`[data-msg-id="${CSS.escape(m.id)}"]`)
-    el?.focus()
-    el?.scrollIntoView({ block: 'nearest' })
+    // The target row may be outside the rendered window: scroll it in, then focus
+    // it once the virtualizer has rendered it.
+    virtualizer.scrollToIndex(next, { align: 'auto' })
+    requestAnimationFrame(() =>
+      peekRef.current?.querySelector<HTMLElement>(`[data-msg-id="${CSS.escape(m.id)}"]`)?.focus()
+    )
   }
 
   function onResizeMouseDown(e: MouseEvent) {
@@ -152,7 +179,12 @@ export function MessagePeekPanel({ tab }: { tab: QueueTab }) {
         {canMutate ? 'live · de-duplicated · non-destructive' : 'HTTP browse · polled · read-only'}
       </div>
 
-      <div className="peek__table-wrap" onKeyDown={onTableKeyDown}>
+      <div
+        className="peek__table-wrap"
+        ref={scrollRef}
+        tabIndex={peeks.length > 0 && !tabStopRendered ? 0 : -1}
+        onKeyDown={onTableKeyDown}
+      >
         <table className="msg-table">
           <thead>
             <tr>
@@ -163,26 +195,39 @@ export function MessagePeekPanel({ tab }: { tab: QueueTab }) {
             </tr>
           </thead>
           <tbody>
-            {peeks.map((m, i) => (
-              <tr
-                key={m.id}
-                className={selectedId === m.id ? 'is-selected' : ''}
-                data-msg-id={m.id}
-                aria-selected={selectedId === m.id}
-                tabIndex={selectedId === m.id || (selectedId == null && i === 0) ? 0 : -1}
-                onClick={() => setSelectedId(m.id)}
-                onContextMenu={(e) => openMenu(e, messageMenu(m))}
-              >
-                <td>
-                  <span className="msg-table__rk">{m.routingKey || '(none)'}</span>
-                  {m.redelivered && <span className="badge">redelivered</span>}
-                  {m.isBinary && <span className="badge">binary</span>}
-                </td>
-                <td className="msg-table__muted">{m.exchange || '(default)'}</td>
-                <td className="num">{formatBytes(byteSize(m))}</td>
-                <td className="msg-table__muted">{new Date(m.observedAt).toLocaleTimeString()}</td>
-              </tr>
-            ))}
+            {padTop > 0 && (
+              <tr className="msg-table__spacer" aria-hidden style={{ height: padTop }} />
+            )}
+            {rows.map(({ index: i, key }) => {
+              const m = peeks[i]
+              return (
+                <tr
+                  key={key}
+                  ref={virtualizer.measureElement}
+                  data-index={i}
+                  className={selectedId === m.id ? 'is-selected' : ''}
+                  data-msg-id={m.id}
+                  aria-selected={selectedId === m.id}
+                  tabIndex={selectedId === m.id || (selectedId == null && i === 0) ? 0 : -1}
+                  onClick={() => setSelectedId(m.id)}
+                  onContextMenu={(e) => openMenu(e, messageMenu(m))}
+                >
+                  <td>
+                    <span className="msg-table__rk">{m.routingKey || '(none)'}</span>
+                    {m.redelivered && <span className="badge">redelivered</span>}
+                    {m.isBinary && <span className="badge">binary</span>}
+                  </td>
+                  <td className="msg-table__muted">{m.exchange || '(default)'}</td>
+                  <td className="num">{formatBytes(byteSize(m))}</td>
+                  <td className="msg-table__muted">
+                    {new Date(m.observedAt).toLocaleTimeString()}
+                  </td>
+                </tr>
+              )
+            })}
+            {padBottom > 0 && (
+              <tr className="msg-table__spacer" aria-hidden style={{ height: padBottom }} />
+            )}
           </tbody>
         </table>
         {peeks.length === 0 && <div className="placeholder">Waiting for messages…</div>}

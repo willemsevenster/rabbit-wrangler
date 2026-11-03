@@ -14,9 +14,9 @@ on **Windows** (PowerShell + Git bash); see Gotchas for the headless-Linux tweak
 
 ## Prerequisites
 
-- Node 20+ and pnpm (this repo uses pnpm — see the user's standing preference).
+- Node 22.12+ (required by Electron 45) and pnpm (this repo uses pnpm — see the user's standing preference).
 - `pnpm install` — also runs the allow-listed build scripts in
-  `pnpm-workspace.yaml` (downloads the Electron binary) and installs
+  `pnpm-workspace.yaml` (Electron ≥ 45 fetches its binary lazily on first launch) and installs
   `playwright-core`, which the driver uses.
 
 ```sh
@@ -44,7 +44,7 @@ $cmds = @"
 launch
 ss launch
 text .titlebar__title
-eval window.api.getEventStreamPort()
+eval window.api.getEventStreamEndpoint()
 windows
 quit
 "@
@@ -58,9 +58,9 @@ printf 'launch\nss bash-test\ntext .titlebar__title\nquit\n' | node .claude/skil
 ```
 
 Expected: `launched: 🐰 Rabbit Wrangler`, a `screenshot: …` path, and
-`eval window.api.getEventStreamPort()` prints a port number — that single line
-proves the `.mjs` preload bridge loaded **and** the main-process WebSocket
-server answered over IPC. Screenshots land in
+`eval window.api.getEventStreamEndpoint()` prints `{ port, token }` — that
+single line proves the sandboxed `.cjs` preload bridge loaded **and** the
+main-process WebSocket server answered over IPC. Screenshots land in
 `.claude/skills/run-rabbit-wrangler/shots/` (override with `SCREENSHOT_DIR`).
 
 Example — drive the add-connection flow (no broker needed; cleans up after):
@@ -126,10 +126,11 @@ quit.
   driver can only reach the app shell.
 - **Driver runs `out/`, not the dev server.** Re-run `pnpm build` after changing
   source or you'll screenshot the old bundle.
-- **Preload is `out/preload/index.mjs`** (electron-vite emits ESM preload as
-  `.mjs`). `src/main/index.ts` references the `.mjs` path on purpose — if the
-  bridge ever comes back undefined, that path is the first suspect. Don't
-  "correct" it to `.js`.
+- **Preload is `out/preload/index.cjs`** (built as CommonJS on purpose: the
+  window is sandboxed, and a sandboxed preload can't be ESM or `require` npm
+  packages). If the bridge ever comes back undefined, check that path in
+  `src/main/index.ts` and that the preload imports nothing but `electron` /
+  `@shared`.
 - **Headless Linux:** prefix the `node …driver.mjs` calls with `xvfb-run -a` and
   install the usual Electron libs (`libnss3 libgbm1 libasound2 libgtk-3-0
   libxss1 libxkbcommon0`). Not verified on this machine (Windows only).
@@ -138,8 +139,8 @@ quit.
 
 - **`launch` hangs / `firstWindow` times out** → the main process crashed on
   boot. Re-run `pnpm build`; confirm `out/main/index.js` and
-  `out/preload/index.mjs` both exist.
+  `out/preload/index.cjs` both exist.
 - **`eval window.api...` prints `null`/errors** → preload didn't load; check the
-  `.mjs` preload path in `src/main/index.ts`.
+  `.cjs` preload path in `src/main/index.ts`.
 - **Driver exits 1 with no screenshot** → `pnpm build` didn't produce `out/`; run
   it and read its output.

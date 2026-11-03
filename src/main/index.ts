@@ -34,8 +34,9 @@ function createWindow(): void {
     // theme change via the persistTheme IPC handler). macOS uses traffic lights.
     titleBarOverlay: process.platform === 'darwin' ? false : startupTitleBarOverlay(),
     webPreferences: {
-      preload: join(import.meta.dirname, '../preload/index.mjs'),
-      sandbox: false,
+      // CommonJS on purpose: a sandboxed preload can't be an ES module.
+      preload: join(import.meta.dirname, '../preload/index.cjs'),
+      sandbox: true,
       contextIsolation: true
     }
   })
@@ -48,9 +49,17 @@ function createWindow(): void {
 
   mainWindow.on('ready-to-show', () => mainWindow.show())
 
+  // window.open (Help links, Ctrl+click on a link in a Monaco payload) never opens
+  // an Electron window. Only https:// URLs go to the OS browser — a message
+  // payload is untrusted, and file://, UNC or custom-protocol links must not be
+  // launched from it.
   mainWindow.webContents.setWindowOpenHandler((details) => {
-    shell.openExternal(details.url)
+    if (isExternalSafe(details.url)) void shell.openExternal(details.url)
     return { action: 'deny' }
+  })
+  // The app is a single page; never let the window itself navigate elsewhere.
+  mainWindow.webContents.on('will-navigate', (event, url) => {
+    if (url !== mainWindow.webContents.getURL()) event.preventDefault()
   })
 
   // electron-vite injects the dev server URL in development and the built
@@ -59,6 +68,14 @@ function createWindow(): void {
     mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
   } else {
     mainWindow.loadFile(join(import.meta.dirname, '../renderer/index.html'))
+  }
+}
+
+function isExternalSafe(url: string): boolean {
+  try {
+    return new URL(url).protocol === 'https:'
+  } catch {
+    return false
   }
 }
 
