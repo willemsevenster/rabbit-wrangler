@@ -687,6 +687,30 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   async setBrowseMode(id, mode) {
     const name = get().connections.find((c) => c.id === id)?.name ?? 'broker'
+    const prevTransport = get().statuses[id]?.transport
+    const before = get().peeksByTab
+    const ownTab = (t: EditorTab): boolean => t.kind === 'queue' && t.connectionId === id
+    // A transport change makes each open queue tab's buffer stale. Clear it BEFORE
+    // asking main to switch: main restarts the browsers and the new ones emit the
+    // head window before the IPC call returns — a reset afterwards would wipe (and
+    // reject) those events, and the new browser's de-dup would never resend them.
+    set({
+      tabs: get().tabs.map((t) => (ownTab(t) ? { ...t, unread: 0, selectedMessageId: null } : t)),
+      peeksByTab: clearBuffers(get, ownTab)
+    })
+    // If the browsers did NOT restart (transport unchanged, or the switch failed),
+    // nothing will re-surface the head window — put the old messages back behind
+    // anything that arrived since.
+    const restoreBuffers = (): void => {
+      const now = get().peeksByTab
+      const restored = { ...now }
+      for (const t of get().tabs) {
+        if (ownTab(t) && before[t.id]) {
+          restored[t.id] = [...(now[t.id] ?? []), ...before[t.id]].slice(0, get().maxMessages)
+        }
+      }
+      set({ peeksByTab: restored })
+    }
     try {
       // main switches transport live (restarting any active peekers) and returns
       // the resolved runtime.
@@ -701,21 +725,15 @@ export const useAppStore = create<AppState>((set, get) => ({
             amqpAvailable: rt.amqpAvailable,
             transport: rt.transport
           }
-        },
-        // The transport changed, so each open queue tab's buffer is stale — clear
-        // it; the restarted browser re-surfaces the head window.
-        tabs: get().tabs.map((t) =>
-          t.kind === 'queue' && t.connectionId === id
-            ? { ...t, unread: 0, selectedMessageId: null }
-            : t
-        ),
-        peeksByTab: clearBuffers(get, (t) => t.connectionId === id)
+        }
       })
+      if (rt.transport === prevTransport) restoreBuffers()
       get().addToast(
         'success',
         `"${name}" is now using ${rt.transport === 'http' ? 'HTTP browse' : 'AMQP'} mode.`
       )
     } catch (e) {
+      restoreBuffers()
       get().addToast('error', `Could not switch mode: ${e instanceof Error ? e.message : String(e)}`)
     }
   },
