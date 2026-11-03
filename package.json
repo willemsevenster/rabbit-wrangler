@@ -7,6 +7,9 @@
   "license": "MIT",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": ">=22.12.0"
+  },
   "scripts": {
     "format": "prettier --write .",
     "lint": "eslint . --cache",
