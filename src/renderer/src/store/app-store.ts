@@ -733,7 +733,11 @@ export const useAppStore = create<AppState>((set, get) => ({
         `"${name}" is now using ${rt.transport === 'http' ? 'HTTP browse' : 'AMQP'} mode.`
       )
     } catch (e) {
-      restoreBuffers()
+      // Restore only if main really stayed on the old transport: if it switched
+      // (and restarted browsers) before failing, those re-surface the head
+      // window, and old + new copies would duplicate rows.
+      const rt = await window.api.getConnectionRuntime(id).catch(() => null)
+      if (!rt || rt.transport === prevTransport) restoreBuffers()
       get().addToast('error', `Could not switch mode: ${e instanceof Error ? e.message : String(e)}`)
     }
   },

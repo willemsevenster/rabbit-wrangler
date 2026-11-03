@@ -164,11 +164,27 @@ export class ClusterConnection {
     this.browseMode = mode
     const next = this.resolveTransport()
     if (next !== this.transport) {
-      const active = [...this.peekers.keys()]
-      await Promise.all([...this.peekers.values()].map((p) => p.stop()))
-      this.peekers.clear()
+      // Stop the current browsers through each queue's start/stop chain (so we
+      // don't race a start/stop in flight), keeping `wantedPeeks` intact.
+      await Promise.all(
+        [...this.peekers.keys()].map((queue) =>
+          this.serialize(queue, async () => {
+            const browser = this.peekers.get(queue)
+            if (!browser) return
+            this.peekers.delete(queue)
+            await browser.stop()
+          })
+        )
+      )
       this.transport = next
-      for (const queue of active) await this.startPeek(queue)
+      // Restart every wanted queue in the new transport. One that can't restart
+      // (e.g. deleted meanwhile) just isn't peeked — it must not abort the switch
+      // and leave the others half-switched with the IPC call reporting failure.
+      await Promise.all(
+        [...this.wantedPeeks].map((queue) =>
+          this.startPeek(queue, { onlyIfWanted: true }).catch(() => undefined)
+        )
+      )
     }
     // Re-broadcast the (possibly) new transport without changing the actual
     // connection state — never force it to 'connected'.
