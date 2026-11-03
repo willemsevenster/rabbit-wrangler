@@ -70,8 +70,8 @@ export function AdministrationView({ tab }: { tab: AdminTab }) {
             </p>
             <p style={{ color: 'var(--text-muted)' }}>
               You’re connected as “{currentUser.name}”
-              {currentUser.tags.length ? ` (${currentUser.tags.join(', ')})` : ' (no tags)'}. Connect
-              with an administrator user to manage users, virtual hosts and permissions.
+              {currentUser.tags.length ? ` (${currentUser.tags.join(', ')})` : ' (no tags)'}.
+              Connect with an administrator user to manage users, virtual hosts and permissions.
             </p>
           </div>
         </div>
@@ -94,7 +94,11 @@ export function AdministrationView({ tab }: { tab: AdminTab }) {
             </div>
           )}
           <div className="editor__body" style={{ padding: 16, overflow: 'auto' }}>
-            {error && <div className="modal__error" style={{ marginBottom: 12 }}>{error}</div>}
+            {error && (
+              <div className="modal__error" style={{ marginBottom: 12 }}>
+                {error}
+              </div>
+            )}
             {tab.section === 'users' && <UsersSection tab={tab} />}
             {tab.section === 'vhosts' && <VhostsSection tab={tab} />}
             {tab.section === 'permissions' && <PermissionsSection tab={tab} />}

@@ -310,7 +310,9 @@ function QueueTab({ tab }: { tab: Extract<EditorTab, { kind: 'queue' }> }) {
     s.queuesByConn[tab.connectionId]?.find((q) => q.name === tab.queue)
   )
   // HTTP browse mode is read-only — Move needs the AMQP port.
-  const httpOnly = useAppStore((s) => (s.statuses[tab.connectionId]?.transport ?? 'amqp') === 'http')
+  const httpOnly = useAppStore(
+    (s) => (s.statuses[tab.connectionId]?.transport ?? 'amqp') === 'http'
+  )
 
   async function purge() {
     const ok = await maybeConfirm({
@@ -422,7 +424,10 @@ function Welcome() {
         <p>Peek messages, move dead-letters and purge queues across your RabbitMQ clusters.</p>
         <p>Add a connection to get started.</p>
         <button className="btn" onClick={openNew} style={{ marginTop: 8 }}>
-          <span className="codicon codicon-add" style={{ marginRight: 6, verticalAlign: 'middle' }} />
+          <span
+            className="codicon codicon-add"
+            style={{ marginRight: 6, verticalAlign: 'middle' }}
+          />
           Add Connection
         </button>
       </div>

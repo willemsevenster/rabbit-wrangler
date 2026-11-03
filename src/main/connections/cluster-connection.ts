@@ -4,7 +4,12 @@ import { ManagementApi } from '../rabbitmq/management-api'
 import { MessagePeeker } from '../rabbitmq/message-peeker'
 import { HttpBrowser } from '../rabbitmq/http-browser'
 import { deleteMessage, exportMessages, moveMessage, moveMessages } from '../rabbitmq/operations'
-import { buildAmqpUrl, connectAmqp, probeAmqpReachable, type AmqpConnection } from '../rabbitmq/amqp'
+import {
+  buildAmqpUrl,
+  connectAmqp,
+  probeAmqpReachable,
+  type AmqpConnection
+} from '../rabbitmq/amqp'
 import type {
   BindingInfo,
   BrowseMode,
@@ -53,8 +58,7 @@ import { clampPeekWindow, PEEK_WINDOW } from '@shared/types'
 type QueueBrowser = MessagePeeker | HttpBrowser
 
 /** Surfaced when an AMQP-only message operation is attempted in HTTP browse mode. */
-const HTTP_ONLY_ERROR =
-  'This action needs the AMQP port, which is unavailable in HTTP browse mode.'
+const HTTP_ONLY_ERROR = 'This action needs the AMQP port, which is unavailable in HTTP browse mode.'
 
 /**
  * One live connection to a single RabbitMQ cluster. Owns both transports for
@@ -480,10 +484,7 @@ export class ClusterConnection {
   /** Start peeking a queue (no-op if already live). `onlyIfWanted` is for resume:
    * skip it if a stopPeek queued ahead of us means the tab has since closed. A
    * restart without a `window` (resume, transport switch) keeps the last one. */
-  startPeek(
-    queue: string,
-    opts: { onlyIfWanted?: boolean; window?: number } = {}
-  ): Promise<void> {
+  startPeek(queue: string, opts: { onlyIfWanted?: boolean; window?: number } = {}): Promise<void> {
     return this.serialize(queue, async () => {
       if (opts.onlyIfWanted && !this.wantedPeeks.has(queue)) return
       const window = clampPeekWindow(

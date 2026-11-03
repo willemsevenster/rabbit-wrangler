@@ -164,7 +164,9 @@ select:-webkit-autofill {
   -webkit-text-fill-color: var(--input-fg);
   caret-color: var(--input-fg);
   border-color: var(--input-border);
-  transition: background-color 600000s 0s, color 600000s 0s;
+  transition:
+    background-color 600000s 0s,
+    color 600000s 0s;
 }
 
 code {
@@ -218,6 +220,10 @@ code {
   align-items: center;
   gap: 8px;
   height: 100%;
+  /* Positioned so z-index applies: the menu must paint above the absolutely
+   * positioned title, because Chromium builds the window drag regions in paint
+   * order and a drag region on top swallows clicks on the menu. */
+  position: relative;
   z-index: 1;
   -webkit-app-region: no-drag;
 }
@@ -226,11 +232,14 @@ code {
   font-size: 14px;
 }
 
+/* Centered on the bar but only as wide as its text, so its (inherited) drag
+ * region never spans the menu. `pointer-events: none` doesn't help here — drag
+ * regions are hit-tested by the OS, not the page. */
 .titlebar__title {
   position: absolute;
-  left: 0;
-  right: 0;
-  text-align: center;
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
   pointer-events: none;
   color: var(--text-muted);
 }

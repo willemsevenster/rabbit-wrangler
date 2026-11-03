@@ -12,7 +12,11 @@ export function ExchangeDiagram({
   bindings: BindingInfo[]
 }) {
   if (bindings.length === 0) {
-    return <div className="placeholder" style={{ padding: 0 }}>No bindings to diagram.</div>
+    return (
+      <div className="placeholder" style={{ padding: 0 }}>
+        No bindings to diagram.
+      </div>
+    )
   }
 
   const shown = bindings.slice(0, MAX)

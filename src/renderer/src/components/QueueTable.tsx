@@ -42,31 +42,34 @@ export function QueueTable({ connectionId }: { connectionId: string }) {
           {queues.map((q) => {
             const isDeadLetter = isDeadLetterQueue(q.name, dlqSuffixes)
             return (
-            <tr
-              key={q.name}
-              data-queue-row={q.name}
-              onClick={() => openQueueTab(connectionId, q.name)}
-              onContextMenu={(e) => openMenu(e, buildQueueMenu(connectionId, q))}
-            >
-              <td>
-                <span
-                  className="codicon codicon-inbox"
-                  style={{ marginRight: 6, color: isDeadLetter ? 'var(--warning)' : 'var(--text-muted)' }}
-                />
-                {q.name}
-                {isDeadLetter && (
-                  <span className="badge badge--dlq" style={{ marginLeft: 6 }}>
-                    DLQ
-                  </span>
-                )}
-              </td>
-              <td className="num">{q.messagesReady}</td>
-              <td className="num">{q.messagesUnacknowledged}</td>
-              <td className="num">{q.consumers}</td>
-              <td className="num">{depthRate(q.messageRate)}</td>
-              <td className="num">{q.memory != null ? formatBytes(q.memory) : '—'}</td>
-              <td>{q.state}</td>
-            </tr>
+              <tr
+                key={q.name}
+                data-queue-row={q.name}
+                onClick={() => openQueueTab(connectionId, q.name)}
+                onContextMenu={(e) => openMenu(e, buildQueueMenu(connectionId, q))}
+              >
+                <td>
+                  <span
+                    className="codicon codicon-inbox"
+                    style={{
+                      marginRight: 6,
+                      color: isDeadLetter ? 'var(--warning)' : 'var(--text-muted)'
+                    }}
+                  />
+                  {q.name}
+                  {isDeadLetter && (
+                    <span className="badge badge--dlq" style={{ marginLeft: 6 }}>
+                      DLQ
+                    </span>
+                  )}
+                </td>
+                <td className="num">{q.messagesReady}</td>
+                <td className="num">{q.messagesUnacknowledged}</td>
+                <td className="num">{q.consumers}</td>
+                <td className="num">{depthRate(q.messageRate)}</td>
+                <td className="num">{q.memory != null ? formatBytes(q.memory) : '—'}</td>
+                <td>{q.state}</td>
+              </tr>
             )
           })}
           {queues.length === 0 && (

@@ -107,7 +107,9 @@ export function ImportConnectionsDialog() {
                       className="pub-input import-row__action"
                       value={actions[i]}
                       onChange={(e) =>
-                        setActions((a) => a.map((v, j) => (j === i ? (e.target.value as Action) : v)))
+                        setActions((a) =>
+                          a.map((v, j) => (j === i ? (e.target.value as Action) : v))
+                        )
                       }
                     >
                       <option value="new">Import as new</option>

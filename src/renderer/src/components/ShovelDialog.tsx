@@ -39,7 +39,9 @@ export function ShovelDialog() {
     void window.api
       .getShovelSupport(connectionId)
       .then((s) => alive && setSupport(s))
-      .catch(() => alive && setSupport({ supported: false, reason: 'Could not check shovel support.' }))
+      .catch(
+        () => alive && setSupport({ supported: false, reason: 'Could not check shovel support.' })
+      )
     return () => {
       alive = false
     }

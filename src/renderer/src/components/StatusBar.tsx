@@ -26,9 +26,7 @@ export function StatusBar() {
     : 'disconnected'
   const state = effectiveConnectionState(rawState, cluster)
   const httpBrowse =
-    selectedId != null &&
-    rawState === 'connected' &&
-    statuses[selectedId]?.transport === 'http'
+    selectedId != null && rawState === 'connected' && statuses[selectedId]?.transport === 'http'
   const totalMessages = queues.reduce((acc, q) => acc + q.messages, 0)
   const memAlarm = cluster?.nodes.some((n) => n.memAlarm) ?? false
   const diskAlarm = cluster?.nodes.some((n) => n.diskFreeAlarm) ?? false
@@ -48,7 +46,10 @@ export function StatusBar() {
         {conn ? `${conn.name} · ${state}` : 'No cluster selected'}
       </span>
       {alarmLabel && (
-        <span className="statusbar__item statusbar__item--alarm" title="A broker node has tripped a resource alarm; publishers are blocked.">
+        <span
+          className="statusbar__item statusbar__item--alarm"
+          title="A broker node has tripped a resource alarm; publishers are blocked."
+        >
           <span className="codicon codicon-warning" />
           {alarmLabel}
         </span>
